@@ -1,0 +1,23 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Railway
+.railway/

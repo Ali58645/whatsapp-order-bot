@@ -1,0 +1,31 @@
+{
+  "shop_name": "Demo Burger Point",
+  "delivery_fee": 100,
+  "delivery_area": "Within 5 km of Johar Town, Lahore",
+  "categories": [
+    {
+      "name": "Burgers",
+      "items": [
+        {"name": "Zinger Burger", "price": 450},
+        {"name": "Chicken Patty Burger", "price": 300},
+        {"name": "Double Decker", "price": 650}
+      ]
+    },
+    {
+      "name": "Shawarma",
+      "items": [
+        {"name": "Chicken Shawarma", "price": 250},
+        {"name": "Zinger Shawarma", "price": 350},
+        {"name": "Shawarma Platter", "price": 550}
+      ]
+    },
+    {
+      "name": "Sides & Drinks",
+      "items": [
+        {"name": "Fries", "price": 200},
+        {"name": "Loaded Fries", "price": 400},
+        {"name": "Soft Drink (500ml)", "price": 120}
+      ]
+    }
+  ]
+}
