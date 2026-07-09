@@ -4,14 +4,13 @@ Deploy target: Railway. Set env vars from .env.example before running.
 """
 
 import os
-import json
 import logging
 import httpx
 from fastapi import FastAPI, Request, Response, HTTPException
 from anthropic import AsyncAnthropic
 
 from app.menu import load_menu, menu_as_text
-from app.sessions import get_session, save_session, clear_session
+from app.sessions import get_session, save_session, clear_session, get_sender_lock
 from app.orders import detect_confirmed_order, forward_order_to_owner
 
 logging.basicConfig(level=logging.INFO)
@@ -95,13 +94,14 @@ async def receive_message(request: Request):
         await send_whatsapp_message(sender, "Order reset. Kya order karna chahenge? Type 'menu' to see the menu.")
         return {"status": "ok"}
 
-    reply = await generate_reply(sender, user_text)
+    async with get_sender_lock(sender):
+        reply = await generate_reply(sender, user_text)
 
-    # If Claude emitted a confirmed order, forward slip to owner and strip the JSON line
-    order, clean_reply = detect_confirmed_order(reply)
-    if order:
-        await forward_order_to_owner(order, sender, OWNER_WHATSAPP, send_whatsapp_message)
-        clear_session(sender)
+        # If Claude emitted a confirmed order, forward slip to owner and strip the JSON line
+        order, clean_reply = detect_confirmed_order(reply)
+        if order:
+            await forward_order_to_owner(order, sender, OWNER_WHATSAPP, send_whatsapp_message)
+            clear_session(sender)
 
     await send_whatsapp_message(sender, clean_reply)
     return {"status": "ok"}
@@ -134,7 +134,7 @@ async def generate_reply(sender: str, user_text: str) -> str:
 # ---------------------------------------------------------------------------
 # Outgoing messages via Meta Graph API
 # ---------------------------------------------------------------------------
-async def send_whatsapp_message(to: str, text: str) -> None:
+async def send_whatsapp_message(to: str, text: str) -> bool:
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
@@ -149,6 +149,8 @@ async def send_whatsapp_message(to: str, text: str) -> None:
         r = await client.post(GRAPH_URL, headers=headers, json=payload)
         if r.status_code >= 400:
             log.error(f"Send failed {r.status_code}: {r.text}")
+            return False
+    return True
 
 
 @app.get("/")
