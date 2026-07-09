@@ -1,5 +1,5 @@
 """
-Smoke tests for the WhatsApp webhook.
+Smoke tests for the WhatsApp webhook — ORDER flow.
 
 No network calls: Graph API (httpx) and Anthropic client are fully mocked.
 Run with: pytest tests/test_webhook.py -v
@@ -79,6 +79,13 @@ def mock_send(monkeypatch):
 
 
 @pytest.fixture()
+def order_mode(monkeypatch):
+    """Force FLOW_MODE=order for tests that exercise the original order flow."""
+    import app.main as main_mod
+    monkeypatch.setattr(main_mod, "FLOW_MODE", "order")
+
+
+@pytest.fixture()
 def mock_claude_ok(monkeypatch):
     """Make AsyncAnthropic.messages.create return a simple reply."""
     import app.main as main_mod
@@ -148,7 +155,7 @@ async def test_post_empty_body_ignored(client, mock_send):
 
 
 @pytest.mark.asyncio
-async def test_post_text_message_sends_reply(client, mock_send, mock_claude_ok):
+async def test_post_text_message_sends_reply(client, mock_send, mock_claude_ok, order_mode):
     """POST text message → 200, send_whatsapp_message called with correct recipient."""
     sender = "923001234567"
     r = await client.post("/webhook", json=_text_payload(sender, "hi"))
@@ -160,7 +167,7 @@ async def test_post_text_message_sends_reply(client, mock_send, mock_claude_ok):
 
 
 @pytest.mark.asyncio
-async def test_post_text_message_claude_error_returns_fallback(client, mock_send, mock_claude_error):
+async def test_post_text_message_claude_error_returns_fallback(client, mock_send, mock_claude_error, order_mode):
     """POST text message when Claude raises → 200, fallback reply sent to sender."""
     sender = "923009999999"
     r = await client.post("/webhook", json=_text_payload(sender, "hello"))
