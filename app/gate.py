@@ -39,6 +39,7 @@ class GateResult:
     message_type: str = "text"
     referral: Optional[dict] = None     # raw referral object if present
     lead_source: Optional[str] = None   # human-readable source label
+    is_status_event: bool = False       # True for delivered/read receipts
 
 
 # ── Mute helpers ─────────────────────────────────────────────────────────────
@@ -78,6 +79,11 @@ def check_gate(
 
     Returns GateResult(allowed=False) for anything that should be silently ignored.
     """
+    # ── 0. Status/receipt events — drop immediately, no echo/mute logic ──────
+    # These arrive on the same webhook URL but must never trigger mute or note writes.
+    if "statuses" in entry_value and "messages" not in entry_value:
+        return GateResult(allowed=False, is_status_event=True)
+
     # ── 1. Must have a messages array ────────────────────────────────────────
     if "messages" not in entry_value:
         return GateResult(allowed=False)

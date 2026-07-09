@@ -138,12 +138,11 @@ def test_find_row_by_phone_empty_sheet():
 
 def test_append_row_correct_lead_id_and_columns():
     """
-    Phone not found → append.  Row should contain lead_id = max+1 = 4,
-    and only COLUMN_MAP columns should be set.
+    Phone not found → insert via batchUpdate on first empty phone row.
+    Row should contain lead_id = max+1 = 4, written to correct column cells.
     """
     from app.sheet import _sync_upsert_lead, COLUMN_MAP
 
-    # Simulate: phone lookup returns nothing; lead_id column has max=3
     svc = MagicMock()
     spreadsheets = svc.spreadsheets.return_value
     values_mock = spreadsheets.values.return_value
@@ -151,12 +150,16 @@ def test_append_row_correct_lead_id_and_columns():
         "sheets": [{"properties": {"title": "Sheet1"}}]
     }
 
+    # _sync_find_row_by_phone: full phone col → not found (2 rows, neither matches)
+    # _sync_find_first_empty_row: phone col from row 2 → 3 rows filled (empty at row 5)
+    # _sync_find_first_empty_row: id col from row 2 → ids 1, 2, 3 → max=3
     get_responses = [
-        {"values": [["9200000001"], ["9200000002"]]},  # phone col → not found
-        {"values": [["1"], ["2"], ["3"]]},             # lead_id col → max=3
+        {"values": [["9200000001"], ["9200000002"]]},           # phone col (find)
+        {"values": [["9200000001"], ["9200000002"], ["9200000003"]]},  # phone from row 2 (insert)
+        {"values": [["1"], ["2"], ["3"]]},                      # id col from row 2
     ]
     values_mock.get.return_value.execute.side_effect = get_responses
-    values_mock.append.return_value.execute.return_value = {}
+    values_mock.batchUpdate.return_value.execute.return_value = {}
 
     with patch("app.sheet._build_service", return_value=svc), \
          patch("app.sheet._resolve_tab", return_value="Sheet1"):
@@ -165,25 +168,36 @@ def test_append_row_correct_lead_id_and_columns():
             "status": "Bot - New",
         })
 
-    append_call = values_mock.append.call_args
-    body = append_call.kwargs["body"]
-    row_data = body["values"][0]
+    # Must use batchUpdate, not append
+    values_mock.append.assert_not_called()
+    values_mock.batchUpdate.assert_called_once()
 
-    # lead_id column A (index 0) should be 4
-    assert row_data[0] == 4
+    batch_body = values_mock.batchUpdate.call_args.kwargs["body"]
+    data = batch_body["data"]
 
-    # phone column E (index 4) should be the phone
-    assert row_data[4] == "923001234567"
+    # Build a dict of range → value for easy assertion
+    written = {d["range"]: d["values"][0][0] for d in data}
 
-    # business_name column F (index 5) should be set
-    assert row_data[5] == "Test Shop"
+    # lead_id (col A) at row 5 should be 4 (max=3, +1)
+    assert written.get("Sheet1!A5") == 4
 
-    # status column L (index 11) should be set
-    assert row_data[11] == "Bot - New"
+    # phone (col E) at row 5
+    assert written.get("Sheet1!E5") == "923001234567"
 
-    # Total length must not exceed max column index in COLUMN_MAP
-    max_col = max(COLUMN_MAP.values())
-    assert len(row_data) == max_col
+    # business_name (col F) at row 5
+    assert written.get("Sheet1!F5") == "Test Shop"
+
+    # status (col L) at row 5
+    assert written.get("Sheet1!L5") == "Bot - New"
+
+    # source (col I) at row 5 — always "Meta Ads" on insert
+    assert written.get("Sheet1!I5") == "Meta Ads"
+
+    # No range outside COLUMN_MAP should appear
+    valid_cols = {f"Sheet1!{chr(64 + c)}" for c in COLUMN_MAP.values()}
+    for rng in written:
+        col_part = rng.split("!")[1].rstrip("0123456789")
+        assert f"Sheet1!{col_part}" in valid_cols, f"Unexpected column written: {rng}"
 
 
 # ── Unit tests: existing row updated in-place ─────────────────────────────────

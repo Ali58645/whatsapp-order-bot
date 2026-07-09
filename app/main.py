@@ -37,6 +37,17 @@ anthropic_client = AsyncAnthropic()  # reads ANTHROPIC_API_KEY from env
 
 app = FastAPI(title="WhatsApp Bot")
 
+
+def _is_own_number(phone: str) -> bool:
+    """
+    Return True if *phone* normalizes to our business number or owner number.
+    Used to prevent sheet writes or mutes for our own numbers.
+    """
+    from app.sheet import _normalize_phone
+    normalized = _normalize_phone(phone)
+    own = {_normalize_phone(n) for n in (OWNER_WHATSAPP, os.environ.get("BUSINESS_WA_ID", "")) if n}
+    return normalized in own
+
 # ---------------------------------------------------------------------------
 # Order-flow assets (only used when FLOW_MODE=order)
 # ---------------------------------------------------------------------------
@@ -129,21 +140,22 @@ async def _handle_lead_flow(entry: dict) -> dict:
 
     if not gate.allowed:
         # ── Sheet: human took over (outbound echo from business app) ─────
-        # Detect the outbound echo case: contacts list present, sender not in it
-        try:
-            contacts = entry.get("contacts", [])
-            if contacts:
-                contact_ids = {c.get("wa_id") for c in contacts}
-                if pre_sender not in contact_ids:
-                    customer_id = next(iter(contact_ids), None)
-                    if customer_id:
-                        from app.sheet import _karachi_now
-                        ts = _karachi_now().strftime("%Y-%m-%d %H:%M")
-                        asyncio.create_task(upsert_lead(customer_id, {
-                            "notes": f"Human took over {ts}",
-                        }))
-        except Exception:
-            pass
+        # Only run for genuine outbound message echoes — never for status/receipt events.
+        if not gate.is_status_event:
+            try:
+                contacts = entry.get("contacts", [])
+                if contacts and "messages" in entry:
+                    contact_ids = {c.get("wa_id") for c in contacts}
+                    if pre_sender not in contact_ids:
+                        customer_id = next(iter(contact_ids), None)
+                        if customer_id and not _is_own_number(customer_id):
+                            from app.sheet import _karachi_now
+                            ts = _karachi_now().strftime("%Y-%m-%d %H:%M")
+                            asyncio.create_task(upsert_lead(customer_id, {
+                                "notes": f"Human took over {ts}",
+                            }))
+            except Exception:
+                pass
         return {"status": "ignored"}
 
     sender = gate.sender
@@ -154,19 +166,20 @@ async def _handle_lead_flow(entry: dict) -> dict:
         # Store lead source on first activation
         if gate.lead_source and "lead_source" not in meta:
             meta["lead_source"] = gate.lead_source
-            # ── Sheet: activation event ───────────────────────────────────
-            profile_name = ""
-            try:
-                contacts = entry.get("contacts", [])
-                if contacts:
-                    profile_name = contacts[0].get("profile", {}).get("name", "")
-            except Exception:
-                pass
-            asyncio.create_task(upsert_lead(sender, {
-                "name":     profile_name,
-                "status":   STATUS_NEW,
-                "interest": gate.lead_source,
-            }))
+            # ── Sheet: activation event (skip own/owner numbers) ─────────
+            if not _is_own_number(sender):
+                profile_name = ""
+                try:
+                    contacts = entry.get("contacts", [])
+                    if contacts:
+                        profile_name = contacts[0].get("profile", {}).get("name", "")
+                except Exception:
+                    pass
+                asyncio.create_task(upsert_lead(sender, {
+                    "name":     profile_name,
+                    "status":   STATUS_NEW,
+                    "interest": gate.lead_source,
+                }))
         if gate.referral:
             meta["referral_source_id"] = gate.referral.get("source_id", "")
             meta["referral_headline"] = gate.referral.get("headline", "")
@@ -275,6 +288,8 @@ async def _handle_lead_flow(entry: dict) -> dict:
 
 def _sheet_field_update(sender: str, meta: dict) -> None:
     """Fire-and-forget sheet update for mid-flow field captures."""
+    if _is_own_number(sender):
+        return
     fields = {}
     for key in ("business_name", "business_type", "current_system"):
         if meta.get(key):
@@ -303,11 +318,12 @@ async def _handle_entry_message(sender: str, meta: dict, user_text: str) -> dict
 
     await send_whatsapp_message(sender, reply_text)
 
-    # Sheet: first reply sent → In Progress
-    asyncio.create_task(upsert_lead(sender, {
-        "status":   STATUS_IN_PROGRESS,
-        "interest": intent,
-    }))
+    # Sheet: first reply sent → In Progress (skip own/owner numbers)
+    if not _is_own_number(sender):
+        asyncio.create_task(upsert_lead(sender, {
+            "status":   STATUS_IN_PROGRESS,
+            "interest": intent,
+        }))
 
     # DEMO_FIRST: immediately follow up with the scheduling interactive widget
     if intent == INTENT_DEMO_FIRST:

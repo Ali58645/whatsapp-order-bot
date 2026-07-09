@@ -8,6 +8,11 @@ Missing config (GOOGLE_SA_JSON_B64 / GSHEET_ID) → all functions are no-ops.
 Sheets errors → logged at ERROR, never raised to the caller.
 All I/O runs in a thread via asyncio.to_thread with a 10 s timeout.
 
+Append strategy: instead of values.append() (which lands below formula rows),
+we read column B (phone) from row 2 down and write to the first empty row via
+an explicit batchUpdate.  A module-level asyncio.Lock serialises concurrent
+writes so two activations arriving simultaneously can't pick the same row.
+
 Usage (fire-and-forget from async code):
     asyncio.create_task(upsert_lead(phone, fields))
 """
@@ -24,9 +29,9 @@ from zoneinfo import ZoneInfo
 log = logging.getLogger("orderbot.sheet")
 
 # ── Status constants — edit here to match sheet dropdown values ───────────────
-STATUS_NEW          = "Bot - New"
-STATUS_IN_PROGRESS  = "Bot - In Progress"
-STATUS_DEMO_BOOKED  = "Demo Booked"
+STATUS_NEW            = "Bot - New"
+STATUS_IN_PROGRESS    = "Bot - In Progress"
+STATUS_DEMO_BOOKED    = "Demo Booked"
 STATUS_NOT_RESPONDING = "Not Responding"
 
 # ── Column map — A=1, B=2, … edit to match your sheet layout ─────────────────
@@ -63,11 +68,23 @@ _GSHEET_TAB  = os.environ.get("GSHEET_TAB", "")   # empty → first tab
 
 _ENABLED = bool(_SA_JSON_B64 and _GSHEET_ID)
 
+# Serialises concurrent find+write operations to prevent two tasks picking
+# the same empty row when two leads activate at the same moment.
+_write_lock: asyncio.Lock | None = None
+
 if not _ENABLED:
     log.warning(
         "sheet: GOOGLE_SA_JSON_B64 or GSHEET_ID not set — "
         "Google Sheets integration disabled"
     )
+
+
+def _get_write_lock() -> asyncio.Lock:
+    """Lazily create the write lock inside the running event loop."""
+    global _write_lock
+    if _write_lock is None:
+        _write_lock = asyncio.Lock()
+    return _write_lock
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -193,26 +210,58 @@ def _sync_find_row_by_phone(service, tab: str, phone: str) -> int | None:
     return None
 
 
-def _sync_max_lead_id(service, tab: str) -> int:
-    """Read column A (lead_id), return the max numeric value found (0 if empty)."""
-    col_letter = _col_letter(COLUMN_MAP["lead_id"])
-    range_str = f"{tab}!{col_letter}:{col_letter}"
-    result = service.spreadsheets().values().get(
+def _sync_find_first_empty_row(service, tab: str) -> tuple[int, int]:
+    """
+    Read column E (phone) from row 2 downwards.
+    Returns (first_empty_row, max_lead_id) where:
+      - first_empty_row: 1-based row index of first row with empty phone cell
+      - max_lead_id: max numeric value found in column A for rows that have a phone
+    Skips row 1 (header).
+    """
+    # Read phone column to find first empty slot
+    phone_col_letter = _col_letter(COLUMN_MAP["phone"])
+    phone_range = f"{tab}!{phone_col_letter}2:{phone_col_letter}"
+    phone_result = service.spreadsheets().values().get(
         spreadsheetId=_GSHEET_ID,
-        range=range_str,
+        range=phone_range,
         valueRenderOption="FORMATTED_VALUE",
     ).execute()
-    values = result.get("values", [])
+    phone_rows = phone_result.get("values", [])
+
+    # Find first empty phone cell; row index starts at 2
+    first_empty = None
+    for offset, row in enumerate(phone_rows):
+        has_value = bool(row and str(row[0]).strip())
+        if not has_value:
+            first_empty = 2 + offset
+            break
+    if first_empty is None:
+        # All scanned rows are occupied; append after the last one
+        first_empty = 2 + len(phone_rows)
+
+    # Read lead_id column only for rows that have a phone (to compute max id)
+    id_col_letter = _col_letter(COLUMN_MAP["lead_id"])
+    id_range = f"{tab}!{id_col_letter}2:{id_col_letter}"
+    id_result = service.spreadsheets().values().get(
+        spreadsheetId=_GSHEET_ID,
+        range=id_range,
+        valueRenderOption="FORMATTED_VALUE",
+    ).execute()
+    id_rows = id_result.get("values", [])
+
     max_id = 0
-    for row in values:
-        if row:
+    for offset, id_row in enumerate(id_rows):
+        phone_row = phone_rows[offset] if offset < len(phone_rows) else []
+        has_phone = bool(phone_row and str(phone_row[0]).strip())
+        if has_phone and id_row:
             try:
-                val = int(str(row[0]).strip())
+                val = int(str(id_row[0]).strip())
                 if val > max_id:
                     max_id = val
             except (ValueError, TypeError):
                 pass
-    return max_id
+
+    return first_empty, max_id
 
 
 def _sync_upsert_lead(phone: str, fields: dict) -> None:
@@ -228,8 +277,8 @@ def _sync_upsert_lead(phone: str, fields: dict) -> None:
         # ── UPDATE: batch-update only the provided mapped columns ─────────
         _sync_update_row(service, tab, row, fields)
     else:
-        # ── INSERT: append a new row ────────────────────────────────────--
-        _sync_append_row(service, tab, phone, fields)
+        # ── INSERT: write to first empty phone row ────────────────────────
+        _sync_insert_row(service, tab, phone, fields)
 
 
 def _sync_update_row(service, tab: str, row: int, fields: dict) -> None:
@@ -253,44 +302,46 @@ def _sync_update_row(service, tab: str, row: int, fields: dict) -> None:
     log.info(f"sheet: updated row {row} — {list(fields.keys())}")
 
 
-def _sync_append_row(service, tab: str, phone: str, fields: dict) -> None:
-    """Append a new row with auto-incremented lead_id + metadata + provided fields."""
-    now = _karachi_now()
-    max_id = _sync_max_lead_id(service, tab)
+def _sync_insert_row(service, tab: str, phone: str, fields: dict) -> None:
+    """
+    Write a new lead to the first empty row in column E (phone).
+    Uses an explicit batchUpdate on the target row (not append) so
+    formula/validation rows below the data are never disturbed.
+    """
+    target_row, max_id = _sync_find_first_empty_row(service, tab)
     new_id = max_id + 1
+    now = _karachi_now()
 
-    # Build a sparse list indexed by column position
-    # Determine total columns needed (max col index in our map)
-    max_col = max(COLUMN_MAP.values())
-    row_data: list = [""] * max_col
+    # Build cell-level data list for batchUpdate
+    data = []
 
-    def _set(field: str, value) -> None:
-        idx = COLUMN_MAP.get(field)
-        if idx:
-            row_data[idx - 1] = value
+    def _add(field: str, value) -> None:
+        col_idx = COLUMN_MAP.get(field)
+        if col_idx:
+            data.append({
+                "range": _a1(tab, target_row, col_idx),
+                "values": [[value]],
+            })
 
     # Fixed fields for every new row
-    _set("lead_id", new_id)
-    _set("date", now.strftime("%Y-%m-%d"))
-    _set("time", now.strftime("%-I:%M %p"))
-    _set("phone", phone)
-    _set("source", "Meta Ads")
+    _add("lead_id", new_id)
+    _add("date", now.strftime("%Y-%m-%d"))
+    _add("time", now.strftime("%-I:%M %p"))
+    _add("phone", phone)
+    _add("source", "Meta Ads")
 
     # Caller-provided fields (only mapped ones)
     for field, value in fields.items():
         if field in COLUMN_MAP:
-            _set(field, value)
+            _add(field, value)
         else:
             log.warning(f"sheet: ignored unmapped field '{field}' on insert")
 
-    service.spreadsheets().values().append(
+    service.spreadsheets().values().batchUpdate(
         spreadsheetId=_GSHEET_ID,
-        range=f"{tab}!A:A",
-        valueInputOption="USER_ENTERED",
-        insertDataOption="INSERT_ROWS",
-        body={"values": [row_data]},
+        body={"valueInputOption": "USER_ENTERED", "data": data},
     ).execute()
-    log.info(f"sheet: appended new row — lead_id={new_id}, phone={phone}")
+    log.info(f"sheet: inserted new row {target_row} — lead_id={new_id}, phone={phone}")
 
 
 # ── Public async API ──────────────────────────────────────────────────────────
@@ -322,18 +373,18 @@ async def upsert_lead(phone: str, fields: dict) -> None:
     """
     Async, fire-and-forget safe.  Runs sync I/O in a thread, 10 s timeout.
     Logs errors; never raises.  Only writes columns in COLUMN_MAP.
+    The write lock serialises concurrent inserts to prevent row collisions.
     """
     if not _ENABLED:
         return
     # Filter to mapped fields only before even entering the thread
     safe_fields = {k: v for k, v in fields.items() if k in COLUMN_MAP}
-    if not safe_fields and "phone" not in fields:
-        return
     try:
-        await asyncio.wait_for(
-            asyncio.to_thread(_sync_upsert_lead, phone, safe_fields),
-            timeout=10,
-        )
+        async with _get_write_lock():
+            await asyncio.wait_for(
+                asyncio.to_thread(_sync_upsert_lead, phone, safe_fields),
+                timeout=10,
+            )
     except asyncio.TimeoutError:
         log.error(f"sheet: upsert_lead timed out for {phone} — fields: {safe_fields}")
     except Exception as exc:
@@ -343,3 +394,4 @@ async def upsert_lead(phone: str, fields: dict) -> None:
 def parse_slot_datetime(slot: str) -> tuple[str | None, str | None]:
     """Public re-export of _parse_slot_datetime for use in wiring code."""
     return _parse_slot_datetime(slot)
+
