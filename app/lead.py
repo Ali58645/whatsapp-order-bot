@@ -18,6 +18,12 @@ Interactive phases:
   CURRENT_SYSTEM → buttons (manual / POS software / nothing)
   SCHEDULING     → buttons (slot 1 / slot 2 / other time)
   slot_other tap → free-text follow-up stored as demo_slot
+
+Entry intent (first message only):
+  GENERIC_INFO  → ad-context greeting + value line + business name question
+  PRICE_FIRST   → pricing deflection + business name question
+  DEMO_FIRST    → skip straight to SCHEDULING (buttons sent immediately)
+  OTHER         → same as GENERIC_INFO
 """
 
 import asyncio
@@ -66,6 +72,113 @@ def has_active_lead(sender: str) -> bool:
     if not m:
         return False
     return m.get("phase") not in (None, "CONFIRMED", "STALLED")
+
+
+# ── Entry intent detection ────────────────────────────────────────────────────
+# Deterministic keyword pre-check — runs BEFORE any LLM call on the first
+# message from a newly-activated lead.
+
+_GENERIC_INFO_SIGNALS = (
+    "more information", "info chahiye", "info", "details", "tell me more",
+    "interested", "hi", "hello", "aoa", "salam", "assalam", "hey",
+    "haan", "okay", "ok", "ha", "جی", "kya hai", "batao", "bata",
+    "more info", "janana hai", "janna hai",
+)
+
+_PRICE_FIRST_SIGNALS = (
+    "price", "cost", "kitne ki", "kitna", "rate", "fee", "charges",
+    "paisa", "paisay", "payment", "subscription", "plan", "package",
+    "mehnga", "sasta", "affordable", "budget", "pricing", "charge karte",
+    "kitne mein", "kya cost",
+)
+
+_DEMO_FIRST_SIGNALS = (
+    "demo", "meeting", "dikhao", "dikhayen", "dekhhna", "dekhna",
+    "show me", "schedule", "book", "appointment", "milna", "milte",
+    "call karo", "call karein", "live", "walkthrough",
+)
+
+# Intent literals
+INTENT_GENERIC_INFO = "GENERIC_INFO"
+INTENT_PRICE_FIRST  = "PRICE_FIRST"
+INTENT_DEMO_FIRST   = "DEMO_FIRST"
+INTENT_OTHER        = "OTHER"
+
+
+def classify_entry_intent(text: str) -> str:
+    """
+    Classify the first message from a newly-activated lead.
+
+    Evaluated in priority order: DEMO_FIRST > PRICE_FIRST > GENERIC_INFO > OTHER.
+    Case-insensitive substring matching; handles Roman Urdu + English.
+    Returns one of the INTENT_* constants.
+    """
+    if not text:
+        return INTENT_GENERIC_INFO
+
+    lower = text.lower().strip()
+
+    # Priority 1: demo/meeting intent — most actionable, handle first
+    if any(sig in lower for sig in _DEMO_FIRST_SIGNALS):
+        return INTENT_DEMO_FIRST
+
+    # Priority 2: price question — deflect immediately
+    if any(sig in lower for sig in _PRICE_FIRST_SIGNALS):
+        return INTENT_PRICE_FIRST
+
+    # Priority 3: generic/low-intent opener — exact match or starts-with for short tokens
+    # Use word-boundary logic: the signal must be a standalone word or the full message
+    words = set(lower.split())
+    if any(sig in words or lower == sig for sig in _GENERIC_INFO_SIGNALS):
+        return INTENT_GENERIC_INFO
+
+    # Priority 3b: very short messages (≤ 4 chars) are almost always greetings
+    if len(lower) <= 4:
+        return INTENT_GENERIC_INFO
+
+    return INTENT_OTHER
+
+
+# Standard greeting components (used by build_entry_response and non-text fallback)
+_GREETING_THANKS  = "Assalam o Alaikum! Bahi POS mein interest ka shukriya 🙏"
+_GREETING_VALUE   = ("Bahi POS aap ke business ka har hisaab ek jagah manage karta hai "
+                     "— sales, stock, khata, FBR invoicing.")
+_GREETING_NAME_Q  = "Aap ke business/shop ka naam kya hai?"
+
+GREETING_TEXT = f"{_GREETING_THANKS}\n{_GREETING_VALUE}\n{_GREETING_NAME_Q}"
+
+_PRICE_DEFLECT = (
+    "Pricing aap ke business size aur requirements par depend karti hai "
+    "— isi liye 15-minute demo mein aap ko exact quote milta hai. "
+    "Taake main aap ko sahi guide kar sakoon, aap ke business ka naam kya hai?"
+)
+
+_DEMO_FIRST_TEXT = (
+    f"{_GREETING_THANKS}\n"
+    "Bilkul — demo ke liye aap ko direct slot choose karein:"
+)
+
+_MEDIA_FIRST_TEXT = (
+    f"{_GREETING_THANKS}\n"
+    f"{_GREETING_VALUE}\n"
+    f"{_GREETING_NAME_Q}\n"
+    "(Text mein reply karein please 🙏)"
+)
+
+
+def build_entry_response(intent: str) -> tuple[str, str]:
+    """
+    Return (reply_text, next_phase) for a first-message entry intent.
+
+    For DEMO_FIRST, reply_text is a short ack; the caller must follow up
+    with the SCHEDULING interactive widget immediately after.
+    """
+    if intent == INTENT_PRICE_FIRST:
+        return _PRICE_DEFLECT, "BUSINESS_NAME"
+    if intent == INTENT_DEMO_FIRST:
+        return _DEMO_FIRST_TEXT, "SCHEDULING"
+    # GENERIC_INFO, OTHER, anything else
+    return GREETING_TEXT, "BUSINESS_NAME"
 
 
 # ── System prompt builder ─────────────────────────────────────────────────────
@@ -174,6 +287,7 @@ async def forward_lead_card(
     phase = meta.get("phase", "?")
     slot = meta.get("demo_slot") or f"not booked — stalled at {phase}"
     source = meta.get("lead_source", "unknown")
+    referral_headline = meta.get("referral_headline", "")
 
     card_lines = [
         "🔔 *NEW LEAD — Bahi POS*",
@@ -183,8 +297,10 @@ async def forward_lead_card(
         f"Current system: {meta.get('current_system', '?')}",
         f"Demo: {slot}",
         f"Source: {source}",
-        f"Number: wa.me/{sender}",
     ]
+    if referral_headline:
+        card_lines.append(f"Ad: {referral_headline}")
+    card_lines.append(f"Number: wa.me/{sender}")
     card = "\n".join(card_lines)
 
     for attempt, delay in enumerate(_RETRY_DELAYS, start=1):

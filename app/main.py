@@ -7,8 +7,10 @@ FLOW_MODE=lead   → Bahi POS lead qualification with coexistence gate (default)
 """
 
 import os
+import asyncio
 import logging
 import httpx
+from datetime import timedelta
 from fastapi import FastAPI, Request, Response, HTTPException
 from anthropic import AsyncAnthropic
 
@@ -65,8 +67,16 @@ if FLOW_MODE == "lead":
         extract_lead_marker, extract_meta_from_turn,
         forward_lead_card, get_phase_interactive,
         apply_interactive_answer,
+        classify_entry_intent, build_entry_response,
+        _MEDIA_FIRST_TEXT,
+        INTENT_DEMO_FIRST,
     )
     from app.interactive import parse_interactive_reply     # noqa: E402
+    from app.sheet import upsert_lead, parse_slot_datetime  # noqa: E402
+    from app.sheet import (                                 # noqa: E402
+        STATUS_NEW, STATUS_IN_PROGRESS,
+        STATUS_DEMO_BOOKED, STATUS_NOT_RESPONDING,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +128,22 @@ async def _handle_lead_flow(entry: dict) -> dict:
     gate = check_gate(entry, active_session=active)
 
     if not gate.allowed:
+        # ── Sheet: human took over (outbound echo from business app) ─────
+        # Detect the outbound echo case: contacts list present, sender not in it
+        try:
+            contacts = entry.get("contacts", [])
+            if contacts:
+                contact_ids = {c.get("wa_id") for c in contacts}
+                if pre_sender not in contact_ids:
+                    customer_id = next(iter(contact_ids), None)
+                    if customer_id:
+                        from app.sheet import _karachi_now
+                        ts = _karachi_now().strftime("%Y-%m-%d %H:%M")
+                        asyncio.create_task(upsert_lead(customer_id, {
+                            "notes": f"Human took over {ts}",
+                        }))
+        except Exception:
+            pass
         return {"status": "ignored"}
 
     sender = gate.sender
@@ -128,6 +154,19 @@ async def _handle_lead_flow(entry: dict) -> dict:
         # Store lead source on first activation
         if gate.lead_source and "lead_source" not in meta:
             meta["lead_source"] = gate.lead_source
+            # ── Sheet: activation event ───────────────────────────────────
+            profile_name = ""
+            try:
+                contacts = entry.get("contacts", [])
+                if contacts:
+                    profile_name = contacts[0].get("profile", {}).get("name", "")
+            except Exception:
+                pass
+            asyncio.create_task(upsert_lead(sender, {
+                "name":     profile_name,
+                "status":   STATUS_NEW,
+                "interest": gate.lead_source,
+            }))
         if gate.referral:
             meta["referral_source_id"] = gate.referral.get("source_id", "")
             meta["referral_headline"] = gate.referral.get("headline", "")
@@ -139,12 +178,14 @@ async def _handle_lead_flow(entry: dict) -> dict:
         user_text = gate.text or ""
         log.info(f"lead: message from {sender} [{meta.get('phase')}]: {user_text!r}")
 
-        # Non-text, non-interactive message — gentle redirect
+        # ── Non-text, non-interactive first message (voice/image/sticker) ─
+        # Treat as a GENERIC_INFO entry: send the full greeting + redirect note
         if gate.message_type not in ("text",):
-            await send_whatsapp_message(
-                sender,
-                "Please apna message text mein likhein — main samajh sakunga 🙂",
-            )
+            is_first = (meta.get("phase") == "GREETING")
+            if is_first:
+                meta["phase"] = "BUSINESS_NAME"
+                meta["entry_intent"] = "GENERIC_INFO"
+            await send_whatsapp_message(sender, _MEDIA_FIRST_TEXT)
             return {"status": "ok"}
 
         # ── Capture custom slot if we're awaiting free-text after slot_other ─
@@ -159,9 +200,25 @@ async def _handle_lead_flow(entry: dict) -> dict:
             )
             await send_whatsapp_message(sender, confirm_msg)
             await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
+            # Sheet: demo booked with custom slot
+            demo_date, demo_time = parse_slot_datetime(meta["demo_slot"])
+            asyncio.create_task(upsert_lead(sender, {
+                "status":        STATUS_DEMO_BOOKED,
+                "notes":         f"Demo confirmed via bot: {meta['demo_slot']}",
+                "next_followup": demo_date or "",
+                "demo_date":     demo_date or "",
+                "demo_time":     demo_time or "",
+                "business_name":  meta.get("business_name", ""),
+                "business_type":  meta.get("business_type", ""),
+                "current_system": meta.get("current_system", ""),
+            }))
             clear_session(sender)
             clear_lead_meta(sender)
             return {"status": "ok"}
+
+        # ── Entry intent: first message from a freshly-activated lead ─────
+        if meta.get("phase") == "GREETING":
+            return await _handle_entry_message(sender, meta, user_text)
 
         # ── Normal LLM turn ───────────────────────────────────────────────
         reply = await _generate_lead_reply(sender, user_text)
@@ -173,6 +230,18 @@ async def _handle_lead_flow(entry: dict) -> dict:
             meta["phase"] = "CONFIRMED"
             await send_whatsapp_message(sender, clean_reply)
             await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
+            # Sheet: demo booked
+            demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
+            asyncio.create_task(upsert_lead(sender, {
+                "status":       STATUS_DEMO_BOOKED,
+                "notes":        f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
+                "next_followup": demo_date or "",
+                "demo_date":    demo_date or "",
+                "demo_time":    demo_time or "",
+                "business_name": meta.get("business_name", ""),
+                "business_type": meta.get("business_type", ""),
+                "current_system": meta.get("current_system", ""),
+            }))
             clear_session(sender)
             clear_lead_meta(sender)
             return {"status": "ok"}
@@ -181,14 +250,70 @@ async def _handle_lead_flow(entry: dict) -> dict:
             meta["phase"] = "STALLED"
             if meta.get("business_name") or meta.get("phase") not in ("GREETING", "BUSINESS_NAME"):
                 await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
+            # Sheet: not responding
+            tomorrow = (_karachi_now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+            asyncio.create_task(upsert_lead(sender, {
+                "status":        STATUS_NOT_RESPONDING,
+                "notes":         f"Bot: stalled at {meta.get('phase', '?')}",
+                "next_followup": tomorrow,
+                "business_name": meta.get("business_name", ""),
+                "business_type": meta.get("business_type", ""),
+                "current_system": meta.get("current_system", ""),
+            }))
             clear_session(sender)
             clear_lead_meta(sender)
             return {"status": "ok"}
+
+        # Sheet: field captures as they arrive
+        _sheet_field_update(sender, meta)
 
         # Send the LLM reply, then check if the *new* phase has an interactive widget
         await send_whatsapp_message(sender, clean_reply)
         await _maybe_send_interactive(sender, meta)
         return {"status": "ok"}
+
+
+def _sheet_field_update(sender: str, meta: dict) -> None:
+    """Fire-and-forget sheet update for mid-flow field captures."""
+    fields = {}
+    for key in ("business_name", "business_type", "current_system"):
+        if meta.get(key):
+            fields[key] = meta[key]
+    if fields:
+        asyncio.create_task(upsert_lead(sender, fields))
+
+
+def _karachi_now():
+    """Re-export for use in main without importing ZoneInfo directly."""
+    from app.sheet import _karachi_now as _kn
+    return _kn()
+
+
+async def _handle_entry_message(sender: str, meta: dict, user_text: str) -> dict:
+    """
+    Handle the very first message from a freshly-activated lead (phase == GREETING).
+    Classifies intent deterministically and responds without an LLM call.
+    """
+    intent = classify_entry_intent(user_text)
+    meta["entry_intent"] = intent
+    reply_text, next_phase = build_entry_response(intent)
+    meta["phase"] = next_phase
+
+    log.info(f"lead: entry intent={intent} from {sender!r}, → phase={next_phase}")
+
+    await send_whatsapp_message(sender, reply_text)
+
+    # Sheet: first reply sent → In Progress
+    asyncio.create_task(upsert_lead(sender, {
+        "status":   STATUS_IN_PROGRESS,
+        "interest": intent,
+    }))
+
+    # DEMO_FIRST: immediately follow up with the scheduling interactive widget
+    if intent == INTENT_DEMO_FIRST:
+        await _maybe_send_interactive(sender, meta)
+
+    return {"status": "ok"}
 
 
 async def _handle_interactive_reply(sender: str, meta: dict, entry: dict) -> dict:
@@ -237,6 +362,18 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict) -> dic
         )
         await send_whatsapp_message(sender, confirm_msg)
         await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
+        # Sheet: demo booked via interactive button
+        demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
+        asyncio.create_task(upsert_lead(sender, {
+            "status":        STATUS_DEMO_BOOKED,
+            "notes":         f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
+            "next_followup": demo_date or "",
+            "demo_date":     demo_date or "",
+            "demo_time":     demo_time or "",
+            "business_name":  meta.get("business_name", ""),
+            "business_type":  meta.get("business_type", ""),
+            "current_system": meta.get("current_system", ""),
+        }))
         clear_session(sender)
         clear_lead_meta(sender)
         return {"status": "ok"}
