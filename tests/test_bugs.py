@@ -176,7 +176,7 @@ def test_insert_uses_batch_update_not_append():
 
     with patch("app.sheet._build_service", return_value=svc), \
          patch("app.sheet._resolve_tab", return_value="Sheet1"):
-        _sync_upsert_lead("923001234567", {"status": "Bot - New"})
+        _sync_upsert_lead("923001234567", {"status": "New"})
 
     # values.append must NEVER be called
     values_mock.append.assert_not_called()

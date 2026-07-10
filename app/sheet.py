@@ -29,9 +29,9 @@ from zoneinfo import ZoneInfo
 log = logging.getLogger("orderbot.sheet")
 
 # ── Status constants — edit here to match sheet dropdown values ───────────────
-STATUS_NEW            = "Bot - New"
+STATUS_NEW            = "New"
 STATUS_IN_PROGRESS    = "Bot - In Progress"
-STATUS_DEMO_BOOKED    = "Demo Booked"
+STATUS_DEMO_BOOKED    = "Demo Scheduled"
 STATUS_NOT_RESPONDING = "Not Responding"
 
 # ── Column map — A=1, B=2, … edit to match your sheet layout ─────────────────

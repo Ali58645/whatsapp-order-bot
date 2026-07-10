@@ -391,12 +391,13 @@ def extract_meta_from_turn(meta: dict, user_text: str, reply: str) -> None:
 # type "list":   list of (id, title, description) — up to 10
 
 _BUSINESS_TYPE_ROWS = [
-    ("retail",       "Retail Store",    "General retail / dukaan"),
-    ("restaurant",   "Restaurant",      "Food & beverage"),
-    ("pharmacy",     "Pharmacy",        "Medical store"),
-    ("grocery",      "Grocery Store",   "Kiryana / superstore"),
-    ("electronics",  "Electronics",     "Mobile / gadgets / home appliances"),
-    ("other",        "Kuch aur",        "Doosra business type"),
+    ("grocery",       "Grocery / Kiryana",    "Kiryana / superstore"),
+    ("restaurant",    "Restaurant",           "Food & beverage"),
+    ("pharmacy",      "Pharmacy",             "Medical store"),
+    ("garments",      "Garments",             "Clothing / fabric"),
+    ("electronics",   "Mobile / Electronics", "Mobile / gadgets / appliances"),
+    ("general_store", "General Store",        "General merchandise"),
+    ("other",         "Other",                "Doosra business type"),
 ]
 
 # Human-readable labels for structured meta storage (id → display label)
@@ -414,6 +415,14 @@ _CURRENT_SYSTEM_BUTTONS = [
     ("sys_none",   "Kuch nahi"),
 ]
 
+# Sheet-matching values for current_system — separate from button display titles.
+# Button titles stay short (≤20 chars for WhatsApp); sheet values match dropdown.
+_CURRENT_SYSTEM_SHEET_VALUES: dict[str, str] = {
+    "sys_manual": "Manual Register",
+    "sys_pos":    "Existing POS",
+    "sys_none":   "No System",
+}
+
 # Scheduling buttons built at call-time so DEMO_SLOT_1/2 are resolved after env load
 def _scheduling_buttons() -> list[tuple[str, str]]:
     return [
@@ -425,7 +434,8 @@ def _scheduling_buttons() -> list[tuple[str, str]]:
 
 # Id → human label for loc / system (used by apply_interactive_answer)
 _LOC_LABELS: dict[str, str]  = {r[0]: r[1] for r in _LOCATIONS_BUTTONS}
-_SYS_LABELS: dict[str, str]  = {r[0]: r[1] for r in _CURRENT_SYSTEM_BUTTONS}
+# _SYS_LABELS maps button id → sheet-matching value (not the button display title)
+_SYS_LABELS: dict[str, str]  = _CURRENT_SYSTEM_SHEET_VALUES
 
 
 def get_phase_interactive(phase: str, sender: str) -> Optional[dict]:

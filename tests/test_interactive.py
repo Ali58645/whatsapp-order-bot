@@ -199,10 +199,10 @@ def test_parse_interactive_reply_button():
 
 def test_parse_interactive_reply_list():
     from app.interactive import parse_interactive_reply
-    msg = {"interactive": {"type": "list_reply", "list_reply": {"id": "retail", "title": "Retail Store"}}}
+    msg = {"interactive": {"type": "list_reply", "list_reply": {"id": "grocery", "title": "Grocery / Kiryana"}}}
     rid, rtitle = parse_interactive_reply(msg)
-    assert rid == "retail"
-    assert rtitle == "Retail Store"
+    assert rid == "grocery"
+    assert rtitle == "Grocery / Kiryana"
 
 
 def test_parse_interactive_reply_malformed_returns_none():
@@ -225,7 +225,7 @@ async def test_button_reply_advances_phase_deterministically(client, mock_send, 
         "phase": "LOCATIONS",
         "lead_source": "ad",
         "business_name": "Ali Shop",
-        "business_type": "Retail Store",
+        "business_type": "Grocery / Kiryana",
     }
 
     r = await client.post("/webhook", json=_interactive_button_payload(CUSTOMER, "loc_1", "1"))
@@ -309,7 +309,7 @@ async def test_slot_other_captures_custom_time(client, mock_send, mock_claude):
         "business_name": "Zain Store",
         "business_type": "Retail",
         "locations": "1",
-        "current_system": "Manual register",
+        "current_system": "Manual Register",
     }
 
     # Step 1: tap slot_other

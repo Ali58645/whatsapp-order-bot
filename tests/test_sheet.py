@@ -165,7 +165,7 @@ def test_append_row_correct_lead_id_and_columns():
          patch("app.sheet._resolve_tab", return_value="Sheet1"):
         _sync_upsert_lead("923001234567", {
             "business_name": "Test Shop",
-            "status": "Bot - New",
+            "status": "New",
         })
 
     # Must use batchUpdate, not append
@@ -188,7 +188,7 @@ def test_append_row_correct_lead_id_and_columns():
     assert written.get("Sheet1!F5") == "Test Shop"
 
     # status (col L) at row 5
-    assert written.get("Sheet1!L5") == "Bot - New"
+    assert written.get("Sheet1!L5") == "New"
 
     # source (col I) at row 5 — always "Meta Ads" on insert
     assert written.get("Sheet1!I5") == "Meta Ads"
@@ -220,7 +220,7 @@ def test_update_existing_row_uses_batch_update():
 
     with patch("app.sheet._build_service", return_value=svc), \
          patch("app.sheet._resolve_tab", return_value="Sheet1"):
-        _sync_upsert_lead("923001234567", {"status": "Demo Booked"})
+        _sync_upsert_lead("923001234567", {"status": "Demo Scheduled"})
 
     # batchUpdate must have been called
     values_mock.batchUpdate.assert_called_once()
@@ -230,7 +230,7 @@ def test_update_existing_row_uses_batch_update():
     data = batch_body["data"]
     assert len(data) == 1
     assert data[0]["range"] == "Sheet1!L5"
-    assert data[0]["values"] == [["Demo Booked"]]
+    assert data[0]["values"] == [["Demo Scheduled"]]
 
     # append must NOT have been called
     values_mock.append.assert_not_called()
@@ -258,7 +258,7 @@ def test_unmapped_fields_not_written():
     with patch("app.sheet._build_service", return_value=svc), \
          patch("app.sheet._resolve_tab", return_value="Sheet1"):
         _sync_upsert_lead("923001234567", {
-            "status": "Demo Booked",
+            "status": "Demo Scheduled",
             "secret_internal_field": "should be dropped",
             "some_other_col": "also dropped",
         })
@@ -281,7 +281,7 @@ async def test_upsert_lead_noop_when_env_missing():
     sheet_mod._ENABLED = False
     try:
         with patch("app.sheet._build_service") as mock_build:
-            await sheet_mod.upsert_lead("923001234567", {"status": "Bot - New"})
+            await sheet_mod.upsert_lead("923001234567", {"status": "New"})
             mock_build.assert_not_called()
     finally:
         sheet_mod._ENABLED = original
@@ -302,7 +302,7 @@ async def test_sheets_exception_does_not_raise():
     try:
         with patch("app.sheet._build_service", side_effect=Exception("API down")):
             # Must not raise
-            await sheet_mod.upsert_lead("923001234567", {"status": "Bot - New"})
+            await sheet_mod.upsert_lead("923001234567", {"status": "New"})
     finally:
         sheet_mod._ENABLED = original
 

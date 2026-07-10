@@ -212,7 +212,7 @@ async def test_confirmed_triggers_lead_card_to_owner(client, mock_send, mock_cla
         "business_name": "Karachi Mart",
         "business_type": "Retail",
         "locations": "2",
-        "current_system": "Manual register",
+        "current_system": "Manual Register",
         "demo_slot": "Kal 11am",
     }
 

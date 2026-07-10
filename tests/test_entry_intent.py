@@ -246,9 +246,9 @@ async def test_referral_headline_appears_on_lead_card_not_in_customer_message(cl
         "lead_source": "Get Bahi POS",
         "referral_headline": "Summer Sale — Get Bahi POS Free Demo",
         "business_name": "Faisal Electronics",
-        "business_type": "Electronics",
+        "business_type": "Mobile / Electronics",
         "locations": "1",
-        "current_system": "Manual register",
+        "current_system": "Manual Register",
         "demo_slot": "Kal 11am",
     }
 
