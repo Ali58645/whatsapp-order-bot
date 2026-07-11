@@ -149,8 +149,8 @@ async def test_generic_info_opener_sends_greeting_with_value_line(client, mock_s
     assert texts, "Expected a reply to customer"
     greeting = texts[0]
     assert "shukriya" in greeting.lower()
-    assert "har hisaab" in greeting.lower()
-    assert "naam" in greeting.lower()
+    assert "sales" in greeting.lower() or "manage" in greeting.lower()
+    assert "naam" in greeting.lower() or "name" in greeting.lower() or "barah" in greeting.lower()
 
     # Phase advanced without LLM
     assert _meta[CUSTOMER]["phase"] == "BUSINESS_NAME"
@@ -173,10 +173,10 @@ async def test_price_first_gets_deflection_and_name_question(client, mock_send):
     texts = [c.args[1] for c in mock_send.call_args_list if c.args and c.args[0] == CUSTOMER]
     assert texts
     msg = texts[0].lower()
-    # Deflection keyword
-    assert "15-minute" in msg or "demo mein" in msg or "exact quote" in msg
+    # Deflection keyword (new formal text uses "quote" and "demo")
+    assert "quote" in msg or "demo" in msg or "pricing" in msg
     # Still asks for name in same message
-    assert "naam" in msg
+    assert "naam" in msg or "name" in msg or "barah" in msg
 
     assert _meta[CUSTOMER]["phase"] == "BUSINESS_NAME"
     assert _meta[CUSTOMER]["entry_intent"] == "PRICE_FIRST"

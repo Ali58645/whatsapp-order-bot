@@ -50,6 +50,8 @@ PHASES = [
 ]
 STALLED = "STALLED"
 
+MAX_REPROMPTS = 2  # after this many unrecognised answers, hand off to team
+
 # ── Retry config (reuse same pattern as orders.py) ───────────────────────────
 _RETRY_DELAYS = (1, 2, 4)
 
@@ -139,34 +141,208 @@ def classify_entry_intent(text: str) -> str:
     return INTENT_OTHER
 
 
-# Standard greeting components (used by build_entry_response and non-text fallback)
-_GREETING_THANKS  = "Assalam o Alaikum! Bahi POS mein interest ka shukriya 🙏"
-_GREETING_VALUE   = ("Bahi POS aap ke business ka har hisaab ek jagah manage karta hai "
-                     "— sales, stock, khata, FBR invoicing.")
-_GREETING_NAME_Q  = "Aap ke business/shop ka naam kya hai?"
+# ── User-facing strings — bilingual (ur = Roman Urdu formal, en = English formal)
+# Rule: max one emoji total, only in the greeting line.
+# Every message ends with exactly one question or a clear next step.
+# ─────────────────────────────────────────────────────────────────────────────
 
-GREETING_TEXT = f"{_GREETING_THANKS}\n{_GREETING_VALUE}\n{_GREETING_NAME_Q}"
+# Greeting line (emoji allowed only here)
+_GREETING_LINE = {
+    "ur": "السلام علیکم 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
+    "en": "Welcome 🙏 Thank you for your interest in Bahi POS.",
+}
+
+# Value proposition (one sentence, no emoji)
+_VALUE_LINE = {
+    "ur": (
+        "Bahi POS aap ke business ki sales, stock, khata aur invoicing "
+        "ko ek jagah manage karta hai."
+    ),
+    "en": (
+        "Bahi POS is a complete point-of-sale and business management "
+        "solution designed for Pakistani businesses."
+    ),
+}
+
+# Business name question
+_Q_BUSINESS_NAME = {
+    "ur": "Barah-e-karam apne business ya shop ka naam farmaayein.",
+    "en": "Kindly share the name of your business or shop.",
+}
+
+# Business type question (shown as header above the interactive list)
+_Q_BUSINESS_TYPE = {
+    "ur": "Aap ka business kaunsi category mein aata hai? Neeche se muntakhib karein.",
+    "en": "Please select the category that best describes your business.",
+}
+
+# Locations question (shown as header above the interactive buttons)
+_Q_LOCATIONS = {
+    "ur": "Aap ki kitni branches ya locations hain?",
+    "en": "How many branches or locations does your business have?",
+}
+
+# Current system question (shown as header above the interactive buttons)
+_Q_CURRENT_SYSTEM = {
+    "ur": "Abhi aap billing ya hisaab kaise karte hain?",
+    "en": "How do you currently manage billing or accounts?",
+}
+
+# Scheduling question — FBR context + slot offer
+_Q_SCHEDULING = {
+    "ur": (
+        "Hamari team aap ko Bahi POS ka mukammal demo dikhana chahti hai, "
+        "jis mein FBR invoicing support bhi shamil hai.\n"
+        "Demo ke liye kaunsa waqt aap ke liye munasib rahega?"
+    ),
+    "en": (
+        "Our team would be glad to walk you through a complete demo of Bahi POS, "
+        "including its invoicing features.\n"
+        "Which time slot would be convenient for you?"
+    ),
+}
+
+# Slot-other follow-up (free-text slot entry)
+_Q_CUSTOM_SLOT = {
+    "ur": "Barah-e-karam apni pasandida tarikh aur waqt likh kar bataayein.",
+    "en": "Kindly specify your preferred date and time.",
+}
+
+# Confirmation message after slot is booked
+_CONFIRM_SLOT = {
+    "ur": (
+        "Shukriya. Aap ka demo {slot} ke liye booked ho gaya hai. "
+        "Hamari team aap se is number par rabta karegi."
+    ),
+    "en": (
+        "Thank you. Your demo has been scheduled for {slot}. "
+        "Our team will contact you on this number."
+    ),
+}
+
+# Pricing deflection
+_PRICING_TEXT = {
+    "ur": (
+        "Pricing aap ke business ki zarooriyaat aur size ke mutabiq mukhtasir hoti hai. "
+        "Hamari team demo ke dauran aap ko aap ke liye mukhtasar quote faraham karegi. "
+        "Barah-e-karam ek demo book karein taake hum aap ko sahi rahnumai de sakein."
+    ),
+    "en": (
+        "Pricing is tailored to the size and requirements of each business. "
+        "Our team will share a personalised quote during the demo session. "
+        "We invite you to book a demo so we can guide you accordingly."
+    ),
+}
+
+# General product information
+_INFO_TEXT = {
+    "ur": (
+        "Bahi POS ek mukamal point-of-sale aur business management software hai "
+        "jo Pakistani businesses ke liye khaas taur par taiyar kiya gaya hai. "
+        "Yeh sales, inventory, customer accounts, aur invoicing ko ek platform par "
+        "manage karne ki sahulat deta hai."
+    ),
+    "en": (
+        "Bahi POS is a comprehensive point-of-sale and shop management software "
+        "built specifically for Pakistani businesses. "
+        "It consolidates sales, inventory, customer accounts, and invoicing "
+        "into a single, unified platform."
+    ),
+}
+
+# Price question at any non-entry phase — deflect + repeat current question
+_PRICE_DEFLECT_MID = {
+    "ur": (
+        "Pricing aap ke business ki zarooriyaat ke mutabiq tay hoti hai — "
+        "sahi quote demo mein milti hai. "
+        "{current_question}"
+    ),
+    "en": (
+        "Pricing depends on your business requirements and will be shared "
+        "as a personalised quote during the demo. "
+        "{current_question}"
+    ),
+}
+
+# Media/non-text first message
+_MEDIA_REDIRECT = {
+    "ur": (
+        "{greeting}\n"
+        "{value}\n"
+        "{name_q}\n"
+        "Barah-e-karam apna jawab text mein likhein."
+    ),
+    "en": (
+        "{greeting}\n"
+        "{value}\n"
+        "{name_q}\n"
+        "Kindly respond in text so we may assist you properly."
+    ),
+}
+
+# Handoff / stall message
+_HANDOFF = {
+    "ur": (
+        "Hamari team jald aap se rabta karegi. "
+        "Shukriya apna waqt dene ka."
+    ),
+    "en": (
+        "Our team will be in touch with you shortly. "
+        "Thank you for your time."
+    ),
+}
+
+# Re-prompt (unparseable answer during a flow step)
+_REPROMPT = {
+    "ur": "Maazrat, jawab samajh nahi aaya. {current_question}",
+    "en": "We apologise — that response was not recognised. {current_question}",
+}
+
+# Claude error fallback
+_ERROR_FALLBACK = {
+    "ur": "Maafi chahte hain, abhi ek masla aa gaya hai. Thodi der baad dobara koshish farmaayein.",
+    "en": "We apologise for the inconvenience. Please try again in a moment.",
+}
+
+
+def _t(strings: dict, lang: str) -> str:
+    """Return the string for *lang*, falling back to 'ur' if key missing."""
+    return strings.get(lang) or strings["ur"]
+
+
+def _greeting_text(lang: str) -> str:
+    return f"{_t(_GREETING_LINE, lang)}\n{_t(_VALUE_LINE, lang)}\n{_t(_Q_BUSINESS_NAME, lang)}"
+
+
+def _media_first_text(lang: str) -> str:
+    return _t(_MEDIA_REDIRECT, lang).format(
+        greeting=_t(_GREETING_LINE, lang),
+        value=_t(_VALUE_LINE, lang),
+        name_q=_t(_Q_BUSINESS_NAME, lang),
+    )
+
+
+# ── Legacy single-language aliases kept for callers that haven't been updated ─
+# These resolve to the "ur" variant by default.
+_GREETING_THANKS  = _GREETING_LINE["ur"]
+_GREETING_VALUE   = _VALUE_LINE["ur"]
+_GREETING_NAME_Q  = _Q_BUSINESS_NAME["ur"]
+
+GREETING_TEXT = _greeting_text("ur")
 
 _PRICE_DEFLECT = (
-    "Pricing aap ke business size aur requirements par depend karti hai "
-    "— isi liye 15-minute demo mein aap ko exact quote milta hai. "
-    "Taake main aap ko sahi guide kar sakoon, aap ke business ka naam kya hai?"
+    f"{_PRICING_TEXT['ur']}\n{_Q_BUSINESS_NAME['ur']}"
 )
 
 _DEMO_FIRST_TEXT = (
-    f"{_GREETING_THANKS}\n"
-    "Bilkul — demo ke liye aap ko direct slot choose karein:"
+    f"{_GREETING_LINE['ur']}\n"
+    "Hamari team aap ko demo ka slot choose karne mein madad karegi:"
 )
 
-_MEDIA_FIRST_TEXT = (
-    f"{_GREETING_THANKS}\n"
-    f"{_GREETING_VALUE}\n"
-    f"{_GREETING_NAME_Q}\n"
-    "(Text mein reply karein please 🙏)"
-)
+_MEDIA_FIRST_TEXT = _media_first_text("ur")
 
 
-def build_entry_response(intent: str) -> tuple[str, str]:
+def build_entry_response(intent: str, lang: str = "ur") -> tuple[str, str]:
     """
     Return (reply_text, next_phase) for a first-message entry intent.
 
@@ -174,82 +350,43 @@ def build_entry_response(intent: str) -> tuple[str, str]:
     with the SCHEDULING interactive widget immediately after.
     """
     if intent == INTENT_PRICE_FIRST:
-        return _PRICE_DEFLECT, "BUSINESS_NAME"
+        text = (
+            f"{_t(_PRICING_TEXT, lang)}\n"
+            f"{_t(_Q_BUSINESS_NAME, lang)}"
+        )
+        return text, "BUSINESS_NAME"
     if intent == INTENT_DEMO_FIRST:
-        return _DEMO_FIRST_TEXT, "SCHEDULING"
+        text = (
+            f"{_t(_GREETING_LINE, lang)}\n"
+            "Hamari team aap ko demo ka slot choose karne mein madad karegi:"
+            if lang == "ur" else
+            f"{_t(_GREETING_LINE, lang)}\n"
+            "Our team will help you select a demo slot:"
+        )
+        return text, "SCHEDULING"
     # GENERIC_INFO, OTHER, anything else
-    return GREETING_TEXT, "BUSINESS_NAME"
+    return _greeting_text(lang), "BUSINESS_NAME"
 
 
-# ── System prompt builder ─────────────────────────────────────────────────────
+# ── System prompt ─────────────────────────────────────────────────────────────
+# Claude is used ONLY for detour one-liners (questions outside the flow).
+# All flow questions are templated above and sent deterministically.
 
-_FACTS = """
-FACTS (the ONLY claims you may make about Bahi POS — never invent beyond these):
+HAIKU_SYSTEM_PROMPT = """You are a courteous, knowledgeable assistant for Bahi POS, a Pakistani point-of-sale software company.
 
-PRODUCT: Bahi POS — "Har hisaab, ek jagah." Complete POS aur shop management software Pakistani businesses ke liye. Desktop app (Windows/macOS), offline-first — internet ke baghair bhi chalta hai, sara data shop ke apne computer par.
+Your role is limited and precise:
+- Answer the user's single off-topic or clarifying question in ONE short sentence (maximum two lines).
+- You may describe what Bahi POS does in general terms: sales management, inventory tracking, customer accounts, and invoicing support for Pakistani businesses.
+- Do NOT state any prices, package names, or numeric figures.
+- Do NOT claim FBR certification or compliance. You may say Bahi POS supports business invoicing requirements in Pakistan.
+- Do NOT promise features not listed above.
+- Do NOT ask the user any question — your turn ends with a statement.
+- Reply in the same language the user wrote in (Roman Urdu or English). Use formal register only.
+- After your one-sentence answer, output exactly: DETOUR_DONE"""
 
-KEY_FEATURES (mention only what's relevant to the lead's business type):
-- Fast checkout POS: walk-in aur udhaar (credit) sales, cash/bank/EasyPaisa/JazzCash payments, discounts, partial payments
-- Customer khata: complete ledger, printable statements, receivables tracking — kis ne kitna dena hai, ek click par
-- Inventory: stock tracking, low-stock alerts, variants (size/color), barcode, bulk import
-- FBR e-invoicing: built-in integration, POS se direct e-invoice submission (sandbox + production ready)
-- Reports: sales, profit, receivables/payables, inventory
-- Invoices: A4 aur thermal (80mm) print, PDF, WhatsApp share
-- Vendors, purchases, returns, manufacturing (BOM) bhi covered
-- Backup: full data backup/restore, JWT-secured admin login
-
-PRICING_RULE: NEVER state any price, package, number, ya range — even if asked repeatedly. Pricing business size aur needs par depend karti hai. Standard response: "Pricing aap ke business size aur requirements par depend karti hai — isi liye 15-minute demo mein aap ko exact quote milta hai." Then continue the flow. If lead insists a second time, acknowledge politely and offer the demo slot again — do not negotiate, do not hint.
-
-FBR_CLAIM (exact scope — do not exceed): "Bahi POS mein FBR e-invoicing ki built-in integration hai — POS se direct e-invoice submit hota hai." You may add that FBR digital invoicing requirements Pakistan mein aa rahi hain aur Bahi POS is ke liye ready hai. NEVER claim the lead's specific business is legally required to comply, never give legal/tax advice, never promise automatic compliance — agar detailed FBR sawal aaye, say the demo will cover their exact FBR setup.
-"""
-
-_SCRIPT = f"""
-CONVERSATION SCRIPT (follow phases in order):
-
-GREETING phase:
-  "Assalam o Alaikum! Bahi POS mein interest ka shukriya 🙏 Aap ke business/shop ka naam kya hai?"
-
-BUSINESS_TYPE phase (after getting name):
-  "[Name] kis type ka business hai — retail store, restaurant, pharmacy, ya kuch aur?"
-
-LOCATIONS phase:
-  "Kitni branches/locations hain?"
-
-CURRENT_SYSTEM phase:
-  "Abhi billing kaise karte hain — manual register ya koi POS software?"
-
-SCHEDULING phase:
-  Weave in FBR hook naturally, then:
-  "FBR ke naye digital invoicing rules ke liye compliant invoicing zaroori ho rahi hai — Bahi POS mein built-in hai ✅
-  Demo ke liye {DEMO_SLOT_1} ya {DEMO_SLOT_2} — kaunsa time theek rahega?"
-
-CONFIRMED phase (after slot selected):
-  Repeat day/time back clearly. Tell them the team will contact on this number.
-  Then output on its own line: LEAD_CONFIRMED
-
-ESCAPE HATCHES (handle via intent, never break the phase flow):
-- Price question at any phase:
-  "Pricing business size par depend karti hai, demo mein exact quote milta hai 👍" + repeat current phase question.
-- Hot-lead signal ("demo chahiye", "meeting", "schedule", "book") at any phase:
-  Jump directly to SCHEDULING phase question.
-- "sirf info" or "just info":
-  Give 3-line Bahi POS summary, then re-offer demo once.
-- Gibberish / off-topic:
-  First time: one polite redirect back to the question.
-  Second time in a row: stay silent and output: LEAD_STALLED
-"""
-
-SYSTEM_PROMPT_LEAD = f"""You are a friendly WhatsApp sales assistant for Bahi POS, a Pakistani POS software company.
-
-Rules:
-- Mirror the lead's language (Roman Urdu + English mix by default; pure English if they write English).
-- ONE question per message. Keep messages WhatsApp-short (max 3 lines).
-- Never invent pricing, features, or FBR claims beyond the FACTS block below.
-- When you output LEAD_CONFIRMED or LEAD_STALLED, put it on its own final line with nothing after it.
-
-{_FACTS}
-{_SCRIPT}
-"""
+# Keep SYSTEM_PROMPT_LEAD as an alias pointing to the same prompt, so existing
+# call sites continue to work without modification.
+SYSTEM_PROMPT_LEAD = HAIKU_SYSTEM_PROMPT
 
 
 # ── LEAD_CONFIRMED / LEAD_STALLED marker detection ───────────────────────────
@@ -438,10 +575,10 @@ _LOC_LABELS: dict[str, str]  = {r[0]: r[1] for r in _LOCATIONS_BUTTONS}
 _SYS_LABELS: dict[str, str]  = _CURRENT_SYSTEM_SHEET_VALUES
 
 
-def get_phase_interactive(phase: str, sender: str) -> Optional[dict]:
+def get_phase_interactive(phase: str, sender: str, lang: str = "ur") -> Optional[dict]:
     """
     Return the interactive payload dict for *phase*, or None if this phase
-    uses free-text (handled by Claude as normal).
+    uses free-text (handled deterministically).
 
     The returned dict is the full message payload (ready for the Graph API).
     Import build_buttons / build_list here to avoid a circular import at
@@ -452,37 +589,128 @@ def get_phase_interactive(phase: str, sender: str) -> Optional[dict]:
     if phase == "BUSINESS_TYPE":
         return build_list(
             sender,
-            "Aap ka business kaunsa type ka hai? Neeche se choose karein:",
-            "Options dekhein",
+            _t(_Q_BUSINESS_TYPE, lang),
+            "Muntakhib karein" if lang == "ur" else "Select",
             _BUSINESS_TYPE_ROWS,
         )
 
     if phase == "LOCATIONS":
         return build_buttons(
             sender,
-            "Aap ki kitni branches/locations hain?",
+            _t(_Q_LOCATIONS, lang),
             _LOCATIONS_BUTTONS,
         )
 
     if phase == "CURRENT_SYSTEM":
         return build_buttons(
             sender,
-            "Abhi billing kaise karte hain?",
+            _t(_Q_CURRENT_SYSTEM, lang),
             _CURRENT_SYSTEM_BUTTONS,
         )
 
     if phase == "SCHEDULING":
         return build_buttons(
             sender,
-            (
-                "FBR ke naye digital invoicing rules ke liye compliant POS zaroori hai — "
-                "Bahi POS mein built-in hai ✅\n\n"
-                "Demo ke liye kaunsa time theek rahega?"
-            ),
+            _t(_Q_SCHEDULING, lang),
             _scheduling_buttons(),
         )
 
-    return None  # GREETING, BUSINESS_NAME, CONFIRMED, STALLED → plain text / LLM
+    return None  # GREETING, BUSINESS_NAME, CONFIRMED, STALLED → deterministic text
+
+
+
+def extract_detour_done(reply: str) -> tuple[bool, str]:
+    """
+    Returns (was_detour, cleaned_reply_without_marker).
+    Strips DETOUR_DONE from Claude's reply.
+    """
+    marker = "DETOUR_DONE"
+    if marker in reply:
+        idx = reply.index(marker)
+        return True, reply[:idx].strip()
+    return False, reply
+
+
+# Off-topic / detour signals — questions that are clearly not flow answers
+_DETOUR_SIGNALS = (
+    "kahan ho", "kahan hain", "where are you", "where is", "kya hai ye",
+    "aap kaun", "who are you", "ye kya hai", "kya karte ho", "about you",
+    "company kahan", "office kahan", "contact number", "helpline",
+    "kab shuru", "since when", "kitne saal", "history", "founder",
+)
+
+
+def _is_detour_question(text: str) -> bool:
+    """
+    Return True if the text looks like an off-topic/clarifying question
+    rather than a flow answer.  Heuristic: ends with '?' or matches known
+    detour signals.
+    """
+    lower = text.lower().strip()
+    if lower.endswith("?"):
+        return True
+    return any(sig in lower for sig in _DETOUR_SIGNALS)
+
+
+# ── Free-text matching for interactive phases ─────────────────────────────────
+
+# Normalised keywords for each business-type id (case-insensitive substrings)
+_BUSINESS_TYPE_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "grocery":       ("grocery", "kiryana", "kirana", "sabzi", "ration"),
+    "restaurant":    ("restaurant", "dhaba", "cafe", "food", "hotel", "karahi", "biryani"),
+    "pharmacy":      ("pharmacy", "medical", "dawai", "dawa", "chemist"),
+    "garments":      ("garment", "clothes", "kapra", "kapray", "fashion", "cloth"),
+    "electronics":   ("electronic", "mobile", "laptop", "computer", "gadget"),
+    "general_store": ("general", "dukaan", "store", "mart", "shop", "retail"),
+    "other":         ("other", "doosra", "alag"),
+}
+
+
+def match_free_text_business_type(text: str) -> str | None:
+    """
+    Try to match free-text business type to a known id.
+    Returns the id string (e.g. 'grocery') or None if ambiguous/unrecognised.
+    Ambiguous = more than one category matches.
+    """
+    lower = text.lower().strip()
+    matched = [
+        btype_id
+        for btype_id, keywords in _BUSINESS_TYPE_KEYWORDS.items()
+        if any(kw in lower for kw in keywords)
+    ]
+    if len(matched) == 1:
+        return matched[0]
+    return None  # 0 = unrecognised, 2+ = ambiguous → both treated as no-match
+
+
+def build_reprompt(phase: str, lang: str = "ur") -> str:
+    """Return a re-prompt string repeating the current phase's question."""
+    phase_q_map = {
+        "BUSINESS_TYPE":  _Q_BUSINESS_TYPE,
+        "LOCATIONS":      _Q_LOCATIONS,
+        "CURRENT_SYSTEM": _Q_CURRENT_SYSTEM,
+        "SCHEDULING":     _Q_SCHEDULING,
+        "BUSINESS_NAME":  _Q_BUSINESS_NAME,
+    }
+    q_dict = phase_q_map.get(phase, _Q_BUSINESS_NAME)
+    current_q = _t(q_dict, lang)
+    return _t(_REPROMPT, lang).format(current_question=current_q)
+
+
+def build_handoff(lang: str = "ur") -> str:
+    """Return the handoff message sent when re-prompt budget is exhausted."""
+    return _t(_HANDOFF, lang)
+
+
+def increment_reprompt(meta: dict) -> int:
+    """Increment and return the new reprompt_count."""
+    count = meta.get("reprompt_count", 0) + 1
+    meta["reprompt_count"] = count
+    return count
+
+
+def reset_reprompts(meta: dict) -> None:
+    meta["reprompt_count"] = 0
 
 
 def apply_interactive_answer(
@@ -501,6 +729,15 @@ def apply_interactive_answer(
     question; the *next* free-text message will be captured as demo_slot.
     """
     phase = meta.get("phase", "GREETING")
+
+    # ── menu_demo: starts the qualification flow from any welcome menu ────────
+    if reply_id == "menu_demo":
+        # Treat as a GENERIC_INFO entry: advance to BUSINESS_NAME
+        meta["phase"] = "BUSINESS_NAME"
+        meta.setdefault("entry_intent", "DEMO_FIRST")
+        lang = meta.get("lang", "ur")
+        log.info("lead: menu_demo tapped — starting qualification flow")
+        return True, _greeting_text(lang)
 
     if phase == "BUSINESS_TYPE" and reply_id in _BUSINESS_TYPE_LABELS:
         meta["business_type"] = _BUSINESS_TYPE_LABELS[reply_id]
@@ -535,7 +772,8 @@ def apply_interactive_answer(
             # Mark that next free-text = custom slot; don't advance phase yet
             meta["awaiting_custom_slot"] = True
             log.info("lead: interactive SCHEDULING → slot_other, awaiting free text")
-            return True, "Kaunsa din/time aap ke liye theek hai? Likh dein 📅"
+            lang = meta.get("lang", "ur")
+            return True, _t(_Q_CUSTOM_SLOT, lang)
 
     # Unknown id for this phase — fall through to LLM
     log.warning(f"lead: interactive reply_id={reply_id!r} unhandled at phase={phase}")

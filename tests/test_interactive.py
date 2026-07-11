@@ -272,28 +272,33 @@ async def test_list_reply_stores_business_type_correctly(client, mock_send, mock
 @pytest.mark.asyncio
 async def test_free_text_at_option_phase_goes_through_llm(client, mock_send, mock_claude):
     """
-    Free-text at BUSINESS_TYPE phase (instead of tapping the list) still works —
-    goes through the LLM as normal.
+    Free-text at BUSINESS_TYPE phase that doesn't match any known keyword
+    triggers a re-prompt (not an LLM call). The handler sends exactly one
+    message containing the re-asked business-type question.
     """
     from app.lead import _meta
     _meta[CUSTOMER] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Fast Mart",
+        "reprompt_count": 0,
     }
 
-    mock_claude.return_value = _make_claude_reply("Kitni branches hain?")
-
-    r = await client.post("/webhook", json=_text_payload(CUSTOMER, "Mera furniture ka shop hai"))
+    r = await client.post("/webhook", json=_text_payload(CUSTOMER, "nahi pata bilkul bhi"))
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
 
-    # LLM must have been called
-    mock_claude.assert_called_once()
+    # Phase must stay at BUSINESS_TYPE (re-prompt, no advance)
+    assert _meta[CUSTOMER].get("phase") == "BUSINESS_TYPE"
 
-    # Bot replied to customer
+    # Exactly one send to customer
     recipients = [c.args[0] for c in mock_send.call_args_list]
-    assert CUSTOMER in recipients
+    assert recipients.count(CUSTOMER) == 1
+
+    # Bot replied to customer (re-prompt message)
+    customer_texts = [c.args[1] for c in mock_send.call_args_list
+                      if c.args and c.args[0] == CUSTOMER]
+    assert customer_texts
 
 
 @pytest.mark.asyncio
@@ -316,9 +321,14 @@ async def test_slot_other_captures_custom_time(client, mock_send, mock_claude):
     r1 = await client.post("/webhook", json=_interactive_button_payload(CUSTOMER, "slot_other", "Koi aur time"))
     assert r1.status_code == 200
 
-    # Follow-up question must have been sent
+    # Follow-up question must have been sent (asking for preferred date/time)
     texts_sent = [c.args[1] for c in mock_send.call_args_list if c.args]
-    assert any("din" in t.lower() or "time" in t.lower() for t in texts_sent)
+    assert any(
+        "tarikh" in t.lower() or "waqt" in t.lower()
+        or "time" in t.lower() or "date" in t.lower()
+        or "din" in t.lower()
+        for t in texts_sent
+    )
 
     # awaiting_custom_slot flag must be set
     assert _meta[CUSTOMER].get("awaiting_custom_slot") is True

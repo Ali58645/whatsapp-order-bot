@@ -79,7 +79,6 @@ if FLOW_MODE == "lead":
         forward_lead_card, get_phase_interactive,
         apply_interactive_answer,
         classify_entry_intent, build_entry_response,
-        _MEDIA_FIRST_TEXT,
         INTENT_DEMO_FIRST,
     )
     from app.interactive import parse_interactive_reply     # noqa: E402
@@ -198,7 +197,9 @@ async def _handle_lead_flow(entry: dict) -> dict:
             if is_first:
                 meta["phase"] = "BUSINESS_NAME"
                 meta["entry_intent"] = "GENERIC_INFO"
-            await send_whatsapp_message(sender, _MEDIA_FIRST_TEXT)
+            lang = meta.get("lang", "ur")
+            from app.lead import _media_first_text
+            await send_whatsapp_message(sender, _media_first_text(lang))
             return {"status": "ok"}
 
         # ── Capture custom slot if we're awaiting free-text after slot_other ─
@@ -207,10 +208,9 @@ async def _handle_lead_flow(entry: dict) -> dict:
             meta.pop("awaiting_custom_slot")
             meta["phase"] = "CONFIRMED"
             log.info(f"lead: custom slot captured: {meta['demo_slot']!r}")
-            confirm_msg = (
-                f"Perfect! {meta['demo_slot']} — hamari team aap se is number par "
-                f"contact karegi. Shukriya! 🙏"
-            )
+            lang = meta.get("lang", "ur")
+            from app.lead import _t, _CONFIRM_SLOT  # noqa: E402
+            confirm_msg = _t(_CONFIRM_SLOT, lang).format(slot=meta["demo_slot"])
             await send_whatsapp_message(sender, confirm_msg)
             await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
             # Sheet: demo booked with custom slot
@@ -233,57 +233,38 @@ async def _handle_lead_flow(entry: dict) -> dict:
         if meta.get("phase") == "GREETING":
             return await _handle_entry_message(sender, meta, user_text)
 
-        # ── Normal LLM turn ───────────────────────────────────────────────
-        reply = await _generate_lead_reply(sender, user_text)
-        extract_meta_from_turn(meta, user_text, reply)
+        # ── Text at an interactive phase: try deterministic match first ───
+        # This prevents the double-send bug (LLM reply + _maybe_send_interactive).
+        # Interactive phases: BUSINESS_TYPE, LOCATIONS, CURRENT_SYSTEM, SCHEDULING.
+        phase = meta.get("phase", "")
+        lang = meta.get("lang", "ur")
 
-        marker, clean_reply = extract_lead_marker(reply)
+        if phase == "BUSINESS_TYPE":
+            return await _handle_text_at_interactive_phase(
+                sender, meta, user_text, lang,
+                match_fn=_match_business_type,
+                advance_to="LOCATIONS",
+                field_key="business_type",
+            )
 
-        if marker == "CONFIRMED":
-            meta["phase"] = "CONFIRMED"
-            await send_whatsapp_message(sender, clean_reply)
-            await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
-            # Sheet: demo booked
-            demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
-            asyncio.create_task(upsert_lead(sender, {
-                "status":       STATUS_DEMO_BOOKED,
-                "notes":        f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
-                "next_followup": demo_date or "",
-                "demo_date":    demo_date or "",
-                "demo_time":    demo_time or "",
-                "business_name": meta.get("business_name", ""),
-                "business_type": meta.get("business_type", ""),
-                "current_system": meta.get("current_system", ""),
-            }))
-            clear_session(sender)
-            clear_lead_meta(sender)
-            return {"status": "ok"}
+        if phase == "LOCATIONS":
+            return await _handle_text_at_interactive_phase(
+                sender, meta, user_text, lang,
+                match_fn=_match_locations,
+                advance_to="CURRENT_SYSTEM",
+                field_key="locations",
+            )
 
-        if marker == "STALLED":
-            meta["phase"] = "STALLED"
-            if meta.get("business_name") or meta.get("phase") not in ("GREETING", "BUSINESS_NAME"):
-                await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
-            # Sheet: not responding
-            tomorrow = (_karachi_now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
-            asyncio.create_task(upsert_lead(sender, {
-                "status":        STATUS_NOT_RESPONDING,
-                "notes":         f"Bot: stalled at {meta.get('phase', '?')}",
-                "next_followup": tomorrow,
-                "business_name": meta.get("business_name", ""),
-                "business_type": meta.get("business_type", ""),
-                "current_system": meta.get("current_system", ""),
-            }))
-            clear_session(sender)
-            clear_lead_meta(sender)
-            return {"status": "ok"}
+        if phase == "CURRENT_SYSTEM":
+            return await _handle_text_at_interactive_phase(
+                sender, meta, user_text, lang,
+                match_fn=_match_current_system,
+                advance_to="SCHEDULING",
+                field_key="current_system",
+            )
 
-        # Sheet: field captures as they arrive
-        _sheet_field_update(sender, meta)
-
-        # Send the LLM reply, then check if the *new* phase has an interactive widget
-        await send_whatsapp_message(sender, clean_reply)
-        await _maybe_send_interactive(sender, meta)
-        return {"status": "ok"}
+        # ── Normal LLM turn (BUSINESS_NAME and non-interactive phases) ───
+        return await _handle_llm_turn(sender, meta, user_text, lang)
 
 
 def _sheet_field_update(sender: str, meta: dict) -> None:
@@ -296,6 +277,207 @@ def _sheet_field_update(sender: str, meta: dict) -> None:
             fields[key] = meta[key]
     if fields:
         asyncio.create_task(upsert_lead(sender, fields))
+
+
+# ── Per-phase free-text match functions ──────────────────────────────────────
+# Return (matched_value_for_meta, sheet_value) or (None, None) if no match.
+
+def _match_business_type(text: str) -> tuple[str | None, str | None]:
+    from app.lead import match_free_text_business_type, _BUSINESS_TYPE_LABELS
+    btype_id = match_free_text_business_type(text)
+    if btype_id:
+        label = _BUSINESS_TYPE_LABELS[btype_id]
+        return label, label
+    return None, None
+
+
+def _match_locations(text: str) -> tuple[str | None, str | None]:
+    """Accept a digit word or Urdu/English number 1-20."""
+    import re
+    _URDU_EN_NUMBERS = {
+        "ek": "1", "one": "1", "do": "2", "two": "2", "teen": "3", "three": "3",
+        "char": "4", "four": "4", "paanch": "5", "five": "5", "chay": "6", "six": "6",
+        "saat": "7", "seven": "7", "aath": "8", "eight": "8", "nau": "9", "nine": "9",
+        "das": "10", "ten": "10",
+    }
+    lower = text.lower().strip()
+    # Digit
+    m = re.search(r"\b(\d+)\b", lower)
+    if m:
+        n = int(m.group(1))
+        if 1 <= n <= 20:
+            val = str(n)
+            return val, val
+    # Word
+    for word, digit in _URDU_EN_NUMBERS.items():
+        if word in lower.split():
+            return digit, digit
+    # Accept "2-5", "5+" style
+    if re.fullmatch(r"\d+[\-\+]\d*", lower.strip()):
+        return lower.strip(), lower.strip()
+    return None, None
+
+
+def _match_current_system(text: str) -> tuple[str | None, str | None]:
+    from app.lead import _CURRENT_SYSTEM_SHEET_VALUES
+    lower = text.lower()
+    if any(kw in lower for kw in ("manual", "dasti", "register", "hand")):
+        return "Manual Register", _CURRENT_SYSTEM_SHEET_VALUES["sys_manual"]
+    if any(kw in lower for kw in ("pos", "software", "system", "computer", "digital")):
+        return "Existing POS", _CURRENT_SYSTEM_SHEET_VALUES["sys_pos"]
+    if any(kw in lower for kw in ("kuch nahi", "nothing", "no system", "nahi", "none", "koi nahi")):
+        return "No System", _CURRENT_SYSTEM_SHEET_VALUES["sys_none"]
+    return None, None
+
+
+async def _handle_text_at_interactive_phase(
+    sender: str,
+    meta: dict,
+    user_text: str,
+    lang: str,
+    match_fn,
+    advance_to: str,
+    field_key: str,
+) -> dict:
+    """
+    Handle free text at a phase that normally shows an interactive widget.
+
+    1. Try match_fn(user_text) → if matched: record, advance, send ONE message
+       (ack + next question as interactive widget or plain text).
+    2. If it looks like a detour question → call Claude for one-liner, combine
+       with re-asked question, send ONE message, phase unchanged.
+    3. Otherwise → reprompt (increment budget); if budget exceeded → handoff.
+    All branches send exactly ONE message.
+    """
+    from app.lead import (
+        build_reprompt, build_handoff,
+        increment_reprompt, reset_reprompts, MAX_REPROMPTS,
+        extract_detour_done, _is_detour_question,
+    )
+
+    display_val, sheet_val = match_fn(user_text)
+
+    if display_val is not None:
+        # ── Matched: record, advance, send next interactive ──────────────
+        meta[field_key] = sheet_val
+        meta["phase"] = advance_to
+        reset_reprompts(meta)
+        _sheet_field_update(sender, meta)
+        # Send next phase's interactive widget; if none, send its plain question
+        payload = get_phase_interactive(advance_to, sender, lang)
+        if payload:
+            await send_whatsapp_message(sender, interactive_payload=payload)
+        else:
+            from app.lead import _t, _Q_BUSINESS_NAME
+            await send_whatsapp_message(sender, _t(_Q_BUSINESS_NAME, lang))
+        return {"status": "ok"}
+
+    if _is_detour_question(user_text):
+        # ── Detour: call Claude, combine answer + re-asked question ──────
+        detour_reply = await _generate_lead_reply(sender, user_text)
+        is_detour, clean_detour = extract_detour_done(detour_reply)
+        from app.lead import _t, _Q_BUSINESS_TYPE, _Q_LOCATIONS, _Q_CURRENT_SYSTEM, _Q_BUSINESS_NAME
+        _phase_q = {
+            "BUSINESS_TYPE":  _Q_BUSINESS_TYPE,
+            "LOCATIONS":      _Q_LOCATIONS,
+            "CURRENT_SYSTEM": _Q_CURRENT_SYSTEM,
+        }
+        phase = meta.get("phase", "")
+        re_ask = _t(_phase_q.get(phase, _Q_BUSINESS_NAME), lang)
+        combined = f"{clean_detour}\n\n{re_ask}" if clean_detour else re_ask
+        await send_whatsapp_message(sender, combined)
+        return {"status": "ok"}
+
+    # ── Unrecognised: reprompt or handoff ────────────────────────────────
+    count = increment_reprompt(meta)
+    if count > MAX_REPROMPTS:
+        # Budget exhausted → handoff
+        meta["phase"] = "STALLED"
+        handoff_msg = build_handoff(lang)
+        await send_whatsapp_message(sender, handoff_msg)
+        await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
+        clear_session(sender)
+        clear_lead_meta(sender)
+    else:
+        # Still within budget → re-prompt
+        phase = meta.get("phase", "")
+        await send_whatsapp_message(sender, build_reprompt(phase, lang))
+    return {"status": "ok"}
+
+
+async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str) -> dict:
+    """
+    LLM turn for phases that don't have deterministic interactive matching
+    (primarily BUSINESS_NAME, and SCHEDULING free-text).
+    Handles DETOUR_DONE, LEAD_CONFIRMED, LEAD_STALLED markers.
+    Sends exactly one message.
+    """
+    from app.lead import extract_detour_done
+
+    reply = await _generate_lead_reply(sender, user_text)
+
+    # ── Detour one-liner ─────────────────────────────────────────────────
+    is_detour, clean_reply = extract_detour_done(reply)
+    if is_detour:
+        # Combine one-liner with the re-asked current question
+        from app.lead import build_reprompt
+        phase = meta.get("phase", "")
+        re_ask = build_reprompt(phase, lang).split(". ", 1)[-1]  # strip "Maazrat..." prefix
+        combined = f"{clean_reply}\n\n{re_ask}" if clean_reply else re_ask
+        await send_whatsapp_message(sender, combined)
+        return {"status": "ok"}
+
+    extract_meta_from_turn(meta, user_text, reply)
+    marker, clean_reply = extract_lead_marker(reply)
+
+    if marker == "CONFIRMED":
+        meta["phase"] = "CONFIRMED"
+        await send_whatsapp_message(sender, clean_reply)
+        await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
+        demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
+        asyncio.create_task(upsert_lead(sender, {
+            "status":        STATUS_DEMO_BOOKED,
+            "notes":         f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
+            "next_followup": demo_date or "",
+            "demo_date":     demo_date or "",
+            "demo_time":     demo_time or "",
+            "business_name": meta.get("business_name", ""),
+            "business_type": meta.get("business_type", ""),
+            "current_system": meta.get("current_system", ""),
+        }))
+        clear_session(sender)
+        clear_lead_meta(sender)
+        return {"status": "ok"}
+
+    if marker == "STALLED":
+        meta["phase"] = "STALLED"
+        if meta.get("business_name"):
+            await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
+        tomorrow = (_karachi_now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        asyncio.create_task(upsert_lead(sender, {
+            "status":        STATUS_NOT_RESPONDING,
+            "notes":         f"Bot: stalled at {meta.get('phase', '?')}",
+            "next_followup": tomorrow,
+            "business_name": meta.get("business_name", ""),
+            "business_type": meta.get("business_type", ""),
+            "current_system": meta.get("current_system", ""),
+        }))
+        clear_session(sender)
+        clear_lead_meta(sender)
+        return {"status": "ok"}
+
+    _sheet_field_update(sender, meta)
+    # For BUSINESS_NAME phase, after recording the name, send the BUSINESS_TYPE
+    # interactive list as ONE combined response (no separate LLM text).
+    new_phase = meta.get("phase", "")
+    interactive_payload = get_phase_interactive(new_phase, sender, lang)
+    if interactive_payload:
+        # Phase has an interactive widget — send it instead of the LLM text.
+        # The LLM text is discarded to enforce one-send-per-turn.
+        await send_whatsapp_message(sender, interactive_payload=interactive_payload)
+    else:
+        await send_whatsapp_message(sender, clean_reply)
+    return {"status": "ok"}
 
 
 def _karachi_now():
@@ -372,10 +554,9 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict) -> dic
 
     # Phase advanced — check if CONFIRMED now (slot_1 / slot_2 direct confirm)
     if meta.get("phase") == "CONFIRMED":
-        confirm_msg = (
-            f"Shukriya! {meta.get('demo_slot', '')} — hamari team aap se is "
-            f"number par contact karegi. 🙏"
-        )
+        lang = meta.get("lang", "ur")
+        from app.lead import _t, _CONFIRM_SLOT  # noqa: E402
+        confirm_msg = _t(_CONFIRM_SLOT, lang).format(slot=meta.get("demo_slot", ""))
         await send_whatsapp_message(sender, confirm_msg)
         await forward_lead_card(sender, meta, OWNER_WHATSAPP, send_whatsapp_message)
         # Sheet: demo booked via interactive button
