@@ -162,6 +162,30 @@ def check_gate(
             lead_source="active_session",
         )
 
-    # ── 6. Default: silent ───────────────────────────────────────────────────
-    log.info(f"gate: silent for {sender}")
-    return GateResult(allowed=False, sender=sender)
+    # ── 6. Catch-all: any unmuted, non-echo message gets a response ─────────
+    # In coexistence mode the bot was previously silent for messages that
+    # didn't match referral/campaign/active-session.  That causes "Hi" and
+    # similar openers to receive no reply.  We now allow every text and
+    # interactive message through; the handler sends the greeting or the
+    # appropriate flow step.  Status events and echoes are still silenced
+    # by the checks above.
+    if msg_type in ("text", "interactive"):
+        log.info(f"gate: direct message from {sender} — catch-all allow")
+        return GateResult(
+            allowed=True,
+            sender=sender,
+            text=text,
+            message_type=msg_type,
+            lead_source="direct",
+        )
+
+    # Non-text media (audio, image, sticker, video, …) with no active session
+    # — allow through so the handler can send the unsupported-type reply.
+    log.info(f"gate: non-text ({msg_type}) from {sender} — catch-all allow")
+    return GateResult(
+        allowed=True,
+        sender=sender,
+        text=None,
+        message_type=msg_type,
+        lead_source="direct",
+    )

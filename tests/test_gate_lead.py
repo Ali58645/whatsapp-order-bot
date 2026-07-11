@@ -127,12 +127,18 @@ async def test_echo_message_ignored(client, mock_send):
 
 
 @pytest.mark.asyncio
-async def test_unknown_contact_no_referral_no_reply(client, mock_send):
-    """Random contact with no referral and no campaign phrase → no reply (default silent)."""
+async def test_unknown_contact_no_referral_gets_greeting(client, mock_send):
+    """
+    Random contact with no referral and no campaign phrase → bot now responds
+    with the greeting (catch-all; no message may be silently dropped for text).
+    Exactly one send.
+    """
     r = await client.post("/webhook", json=_text_payload(CUSTOMER, "Hello there"))
     assert r.status_code == 200
-    assert r.json() == {"status": "ignored"}
-    mock_send.assert_not_called()
+    assert r.json() == {"status": "ok"}
+
+    calls = [c for c in mock_send.call_args_list if c.args and c.args[0] == CUSTOMER]
+    assert len(calls) == 1, f"Expected 1 send, got {len(calls)}"
 
 
 @pytest.mark.asyncio

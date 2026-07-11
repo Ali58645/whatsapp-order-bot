@@ -83,7 +83,7 @@ def has_active_lead(sender: str) -> bool:
 _GENERIC_INFO_SIGNALS = (
     "more information", "info chahiye", "info", "details", "tell me more",
     "interested", "hi", "hello", "aoa", "salam", "assalam", "hey",
-    "haan", "okay", "ok", "ha", "جی", "kya hai", "batao", "bata",
+    "haan", "okay", "ok", "ha", "ji", "kya hai", "batao", "bata",
     "more info", "janana hai", "janna hai",
 )
 
@@ -148,7 +148,7 @@ def classify_entry_intent(text: str) -> str:
 
 # Greeting line (emoji allowed only here)
 _GREETING_LINE = {
-    "ur": "السلام علیکم 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
+    "ur": "Assalam o Alaikum 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
     "en": "Welcome 🙏 Thank you for your interest in Bahi POS.",
 }
 
@@ -711,6 +711,54 @@ def increment_reprompt(meta: dict) -> int:
 
 def reset_reprompts(meta: dict) -> None:
     meta["reprompt_count"] = 0
+
+
+# ── Business name capture ─────────────────────────────────────────────────────
+
+# Acknowledgment after name is captured (shown before the business-type list)
+_ACK_BUSINESS_NAME = {
+    "ur": "Shukriya. Aap ke business ka naam record ho gaya.",
+    "en": "Thank you. Your business name has been noted.",
+}
+
+# Maximum word count accepted verbatim as a business name
+_BUSINESS_NAME_MAX_WORDS = 6
+
+
+def handle_business_name(
+    meta: dict,
+    text: str,
+    lang: str = "ur",
+) -> tuple[str, bool]:
+    """
+    Deterministically process a BUSINESS_NAME phase answer.
+
+    Rules:
+    - If text is a detour question (_is_detour_question): caller must handle
+      via detour path. Returns ("", False) to signal this.
+    - If text is 1-6 words (any language, any capitalisation): accept verbatim,
+      record in meta, advance phase to BUSINESS_TYPE, return (ack_text, True).
+    - If empty or > 6 words: return (reprompt_text, False) — phase unchanged.
+
+    Returns (reply_text, accepted) where accepted=True means phase advanced.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return build_reprompt("BUSINESS_NAME", lang), False
+
+    if _is_detour_question(stripped):
+        return "", False  # signal: caller should use detour path
+
+    word_count = len(stripped.split())
+    if word_count > _BUSINESS_NAME_MAX_WORDS:
+        return build_reprompt("BUSINESS_NAME", lang), False
+
+    # Accept verbatim — no keyword filtering, no LLM judgment
+    meta["business_name"] = stripped
+    meta["phase"] = "BUSINESS_TYPE"
+    reset_reprompts(meta)
+    log.info(f"lead: business name captured: {stripped!r}")
+    return _t(_ACK_BUSINESS_NAME, lang), True
 
 
 def apply_interactive_answer(
