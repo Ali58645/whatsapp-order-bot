@@ -15,15 +15,17 @@ JSONB columns are mapped as JSON for SQLite compatibility in tests.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import (
-    BigInteger, Boolean, DateTime, ForeignKey, Index, Integer,
-    String, Text, UniqueConstraint, func,
+    BigInteger, DateTime, ForeignKey, Index, Integer,
+    String, Text, UniqueConstraint, func, text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
+
+# SQLite only autoincrements INTEGER PKs; Postgres keeps BIGINT.
+_PK = BigInteger().with_variant(Integer, "sqlite")
 
 
 def _json_col():
@@ -42,7 +44,7 @@ class Base(DeclarativeBase):
 class DBTenant(Base):
     __tablename__ = "tenants"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     phone_number_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     flow_mode: Mapped[str] = mapped_column(String(16), nullable=False)  # "lead" | "order"
@@ -53,7 +55,6 @@ class DBTenant(Base):
 
     contacts: Mapped[list["DBContact"]] = relationship(back_populates="tenant")
     sessions: Mapped[list["DBSession"]] = relationship(back_populates="tenant")
-    mutes: Mapped[list["DBMute"]] = relationship(back_populates="tenant")
     events: Mapped[list["DBEvent"]] = relationship(back_populates="tenant")
 
 
@@ -65,7 +66,7 @@ class DBContact(Base):
         UniqueConstraint("tenant_id", "wa_id", name="uq_contacts_tenant_wa"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     wa_id: Mapped[str] = mapped_column(String(32), nullable=False)
     profile_name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
@@ -80,7 +81,6 @@ class DBContact(Base):
     sessions: Mapped[list["DBSession"]] = relationship(back_populates="contact")
     leads: Mapped[list["DBLead"]] = relationship(back_populates="contact")
     orders: Mapped[list["DBOrder"]] = relationship(back_populates="contact")
-    mutes: Mapped[list["DBMute"]] = relationship(back_populates="contact")
     events: Mapped[list["DBEvent"]] = relationship(back_populates="contact")
 
 
@@ -93,7 +93,7 @@ class DBSession(Base):
     """
     __tablename__ = "sessions"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     contact_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contacts.id"), nullable=False)
     flow_mode: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -123,8 +123,8 @@ class DBSession(Base):
             "tenant_id",
             "contact_id",
             unique=True,
-            postgresql_where="status = 'active'",
-            sqlite_where="status = 'active'",
+            postgresql_where=text("status = 'active'"),
+            sqlite_where=text("status = 'active'"),
         ),
     )
 
@@ -134,7 +134,7 @@ class DBSession(Base):
 class DBLead(Base):
     __tablename__ = "leads"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     contact_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contacts.id"), nullable=False)
     session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("sessions.id"), nullable=False)
@@ -163,7 +163,7 @@ class DBLead(Base):
 class DBOrder(Base):
     __tablename__ = "orders"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     contact_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contacts.id"), nullable=False)
     session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("sessions.id"), nullable=False)
@@ -196,13 +196,6 @@ class DBMute(Base):
     wa_id: Mapped[str] = mapped_column(String(32), primary_key=True, nullable=False)
     muted_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    tenant: Mapped["DBTenant"] = relationship(back_populates="mutes")
-    contact: Mapped["DBContact"] = relationship(
-        primaryjoin="and_(DBMute.tenant_id == DBContact.tenant_id, DBMute.wa_id == DBContact.wa_id)",
-        foreign_keys="[DBMute.tenant_id, DBMute.wa_id]",
-        viewonly=True,
-    )
-
 
 # ── Events ────────────────────────────────────────────────────────────────────
 
@@ -213,7 +206,7 @@ class DBEvent(Base):
     """
     __tablename__ = "events"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     contact_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("contacts.id"), nullable=True

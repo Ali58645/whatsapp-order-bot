@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 log = logging.getLogger("orderbot.db")
 
@@ -64,16 +66,13 @@ if DB_ENABLED:
         log.warning(f"db: failed to create engine ({exc}) — falling back to in-memory mode")
         DB_ENABLED = False
 else:
-    log.warning(
+        log.warning(
         "db: DATABASE_URL not set — running in in-memory fallback mode "
         "(sessions/leads/mutes will not survive restarts)"
     )
 
 
 # ── Context manager helper ───────────────────────────────────────────────────
-
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 
 @asynccontextmanager

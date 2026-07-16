@@ -121,6 +121,115 @@ def _sheet_field_update(sender: str, meta: dict, tenant: Tenant) -> None:
         _sheet_upsert(sender, fields, tenant)
 
 
+# ---------------------------------------------------------------------------
+# DB helpers — fire-and-forget; never delay or break a reply
+# ---------------------------------------------------------------------------
+
+async def _db_save_lead_state(sender: str, meta: dict, tenant: Tenant) -> None:
+    """Persist active lead session state. Errors logged only."""
+    try:
+        from app.db.store import SessionStore
+        store = await SessionStore.load(sender, tenant)
+        store.meta = dict(meta)
+        store.phase = meta.get("phase", store.phase or "GREETING")
+        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        await store.save()
+    except Exception as exc:
+        log.error(f"db: save lead state failed for {sender} — {exc}")
+
+
+async def _db_close_lead(
+    sender: str, meta: dict, tenant: Tenant, status: str
+) -> None:
+    """Close lead session + append audit event. Errors logged only."""
+    try:
+        from app.db.store import SessionStore, EventStore
+        store = await SessionStore.load(sender, tenant)
+        store.meta = dict(meta)
+        store.phase = meta.get("phase", store.phase or "GREETING")
+        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        await store.close(status)
+        await EventStore.append(
+            tenant, status, {"phase": meta.get("phase", "")}, wa_id=sender
+        )
+    except Exception as exc:
+        log.error(f"db: close lead failed for {sender} — {exc}")
+
+
+async def _db_persist_lead(sender: str, meta: dict, tenant: Tenant) -> None:
+    """Save or close based on phase (CONFIRMED / STALLED → close)."""
+    phase = meta.get("phase", "")
+    if phase == "CONFIRMED":
+        await _db_close_lead(sender, meta, tenant, "confirmed")
+    elif phase == "STALLED":
+        await _db_close_lead(sender, meta, tenant, "stalled")
+    else:
+        await _db_save_lead_state(sender, meta, tenant)
+
+
+async def _db_append_event(
+    tenant: Tenant,
+    event_type: str,
+    payload: dict,
+    wa_id: str | None = None,
+) -> None:
+    """Append audit event. Errors logged only."""
+    try:
+        from app.db.store import EventStore
+        await EventStore.append(tenant, event_type, payload, wa_id=wa_id)
+    except Exception as exc:
+        log.error(f"db: append event ({event_type}) failed — {exc}")
+
+
+async def _db_save_order_state(sender: str, tenant: Tenant) -> None:
+    """Persist order-flow session history. Errors logged only."""
+    try:
+        from app.db.store import SessionStore
+        store = await SessionStore.load(sender, tenant)
+        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        store.phase = "ORDERING"
+        store.meta = {"phase": "ORDERING"}
+        await store.save()
+    except Exception as exc:
+        log.error(f"db: save order state failed for {sender} — {exc}")
+
+
+async def _db_confirm_order(
+    sender: str, tenant: Tenant, order: dict, history: list | None = None
+) -> None:
+    """Persist confirmed order + close session + event. Errors logged only."""
+    try:
+        from app.db.store import SessionStore, OrderStore, EventStore
+        store = await SessionStore.load(sender, tenant)
+        store.history = list(
+            history if history is not None
+            else get_session(sender, tenant_id=tenant.phone_number_id)
+        )
+        store.phase = "CONFIRMED"
+        store.meta = {"phase": "CONFIRMED", "order": order}
+        await store.save()
+        await OrderStore.save_order(tenant, sender, order, store)
+        await store.close("confirmed")
+        await EventStore.append(
+            tenant, "confirmed",
+            {"total": order.get("total"), "items": order.get("items", [])},
+            wa_id=sender,
+        )
+    except Exception as exc:
+        log.error(f"db: confirm order failed for {sender} — {exc}")
+
+
+async def _db_close_order_session(sender: str, tenant: Tenant, status: str = "closed") -> None:
+    """Close order session (e.g. reset). Errors logged only."""
+    try:
+        from app.db.store import SessionStore
+        store = await SessionStore.load(sender, tenant)
+        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        await store.close(status)
+    except Exception as exc:
+        log.error(f"db: close order session failed for {sender} — {exc}")
+
+
 def _build_order_system_prompt(tenant: Tenant) -> str:
     if tenant.menu:
         menu_dict = tenant.menu.model_dump()
@@ -266,7 +375,7 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
 
         if gate.message_type == "interactive":
             result = await _handle_interactive_reply(sender, meta, entry, tenant)
-            asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
         user_text = gate.text or ""
@@ -287,7 +396,7 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
                                 "en": "Kindly respond in text so we may assist you."}
                 reply_text = f"{_t(_UNSUPPORTED, lang)}\n\n{build_reprompt(phase, lang)}"
             await send_whatsapp_message(sender, reply_text, tenant=tenant)
-            asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return {"status": "ok"}
 
         # Custom slot
@@ -316,7 +425,7 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
         # Entry intent
         if meta.get("phase") == "GREETING":
             result = await _handle_entry_message(sender, meta, user_text, tenant)
-            asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
         phase = meta.get("phase", "")
@@ -324,26 +433,26 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
 
         if phase == "BUSINESS_NAME":
             result = await _handle_business_name_phase(sender, meta, user_text, lang, tenant)
-            asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
         if phase == "BUSINESS_TYPE":
             result = await _handle_text_at_interactive_phase(
                 sender, meta, user_text, lang, _match_business_type, "LOCATIONS", "business_type", tenant)
-            asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
         if phase == "LOCATIONS":
             result = await _handle_text_at_interactive_phase(
                 sender, meta, user_text, lang, _match_locations, "CURRENT_SYSTEM", "locations", tenant)
-            asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
         if phase == "CURRENT_SYSTEM":
             result = await _handle_text_at_interactive_phase(
                 sender, meta, user_text, lang, _match_current_system, "SCHEDULING", "current_system", tenant)
-            asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
         result = await _handle_llm_turn(sender, meta, user_text, lang, tenant)
-        asyncio.create_task(_db_save_lead_state(sender, meta, tenant))
+        asyncio.create_task(_db_persist_lead(sender, meta, tenant))
         return result
 
 
@@ -626,6 +735,7 @@ async def _handle_order_flow(entry: dict, tenant: Tenant) -> dict:
         return {"status": "ok"}
     user_text = message["text"]["body"].strip()
     if user_text.lower() in ("reset", "restart", "naya order"):
+        asyncio.create_task(_db_close_order_session(sender, tenant, "closed"))
         clear_session(sender, tenant_id=tid)
         await send_whatsapp_message(sender, "Order reset. What would you like to order?", tenant=tenant)
         return {"status": "ok"}
@@ -635,7 +745,11 @@ async def _handle_order_flow(entry: dict, tenant: Tenant) -> dict:
         if order:
             await forward_order_to_owner(order, sender, tenant.owner_whatsapp,
                                          lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+            hist = list(get_session(sender, tenant_id=tid))
+            asyncio.create_task(_db_confirm_order(sender, tenant, order, history=hist))
             clear_session(sender, tenant_id=tid)
+        else:
+            asyncio.create_task(_db_save_order_state(sender, tenant))
     await send_whatsapp_message(sender, clean_reply, tenant=tenant)
     return {"status": "ok"}
 

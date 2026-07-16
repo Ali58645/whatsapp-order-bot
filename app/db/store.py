@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional, TYPE_CHECKING
 
@@ -128,7 +127,7 @@ class SessionStore:
         from app.db.engine import get_db
         from app.db.repo import (
             get_db_tenant_id, get_or_create_contact,
-            get_active_session, create_session,
+            get_active_session,
         )
 
         async with get_db() as db:
@@ -248,6 +247,14 @@ class SessionStore:
                 self._db_session_row = db_sess
                 self._tenant_db_id = tenant_db_id
                 self._contact_id = contact_id
+                # Apply final status/history even on first write (e.g. close-on-create)
+                await save_session_state(
+                    db, db_sess,
+                    phase=self.phase,
+                    meta=self.meta,
+                    history=self.history,
+                    status=status,
+                )
             else:
                 await save_session_state(
                     db, db_sess,

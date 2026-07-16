@@ -1,7 +1,7 @@
 """
 Run Alembic migrations at startup.
 
-Uses an advisory lock (Postgres) or a simple retry (SQLite) so that
+Uses a Postgres advisory lock (or a no-op for SQLite) so that
 multi-worker deploys don't run migrations concurrently.
 
 Called from the FastAPI lifespan handler so migrations run before the
@@ -12,9 +12,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
 log = logging.getLogger("orderbot.migrate")
+
+# Arbitrary lock key — unique to this app
+_ADVISORY_LOCK_KEY = 74231459
+
+
+def _to_sync_url(url: str) -> str:
+    """Alembic/SQLAlchemy sync engines can't use asyncpg / aiosqlite drivers."""
+    if url.startswith("postgresql+asyncpg://"):
+        return "postgresql://" + url[len("postgresql+asyncpg://"):]
+    if url.startswith("sqlite+aiosqlite://"):
+        return "sqlite://" + url[len("sqlite+aiosqlite://"):]
+    return url
 
 
 async def run_migrations() -> None:
@@ -27,7 +38,6 @@ async def run_migrations() -> None:
 
     log.info("migrate: running Alembic migrations …")
     try:
-        # Run in thread to avoid blocking the event loop (Alembic is sync)
         await asyncio.to_thread(_run_sync_migrations, DATABASE_URL)
         log.info("migrate: migrations complete")
     except Exception as exc:
@@ -38,11 +48,32 @@ async def run_migrations() -> None:
 def _run_sync_migrations(database_url: str) -> None:
     """Sync helper executed in a worker thread."""
     import os as _os
-    from alembic.config import Config
-    from alembic import command
 
-    # Point alembic at our ini file (repo root)
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, text
+
+    sync_url = _to_sync_url(database_url)
     ini_path = _os.path.join(_os.path.dirname(__file__), "..", "..", "alembic.ini")
     cfg = Config(ini_path)
-    cfg.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(cfg, "head")
+    cfg.set_main_option("sqlalchemy.url", sync_url)
+
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            if conn.dialect.name == "postgresql":
+                got_lock = conn.execute(
+                    text(f"SELECT pg_try_advisory_lock({_ADVISORY_LOCK_KEY})")
+                ).scalar()
+                if not got_lock:
+                    log.info("migrate: another worker holds the lock — skipping")
+                    return
+                try:
+                    command.upgrade(cfg, "head")
+                finally:
+                    conn.execute(text(f"SELECT pg_advisory_unlock({_ADVISORY_LOCK_KEY})"))
+                    conn.commit()
+            else:
+                command.upgrade(cfg, "head")
+    finally:
+        engine.dispose()

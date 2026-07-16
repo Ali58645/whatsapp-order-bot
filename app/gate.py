@@ -19,6 +19,7 @@ Rules (in evaluation order):
 
 import logging
 import time
+import asyncio
 from dataclasses import dataclass
 from typing import Dict, Optional, TYPE_CHECKING
 
@@ -56,6 +57,35 @@ def mute_contact(wa_id: str, tenant_id: str = "", duration_s: int = MUTE_DURATIO
         f"gate: muted {wa_id} (tenant={tenant_id}) until "
         f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(until))}"
     )
+
+
+def _schedule_mute_persist(wa_id: str, tenant: "Tenant", duration_s: int = MUTE_DURATION_S) -> None:
+    """Fire-and-forget DB mute + human_takeover event (memory already updated)."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+
+    async def _persist() -> None:
+        try:
+            from datetime import datetime, timezone, timedelta
+            from app.db.engine import DB_ENABLED, get_db
+            from app.db.repo import get_db_tenant_id, set_mute
+            from app.db.store import EventStore
+
+            if DB_ENABLED:
+                muted_until = datetime.now(timezone.utc) + timedelta(seconds=duration_s)
+                async with get_db() as db:
+                    tid = await get_db_tenant_id(db, tenant.phone_number_id)
+                    if tid is not None:
+                        await set_mute(db, tid, wa_id, muted_until)
+            await EventStore.append(
+                tenant, "human_takeover", {"wa_id": wa_id}, wa_id=wa_id
+            )
+        except Exception as exc:
+            log.error(f"gate: DB mute persist failed for {wa_id} — {exc}")
+
+    loop.create_task(_persist())
 
 
 def is_muted(wa_id: str, tenant_id: str = "") -> bool:
@@ -110,6 +140,7 @@ def check_gate(
             customer_id = next(iter(contact_ids), None)
             if customer_id:
                 mute_contact(customer_id, tenant_id)
+                _schedule_mute_persist(customer_id, tenant)
             log.info(f"gate: outbound echo detected — muting customer {customer_id}")
             return GateResult(allowed=False, sender=sender)
 
