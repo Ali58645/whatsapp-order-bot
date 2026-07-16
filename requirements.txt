@@ -10,3 +10,5 @@ asyncpg==0.30.0
 aiosqlite==0.20.0
 alembic==1.14.0
 psycopg2-binary==2.9.10
+PyJWT==2.10.1
+bcrypt==4.2.1

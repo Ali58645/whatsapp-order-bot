@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg0: #e8eef5;
+  --bg1: #f0f4f8;
+  --ink: #141c2e;
+  --sea: #148077;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(26, 155, 142, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(61, 82, 120, 0.1), transparent 50%),
+    linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #eef2f7);
+  color: var(--ink);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.28s ease-out both;
+}

@@ -64,6 +64,34 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="WhatsApp Bot", lifespan=lifespan)
 
+# Dashboard API (404 when DASHBOARD_* env vars absent; 503 without DATABASE_URL)
+from app.dashboard.routes import router as dashboard_router  # noqa: E402
+app.include_router(dashboard_router)
+
+# Serve built React dashboard (Vite → app/static/dashboard)
+from pathlib import Path  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_DASHBOARD_DIR = Path(__file__).resolve().parent / "static" / "dashboard"
+if _DASHBOARD_DIR.is_dir() and (_DASHBOARD_DIR / "index.html").exists():
+    app.mount(
+        "/dashboard/assets",
+        StaticFiles(directory=_DASHBOARD_DIR / "assets"),
+        name="dashboard-assets",
+    )
+
+    @app.get("/dashboard")
+    @app.get("/dashboard/{full_path:path}")
+    async def dashboard_spa(full_path: str = ""):
+        """SPA fallback — never shadow /api/*."""
+        # Prefer exact static file if present (favicon, etc.)
+        candidate = (_DASHBOARD_DIR / full_path) if full_path else None
+        if candidate and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_DASHBOARD_DIR / "index.html")
+
+
 # Lead-flow symbols (always imported — tenants choose which flow to run)
 from app.lead import (                                      # noqa: E402
     get_lead_meta, clear_lead_meta, has_active_lead,

@@ -1,0 +1,8 @@
+# Optional Nixpacks hooks — prefer root `npm run build` (package.json) on Railway.
+# Ensures Node is available when building the React dashboard.
+
+[variables]
+NIXPACKS_NODE_VERSION = "20"
+
+[phases.build]
+cmds = ["npm run build"]

@@ -1,14 +1,15 @@
 # WhatsApp Order Bot — Deploy Tonight
 
-FastAPI + Meta Cloud API + Claude Haiku. One deployment = one shop (v1).
-Per-client customization = edit `menu.json` only.
+FastAPI + Meta Cloud API + Claude Haiku. Multi-tenant WhatsApp bots with
+optional Postgres persistence and an admin dashboard at `/dashboard`.
 
 ## Deploy steps (45-60 min total)
 
 ### 1. Railway (10 min)
 - Push this folder to a GitHub repo, connect to Railway
-- Railway auto-detects the Procfile
-- Set all env vars from `.env.example` in Railway dashboard
+- Add a **PostgreSQL** plugin (sets `DATABASE_URL`)
+- Set env vars from `.env.example` (WhatsApp, Anthropic, dashboard creds)
+- Build runs `dashboard-ui` via `nixpacks.toml` → static files in `app/static/dashboard`
 - Note your public URL: `https://xxxx.up.railway.app`
 
 ### 2. Meta app (15 min)
@@ -24,7 +25,20 @@ Per-client customization = edit `menu.json` only.
 - Verify token: whatever you set as WHATSAPP_VERIFY_TOKEN
 - Click Verify and Save → subscribe to **messages** field
 
-### 4. Test (5 min)
+### 4. Admin dashboard
+- URL: `https://xxxx.up.railway.app/dashboard`
+- Set `DASHBOARD_USER`, `DASHBOARD_PASSWORD`, `DASHBOARD_JWT_SECRET` (all three required)
+- Without those vars the bot still runs; dashboard API returns 404
+- Without `DATABASE_URL` the dashboard API returns 503 (in-memory bot mode)
+
+### Local dashboard UI build
+```bash
+cd dashboard-ui && npm ci && npm run build
+# output → app/static/dashboard/  (served by FastAPI at /dashboard)
+npm run dev   # Vite on :5173, proxies /api → :8000
+```
+
+### 5. Test (5 min)
 - Message the test number from your phone: "menu"
 - Order something, give an address, confirm
 - Owner number (OWNER_WHATSAPP env var) receives the order slip
@@ -42,9 +56,8 @@ Per-client customization = edit `menu.json` only.
 6. Print counter sticker with the ordering number
 
 ## Known v1 limits (fine for pilot)
-- Sessions are in-memory: process restart = conversations reset
+- Without `DATABASE_URL`, sessions are in-memory (restart clears them)
 - Text messages only (images/voice get a polite redirect)
-- Single shop per deployment (multi-tenant is the v2 refactor)
 - Order slip goes to owner via WhatsApp free-window — works only if
   owner has messaged the bot number once (do this during setup)
 

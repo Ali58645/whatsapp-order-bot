@@ -1,0 +1,8 @@
+{
+  "name": "whatsapp-order-bot",
+  "private": true,
+  "description": "Root scripts for Railway — builds the admin dashboard into app/static/dashboard",
+  "scripts": {
+    "build": "npm ci --prefix dashboard-ui && npm run build --prefix dashboard-ui"
+  }
+}
