@@ -31,11 +31,14 @@ optional Postgres persistence and an admin dashboard at `/dashboard`.
 - Without those vars the bot still runs; dashboard API returns 404
 - Without `DATABASE_URL` the dashboard API returns 503 (in-memory bot mode)
 
-### Local dashboard UI build
+### Local dashboard UI (from repo root)
 ```bash
-cd dashboard-ui && npm ci && npm run build
-# output → app/static/dashboard/  (served by FastAPI at /dashboard)
-npm run dev   # Vite on :5173, proxies /api → :8000
+npm install          # also installs dashboard-ui deps
+npm run dev          # API :8000 + Vite :5173 together (needs .env)
+npm run dev:api      # FastAPI only
+npm run dev:ui       # Vite only
+npm run build        # → app/static/dashboard/ (served by FastAPI at /dashboard)
+npm start            # preview the production build
 ```
 
 ### 5. Test (5 min)

@@ -1,8 +1,17 @@
 {
   "name": "whatsapp-order-bot",
   "private": true,
-  "description": "Root scripts for Railway — builds the admin dashboard into app/static/dashboard",
+  "description": "Root scripts — dashboard UI lives in dashboard-ui/",
   "scripts": {
-    "build": "npm ci --prefix dashboard-ui && npm run build --prefix dashboard-ui"
+    "postinstall": "npm install --prefix dashboard-ui",
+    "dev": "concurrently -k -n api,ui -c blue,magenta \"npm run dev:api\" \"npm run dev:ui\"",
+    "dev:api": "uvicorn app.main:app --env-file .env --host 127.0.0.1 --port 8000 --reload",
+    "dev:ui": "npm run dev --prefix dashboard-ui",
+    "start": "npm run preview --prefix dashboard-ui",
+    "build": "npm install --prefix dashboard-ui && npm run build --prefix dashboard-ui",
+    "preview": "npm run preview --prefix dashboard-ui"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }

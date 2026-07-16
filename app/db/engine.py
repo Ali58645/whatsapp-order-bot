@@ -22,11 +22,14 @@ log = logging.getLogger("orderbot.db")
 # ── Resolve URL ──────────────────────────────────────────────────────────────
 
 def _normalise_url(raw: str) -> str:
-    """Convert Railway-style postgres:// to postgresql+asyncpg://"""
+    """Convert Railway/Neon postgres:// to postgresql+asyncpg:// (+ SSL fix)."""
     if raw.startswith("postgres://"):
-        return "postgresql+asyncpg://" + raw[len("postgres://"):]
-    if raw.startswith("postgresql://") and "+asyncpg" not in raw:
-        return "postgresql+asyncpg://" + raw[len("postgresql://"):]
+        raw = "postgresql+asyncpg://" + raw[len("postgres://"):]
+    elif raw.startswith("postgresql://") and "+asyncpg" not in raw:
+        raw = "postgresql+asyncpg://" + raw[len("postgresql://"):]
+    # libpq uses sslmode=; asyncpg expects ssl=
+    if "+asyncpg" in raw and "sslmode=" in raw:
+        raw = raw.replace("sslmode=", "ssl=")
     return raw
 
 
@@ -66,7 +69,7 @@ if DB_ENABLED:
         log.warning(f"db: failed to create engine ({exc}) — falling back to in-memory mode")
         DB_ENABLED = False
 else:
-        log.warning(
+    log.warning(
         "db: DATABASE_URL not set — running in in-memory fallback mode "
         "(sessions/leads/mutes will not survive restarts)"
     )

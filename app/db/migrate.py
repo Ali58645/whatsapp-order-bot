@@ -22,9 +22,12 @@ _ADVISORY_LOCK_KEY = 74231459
 def _to_sync_url(url: str) -> str:
     """Alembic/SQLAlchemy sync engines can't use asyncpg / aiosqlite drivers."""
     if url.startswith("postgresql+asyncpg://"):
-        return "postgresql://" + url[len("postgresql+asyncpg://"):]
+        url = "postgresql://" + url[len("postgresql+asyncpg://"):]
     if url.startswith("sqlite+aiosqlite://"):
-        return "sqlite://" + url[len("sqlite+aiosqlite://"):]
+        url = "sqlite://" + url[len("sqlite+aiosqlite://"):]
+    # Sync psycopg2 wants sslmode=, not asyncpg's ssl=
+    if "ssl=require" in url and "sslmode=" not in url:
+        url = url.replace("ssl=require", "sslmode=require")
     return url
 
 
