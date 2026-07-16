@@ -153,8 +153,8 @@ async def test_generic_info_opener_sends_greeting_with_value_line(client, mock_s
     assert "naam" in greeting.lower() or "name" in greeting.lower() or "barah" in greeting.lower()
 
     # Phase advanced without LLM
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_NAME"
-    assert _meta[CUSTOMER]["entry_intent"] == "GENERIC_INFO"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_NAME"
+    assert _meta[("12345", CUSTOMER)]["entry_intent"] == "GENERIC_INFO"
 
 
 @pytest.mark.asyncio
@@ -178,8 +178,8 @@ async def test_price_first_gets_deflection_and_name_question(client, mock_send):
     # Still asks for name in same message
     assert "naam" in msg or "name" in msg or "barah" in msg
 
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_NAME"
-    assert _meta[CUSTOMER]["entry_intent"] == "PRICE_FIRST"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_NAME"
+    assert _meta[("12345", CUSTOMER)]["entry_intent"] == "PRICE_FIRST"
 
 
 @pytest.mark.asyncio
@@ -207,8 +207,8 @@ async def test_demo_first_jumps_to_scheduling_buttons(client, mock_send):
     ]
     assert "slot_1" in btn_ids
 
-    assert _meta[CUSTOMER]["phase"] == "SCHEDULING"
-    assert _meta[CUSTOMER]["entry_intent"] == "DEMO_FIRST"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "SCHEDULING"
+    assert _meta[("12345", CUSTOMER)]["entry_intent"] == "DEMO_FIRST"
 
 
 @pytest.mark.asyncio
@@ -228,8 +228,8 @@ async def test_voice_note_first_gets_generic_greeting(client, mock_send):
     assert "shukriya" in msg
     assert "text" in msg          # contains the 'text mein reply' note
 
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_NAME"
-    assert _meta[CUSTOMER]["entry_intent"] == "GENERIC_INFO"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_NAME"
+    assert _meta[("12345", CUSTOMER)]["entry_intent"] == "GENERIC_INFO"
 
 
 @pytest.mark.asyncio
@@ -241,7 +241,7 @@ async def test_referral_headline_appears_on_lead_card_not_in_customer_message(cl
     from app.lead import _meta
 
     # Simulate a lead that's already at CONFIRMED with a referral headline stored
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "SCHEDULING",
         "lead_source": "Get Bahi POS",
         "referral_headline": "Summer Sale — Get Bahi POS Free Demo",

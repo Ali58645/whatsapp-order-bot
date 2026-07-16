@@ -274,11 +274,33 @@ def _sync_upsert_lead(phone: str, fields: dict) -> None:
     row = _sync_find_row_by_phone(service, tab, phone)
 
     if row is not None:
-        # ── UPDATE: batch-update only the provided mapped columns ─────────
         _sync_update_row(service, tab, row, fields)
     else:
-        # ── INSERT: write to first empty phone row ────────────────────────
         _sync_insert_row(service, tab, phone, fields)
+
+
+def _sync_upsert_lead_for(
+    phone: str, fields: dict, gsheet_id: str, tab_name: str
+) -> None:
+    """
+    Like _sync_upsert_lead but writes to *gsheet_id* / *tab_name* explicitly.
+    Used for per-tenant sheets.
+    """
+    service = _build_service()
+    effective_tab = tab_name if tab_name else _resolve_tab(service)
+
+    # Temporarily swap the global sheet id for this call
+    import app.sheet as _self
+    orig = _self._GSHEET_ID
+    _self._GSHEET_ID = gsheet_id
+    try:
+        row = _sync_find_row_by_phone(service, effective_tab, phone)
+        if row is not None:
+            _sync_update_row(service, effective_tab, row, fields)
+        else:
+            _sync_insert_row(service, effective_tab, phone, fields)
+    finally:
+        _self._GSHEET_ID = orig
 
 
 def _sync_update_row(service, tab: str, row: int, fields: dict) -> None:
@@ -369,22 +391,45 @@ async def find_row_by_phone(phone: str) -> int | None:
         return None
 
 
-async def upsert_lead(phone: str, fields: dict) -> None:
+async def upsert_lead(
+    phone: str,
+    fields: dict,
+    *,
+    gsheet_id: str = "",
+    tab: str = "",
+) -> None:
     """
     Async, fire-and-forget safe.  Runs sync I/O in a thread, 10 s timeout.
     Logs errors; never raises.  Only writes columns in COLUMN_MAP.
     The write lock serialises concurrent inserts to prevent row collisions.
+
+    gsheet_id / tab: if provided, write to that specific sheet (multi-tenant).
+    Falls back to the module-level _GSHEET_ID / _GSHEET_TAB env-var values.
     """
-    if not _ENABLED:
-        return
+    effective_gsheet_id = gsheet_id or _GSHEET_ID
+    if not (effective_gsheet_id and _SA_JSON_B64):
+        if not _ENABLED and not effective_gsheet_id:
+            return
+        if not effective_gsheet_id:
+            return
     # Filter to mapped fields only before even entering the thread
     safe_fields = {k: v for k, v in fields.items() if k in COLUMN_MAP}
     try:
         async with _get_write_lock():
-            await asyncio.wait_for(
-                asyncio.to_thread(_sync_upsert_lead, phone, safe_fields),
-                timeout=10,
-            )
+            if gsheet_id:
+                await asyncio.wait_for(
+                    asyncio.to_thread(
+                        _sync_upsert_lead_for, phone, safe_fields, gsheet_id, tab
+                    ),
+                    timeout=10,
+                )
+            else:
+                if not _ENABLED:
+                    return
+                await asyncio.wait_for(
+                    asyncio.to_thread(_sync_upsert_lead, phone, safe_fields),
+                    timeout=10,
+                )
     except asyncio.TimeoutError:
         log.error(f"sheet: upsert_lead timed out for {phone} — fields: {safe_fields}")
     except Exception as exc:

@@ -1,30 +1,42 @@
 """
-Conversation session storage.
+Conversation session storage — multi-tenant.
 
-v1: in-memory dict — fine for a single Railway instance and a pilot shop.
-If the process restarts, conversations reset (customers just start over).
-Upgrade path: swap these three functions for Redis when you have >3 clients.
+v2: DB-backed when DATABASE_URL is set; in-memory fallback otherwise.
+
+The in-memory dicts here are always kept up-to-date by SessionStore.save()
+so existing call sites (get_session / save_session / clear_session) continue
+to work unchanged in both DB and fallback modes.
+
+get_sender_lock is re-exported from app.db.store so callers only need one
+import regardless of mode.
 """
 
 import asyncio
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
-_sessions: Dict[str, List[dict]] = {}
-_locks: Dict[str, asyncio.Lock] = {}
-
-
-def get_session(sender: str) -> List[dict]:
-    return _sessions.setdefault(sender, [])
+# (tenant_id, sender) → conversation history
+_sessions: Dict[Tuple[str, str], List[dict]] = {}
+# (tenant_id, sender) → asyncio.Lock
+_locks: Dict[Tuple[str, str], asyncio.Lock] = {}
 
 
-def save_session(sender: str, history: List[dict]) -> None:
-    _sessions[sender] = history
+def _key(tenant_id: str, sender: str) -> Tuple[str, str]:
+    return (tenant_id, sender)
 
 
-def clear_session(sender: str) -> None:
-    _sessions.pop(sender, None)
+def get_session(sender: str, tenant_id: str = "") -> List[dict]:
+    return _sessions.setdefault(_key(tenant_id, sender), [])
 
 
-def get_sender_lock(sender: str) -> asyncio.Lock:
-    """Return (creating if needed) a per-sender asyncio.Lock."""
-    return _locks.setdefault(sender, asyncio.Lock())
+def save_session(sender: str, history: List[dict], tenant_id: str = "") -> None:
+    _sessions[_key(tenant_id, sender)] = history
+
+
+def clear_session(sender: str, tenant_id: str = "") -> None:
+    _sessions.pop(_key(tenant_id, sender), None)
+
+
+def get_sender_lock(sender: str, tenant_id: str = "") -> asyncio.Lock:
+    """Return (creating if needed) a per-sender-per-tenant asyncio.Lock."""
+    k = _key(tenant_id, sender)
+    return _locks.setdefault(k, asyncio.Lock())

@@ -80,9 +80,22 @@ def mock_send(monkeypatch):
 
 @pytest.fixture()
 def order_mode(monkeypatch):
-    """Force FLOW_MODE=order for tests that exercise the original order flow."""
-    import app.main as main_mod
-    monkeypatch.setattr(main_mod, "FLOW_MODE", "order")
+    """Force the single fallback tenant into order mode for these smoke tests."""
+    import app.tenants as tenants_mod
+    from app.tenants import Tenant
+
+    # Build an order-mode tenant from the env stubs (menu.json must exist)
+    order_tenant = Tenant.model_validate({
+        "phone_number_id": "12345",
+        "name": "Test Order Shop",
+        "flow_mode": "order",
+        "owner_whatsapp": "9200000000",
+        "menu": {
+            "shop_name": "Test Shop",
+            "categories": [{"name": "Burgers", "items": [{"name": "Burger", "price": 300}]}],
+        },
+    })
+    monkeypatch.setattr(tenants_mod, "_registry", {"12345": order_tenant})
 
 
 @pytest.fixture()

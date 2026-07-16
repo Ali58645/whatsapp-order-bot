@@ -257,7 +257,7 @@ async def test_delivered_status_no_mute_no_sheet(client, mock_send, mock_upsert)
     assert r.json() == {"status": "ignored"}
     mock_send.assert_not_called()
     mock_upsert.assert_not_called()
-    assert CUSTOMER not in _muted
+    assert ("12345", CUSTOMER) not in _muted
 
 
 @pytest.mark.asyncio
@@ -269,7 +269,7 @@ async def test_read_status_no_mute_no_sheet(client, mock_send, mock_upsert):
     assert r.json() == {"status": "ignored"}
     mock_send.assert_not_called()
     mock_upsert.assert_not_called()
-    assert CUSTOMER not in _muted
+    assert ("12345", CUSTOMER) not in _muted
 
 
 @pytest.mark.asyncio
@@ -280,13 +280,13 @@ async def test_status_event_after_active_lead_no_mute(client, mock_send, mock_up
     """
     from app.lead import _meta
     from app.gate import _muted
-    _meta[CUSTOMER] = {"phase": "BUSINESS_NAME", "lead_source": "ad"}
+    _meta[("12345", CUSTOMER)] = {"phase": "BUSINESS_NAME", "lead_source": "ad"}
 
     r = await client.post("/webhook", json=_delivered_status_payload(CUSTOMER))
     assert r.status_code == 200
     # Session must be untouched
-    assert _meta.get(CUSTOMER, {}).get("phase") == "BUSINESS_NAME"
-    assert CUSTOMER not in _muted
+    assert _meta.get(("12345", CUSTOMER), {}).get("phase") == "BUSINESS_NAME"
+    assert ("12345", CUSTOMER) not in _muted
     mock_upsert.assert_not_called()
 
 
@@ -330,7 +330,7 @@ async def test_echo_from_business_number_no_sheet_mute_for_own_contact(client, m
     assert r.status_code == 200
 
     # Customer must be muted
-    assert CUSTOMER in _muted
+    assert ("12345", CUSTOMER) in _muted
 
     # If upsert_lead was called (for customer "human took over" note), the
     # phone arg must be the CUSTOMER number, never the BUSINESS number
@@ -345,13 +345,21 @@ async def test_echo_from_business_number_no_sheet_mute_for_own_contact(client, m
 async def test_is_own_number_normalizes_correctly():
     """_is_own_number must correctly identify OWNER and BUSINESS numbers."""
     import app.main as main_mod
-    # OWNER_WHATSAPP = "9200000000" → last 10 digits "9200000000" → normalized "200000000" (9 digits, < 10)
-    # Actually 9200000000 is 10 digits already, normalize → 9200000000
-    # Various formats of OWNER
-    assert main_mod._is_own_number("9200000000")   is True
-    assert main_mod._is_own_number("+9200000000")  is True
-    assert main_mod._is_own_number("09200000000")  is True   # leading 0
+    from app.tenants import Tenant
 
-    # BUSINESS_WA_ID = "92300BUSINESS" (not all digits, normalizes to empty-ish)
-    # The test is that a real customer number is NOT flagged
-    assert main_mod._is_own_number(CUSTOMER) is False
+    # Build a minimal tenant matching the env stubs above
+    tenant = Tenant.model_validate({
+        "phone_number_id": "12345",
+        "name": "Test",
+        "flow_mode": "lead",
+        "owner_whatsapp": OWNER,       # "9200000000"
+        "business_wa_id": BUSINESS,    # "92300BUSINESS"
+    })
+
+    # OWNER_WHATSAPP = "9200000000" — normalized → "9200000000" (10 digits, exact match)
+    assert main_mod._is_own_number("9200000000", tenant)   is True
+    assert main_mod._is_own_number("+9200000000", tenant)  is True
+    assert main_mod._is_own_number("09200000000", tenant)  is True   # leading 0
+
+    # A real customer number must NOT be flagged
+    assert main_mod._is_own_number(CUSTOMER, tenant) is False

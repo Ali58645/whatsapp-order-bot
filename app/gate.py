@@ -1,33 +1,36 @@
 """
-Activation gate — coexistence mode.
+Activation gate — coexistence mode, multi-tenant.
 
 Every incoming webhook event passes through `check_gate` BEFORE any reply
 logic runs.  Returns a GateResult that tells the caller whether to proceed
 and what lead metadata was detected.
 
+check_gate() now accepts a Tenant object so campaign_phrase / business_wa_id
+are read from per-tenant config rather than global env vars.
+
 Rules (in evaluation order):
-  1. Echo guard   — silently drop messages whose sender == our own number.
-  2. Human-override — if the *business app* sent a manual reply to a contact,
-                      mute that contact for 24 h.  Also drop muted contacts.
-  3. Lead detection — activate only if referral OR campaign phrase OR active session.
+  1. Status/receipt events — drop immediately.
+  2. Echo guard — drop own business number.
+  3. Outbound echo detection — mute customer if detected.
+  4. Human-override mute check.
+  5. Lead detection — referral / campaign phrase / active session.
+  6. Catch-all — allow every unmuted text/interactive through.
 """
 
 import logging
-import os
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.tenants import Tenant
 
 log = logging.getLogger("orderbot.gate")
 
-# ── Config ──────────────────────────────────────────────────────────────────
-BUSINESS_WA_ID: str = os.environ.get("BUSINESS_WA_ID", "")
-CAMPAIGN_PHRASE: str = os.environ.get("CAMPAIGN_PHRASE", "Bahi POS")
-
 MUTE_DURATION_S: int = 24 * 60 * 60  # 24 hours
 
-# ── In-memory mute store  {wa_id: muted_until_unix_ts} ──────────────────────
-_muted: Dict[str, float] = {}
+# ── In-memory mute store  {(tenant_id, wa_id): muted_until_unix_ts} ──────────
+_muted: Dict[tuple[str, str], float] = {}
 
 
 # ── Public result type ───────────────────────────────────────────────────────
@@ -43,44 +46,52 @@ class GateResult:
 
 
 # ── Mute helpers ─────────────────────────────────────────────────────────────
-def mute_contact(wa_id: str, duration_s: int = MUTE_DURATION_S) -> None:
-    """Silence the bot for *wa_id* for *duration_s* seconds."""
+
+def mute_contact(wa_id: str, tenant_id: str = "", duration_s: int = MUTE_DURATION_S) -> None:
+    """Silence the bot for *wa_id* within *tenant_id* for *duration_s* seconds."""
+    key = (tenant_id, wa_id)
     until = time.time() + duration_s
-    _muted[wa_id] = until
+    _muted[key] = until
     log.info(
-        f"gate: muted {wa_id} until {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(until))}"
+        f"gate: muted {wa_id} (tenant={tenant_id}) until "
+        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(until))}"
     )
 
 
-def is_muted(wa_id: str) -> bool:
-    until = _muted.get(wa_id)
+def is_muted(wa_id: str, tenant_id: str = "") -> bool:
+    key = (tenant_id, wa_id)
+    until = _muted.get(key)
     if until is None:
         return False
     if time.time() >= until:
-        del _muted[wa_id]          # expired — clean up
+        del _muted[key]
         return False
     return True
 
 
-def clear_mute(wa_id: str) -> None:
-    _muted.pop(wa_id, None)
+def clear_mute(wa_id: str, tenant_id: str = "") -> None:
+    _muted.pop((tenant_id, wa_id), None)
 
 
 # ── Main gate function ────────────────────────────────────────────────────────
+
 def check_gate(
     entry_value: dict,
     active_session: bool,
+    tenant: "Tenant",
 ) -> GateResult:
     """
     Evaluate the gate for one webhook value payload.
 
     *entry_value* is body["entry"][0]["changes"][0]["value"].
     *active_session* is True if the sender already has a live lead session.
+    *tenant* provides campaign_phrase and business_wa_id.
 
     Returns GateResult(allowed=False) for anything that should be silently ignored.
     """
-    # ── 0. Status/receipt events — drop immediately, no echo/mute logic ──────
-    # These arrive on the same webhook URL but must never trigger mute or note writes.
+    tenant_id = tenant.phone_number_id
+
+    # ── 0. Status/receipt events ─────────────────────────────────────────────
     if "statuses" in entry_value and "messages" not in entry_value:
         return GateResult(allowed=False, is_status_event=True)
 
@@ -91,32 +102,23 @@ def check_gate(
     message = entry_value["messages"][0]
     sender: str = message.get("from", "")
 
-    # ── 2. Echo guard — drop our own business number ──────────────────────────
-    #    But do NOT return before checking for outbound echoes (which carry our
-    #    number as sender AND a contacts list pointing to the real customer).
-    #    Outbound echoes must mute the customer before we drop.
-
-    # ── 3. Detect manual app echoes (message sent *by* the business app) ──────
-    #   Reliable heuristic: contacts list is present AND the first contact wa_id
-    #   does NOT match the "from" field → this is an outbound echo.
+    # ── 2 & 3. Outbound echo detection ───────────────────────────────────────
     contacts = entry_value.get("contacts", [])
     if contacts:
         contact_ids = {c.get("wa_id") for c in contacts}
         if sender not in contact_ids:
-            # Outbound echo: mute the actual customer and drop
             customer_id = next(iter(contact_ids), None)
             if customer_id:
-                mute_contact(customer_id)
+                mute_contact(customer_id, tenant_id)
             log.info(f"gate: outbound echo detected — muting customer {customer_id}")
             return GateResult(allowed=False, sender=sender)
 
-    # Plain echo from own number (no contacts list, or contacts matched sender)
-    if BUSINESS_WA_ID and sender == BUSINESS_WA_ID:
+    if tenant.business_wa_id and sender == tenant.business_wa_id:
         log.info(f"gate: echo from own number {sender} — ignored")
         return GateResult(allowed=False, sender=sender)
 
     # ── 4. Human-override mute check ─────────────────────────────────────────
-    if is_muted(sender):
+    if is_muted(sender, tenant_id):
         log.info(f"gate: {sender} is muted — silent")
         return GateResult(allowed=False, sender=sender)
 
@@ -125,67 +127,43 @@ def check_gate(
     text: Optional[str] = None
     if msg_type == "text":
         text = message.get("text", {}).get("body", "").strip()
-    # For interactive replies, text stays None — handled by parse_interactive_reply
 
-    # 5a. Referral object (click-to-WhatsApp ad)
+    # 5a. Referral object
     referral: Optional[dict] = message.get("referral")
     if referral:
         source_label = referral.get("headline") or referral.get("source_id", "ad")
         log.info(f"gate: referral lead from {sender} — source: {source_label}")
         return GateResult(
-            allowed=True,
-            sender=sender,
-            text=text,
-            message_type=msg_type,
-            referral=referral,
-            lead_source=source_label,
+            allowed=True, sender=sender, text=text,
+            message_type=msg_type, referral=referral, lead_source=source_label,
         )
 
-    # 5b. Campaign greeting phrase (text messages only)
-    if text and CAMPAIGN_PHRASE.lower() in text.lower():
+    # 5b. Campaign greeting phrase
+    if text and tenant.campaign_phrase.lower() in text.lower():
         log.info(f"gate: campaign phrase match from {sender}")
         return GateResult(
-            allowed=True,
-            sender=sender,
-            text=text,
+            allowed=True, sender=sender, text=text,
             message_type=msg_type,
-            lead_source=f"campaign:{CAMPAIGN_PHRASE}",
+            lead_source=f"campaign:{tenant.campaign_phrase}",
         )
 
-    # 5c. Already has an active lead session (includes interactive replies mid-flow)
+    # 5c. Already has an active lead session
     if active_session:
         return GateResult(
-            allowed=True,
-            sender=sender,
-            text=text,
-            message_type=msg_type,
-            lead_source="active_session",
+            allowed=True, sender=sender, text=text,
+            message_type=msg_type, lead_source="active_session",
         )
 
-    # ── 6. Catch-all: any unmuted, non-echo message gets a response ─────────
-    # In coexistence mode the bot was previously silent for messages that
-    # didn't match referral/campaign/active-session.  That causes "Hi" and
-    # similar openers to receive no reply.  We now allow every text and
-    # interactive message through; the handler sends the greeting or the
-    # appropriate flow step.  Status events and echoes are still silenced
-    # by the checks above.
+    # ── 6. Catch-all ─────────────────────────────────────────────────────────
     if msg_type in ("text", "interactive"):
         log.info(f"gate: direct message from {sender} — catch-all allow")
         return GateResult(
-            allowed=True,
-            sender=sender,
-            text=text,
-            message_type=msg_type,
-            lead_source="direct",
+            allowed=True, sender=sender, text=text,
+            message_type=msg_type, lead_source="direct",
         )
 
-    # Non-text media (audio, image, sticker, video, …) with no active session
-    # — allow through so the handler can send the unsupported-type reply.
     log.info(f"gate: non-text ({msg_type}) from {sender} — catch-all allow")
     return GateResult(
-        allowed=True,
-        sender=sender,
-        text=None,
-        message_type=msg_type,
-        lead_source="direct",
+        allowed=True, sender=sender, text=None,
+        message_type=msg_type, lead_source="direct",
     )

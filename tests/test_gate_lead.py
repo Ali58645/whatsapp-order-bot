@@ -176,7 +176,7 @@ async def test_active_session_continues_without_referral(client, mock_send, mock
     """
     from app.lead import _meta
     # Manually plant an active lead session
-    _meta[CUSTOMER] = {"phase": "BUSINESS_TYPE", "lead_source": "ad", "business_name": "Ali Shop"}
+    _meta[("12345", CUSTOMER)] = {"phase": "BUSINESS_TYPE", "lead_source": "ad", "business_name": "Ali Shop"}
 
     mock_claude.return_value = _make_claude_reply("Ali Shop kis type ka business hai?")
     r = await client.post("/webhook", json=_text_payload(CUSTOMER, "Retail store"))
@@ -212,7 +212,7 @@ async def test_confirmed_triggers_lead_card_to_owner(client, mock_send, mock_cla
     with the correct fields.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "SCHEDULING",
         "lead_source": "campaign:Bahi POS",
         "business_name": "Karachi Mart",
@@ -247,7 +247,7 @@ async def test_price_question_mid_flow_does_not_break_phase(client, mock_send, m
     or resetting the phase.  The bot must still reply 200 and send a message.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "LOCATIONS",
         "lead_source": "ad",
         "business_name": "Fast Mart",
@@ -264,7 +264,7 @@ async def test_price_question_mid_flow_does_not_break_phase(client, mock_send, m
     assert r.json() == {"status": "ok"}
 
     # Phase should NOT have been reset or jumped forward beyond what's expected
-    assert _meta[CUSTOMER]["phase"] in ("LOCATIONS", "CURRENT_SYSTEM")
+    assert _meta[("12345", CUSTOMER)]["phase"] in ("LOCATIONS", "CURRENT_SYSTEM")
 
     # Bot must have replied
     recipients = [c.args[0] for c in mock_send.call_args_list]

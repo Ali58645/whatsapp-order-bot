@@ -177,7 +177,7 @@ async def test_case2_second_message_no_greeting(client, mock_send):
     and send the interactive list (exactly one send).
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_NAME",
         "lead_source": "ad",
     }
@@ -213,7 +213,7 @@ async def test_case3_typed_retail_at_business_type_one_send_no_list(client, mock
     - NOT re-send the business-type interactive list
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Ali Traders",
@@ -235,7 +235,7 @@ async def test_case3_typed_retail_at_business_type_one_send_no_list(client, mock
         assert "grocery" not in row_ids, "Business-type list must NOT be re-sent"
 
     # Phase must have advanced
-    assert _meta[CUSTOMER].get("phase") == "LOCATIONS"
+    assert _meta[("12345", CUSTOMER)].get("phase") == "LOCATIONS"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -252,7 +252,7 @@ async def test_case4_detour_question_one_send_state_unchanged(client, mock_send,
     Phase must NOT advance.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Ali Traders",
@@ -270,7 +270,7 @@ async def test_case4_detour_question_one_send_state_unchanged(client, mock_send,
     assert len(calls) == 1, f"Expected exactly 1 send, got {len(calls)}"
 
     # Phase must NOT have advanced
-    assert _meta[CUSTOMER].get("phase") == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)].get("phase") == "BUSINESS_TYPE"
 
     # The single message must contain both the detour answer and the
     # re-asked business-type question (either as text or as interactive)
@@ -293,7 +293,7 @@ async def test_case5_reprompt_budget_then_handoff(client, mock_send):
     Third → handoff message + state reset (exactly 1 send).
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Ali Traders",
@@ -305,14 +305,14 @@ async def test_case5_reprompt_budget_then_handoff(client, mock_send):
     await client.post("/webhook", json=_active_text(CUSTOMER, "asdfgh zxcv"))
     calls1 = _customer_calls(mock_send)
     assert len(calls1) == 1, f"Re-prompt 1: expected 1 send, got {len(calls1)}"
-    assert _meta[CUSTOMER].get("phase") == "BUSINESS_TYPE", "Phase must not advance on reprompt"
+    assert _meta[("12345", CUSTOMER)].get("phase") == "BUSINESS_TYPE", "Phase must not advance on reprompt"
 
     # Message 2: another unparseable
     mock_send.reset_mock()
     await client.post("/webhook", json=_active_text(CUSTOMER, "nahi pata"))
     calls2 = _customer_calls(mock_send)
     assert len(calls2) == 1, f"Re-prompt 2: expected 1 send, got {len(calls2)}"
-    assert _meta[CUSTOMER].get("phase") == "BUSINESS_TYPE", "Phase must not advance on reprompt"
+    assert _meta[("12345", CUSTOMER)].get("phase") == "BUSINESS_TYPE", "Phase must not advance on reprompt"
 
     # Message 3: handoff
     mock_send.reset_mock()
@@ -321,7 +321,7 @@ async def test_case5_reprompt_budget_then_handoff(client, mock_send):
     assert len(calls3) == 1, f"Handoff: expected 1 send, got {len(calls3)}"
 
     # After handoff, session must be reset (meta cleared or phase reset)
-    phase_after = _meta.get(CUSTOMER, {}).get("phase")
+    phase_after = _meta.get(("12345", CUSTOMER), {}).get("phase")
     assert phase_after in (None, "GREETING", "STALLED"), (
         f"After handoff phase should be reset, got {phase_after!r}"
     )
@@ -346,7 +346,7 @@ async def test_case6_ambiguous_business_type_reprompt(client, mock_send):
     phase at BUSINESS_TYPE.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Ali Traders",
@@ -362,10 +362,10 @@ async def test_case6_ambiguous_business_type_reprompt(client, mock_send):
     assert len(calls) == 1, f"Expected exactly 1 send, got {len(calls)}"
 
     # Phase must NOT have advanced
-    assert _meta[CUSTOMER].get("phase") == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)].get("phase") == "BUSINESS_TYPE"
 
     # business_type must NOT have been set with an ambiguous guess
-    bt = _meta[CUSTOMER].get("business_type")
+    bt = _meta[("12345", CUSTOMER)].get("business_type")
     assert bt is None, f"business_type must not be recorded from ambiguous input, got {bt!r}"
 
 
@@ -383,7 +383,7 @@ async def test_case7_menu_demo_list_reply_starts_flow(client, mock_send):
     from app.lead import _meta
 
     # Seed a fresh session (phase = GREETING, no business name yet)
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "GREETING",
         "lead_source": "campaign:Bahi POS",
     }
@@ -395,7 +395,7 @@ async def test_case7_menu_demo_list_reply_starts_flow(client, mock_send):
     assert len(calls) == 1, f"Expected exactly 1 send, got {len(calls)}"
 
     # Phase must advance out of GREETING
-    phase = _meta.get(CUSTOMER, {}).get("phase")
+    phase = _meta.get(("12345", CUSTOMER), {}).get("phase")
     assert phase in ("BUSINESS_NAME", "SCHEDULING"), (
         f"Expected flow to start (BUSINESS_NAME or SCHEDULING), got {phase!r}"
     )

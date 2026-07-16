@@ -76,8 +76,8 @@ async def client():
 def _at_business_name(sender: str) -> dict:
     """Pre-seed meta at BUSINESS_NAME phase."""
     from app.lead import _meta
-    _meta[sender] = {"phase": "BUSINESS_NAME", "lead_source": "ad"}
-    return _meta[sender]
+    _meta[("12345", sender)] = {"phase": "BUSINESS_NAME", "lead_source": "ad"}
+    return _meta[("12345", sender)]
 
 
 def _customer_sends(mock_send):
@@ -108,10 +108,10 @@ async def test_chargebyte_accepted_no_llm(client, mock_send, mock_claude):
     assert len(calls) == 1, f"Expected 1 send, got {len(calls)}"
 
     # Name recorded
-    assert _meta[CUSTOMER]["business_name"] == "ChargeByte"
+    assert _meta[("12345", CUSTOMER)]["business_name"] == "ChargeByte"
 
     # Phase advanced
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_TYPE"
 
 
 @pytest.mark.asyncio
@@ -130,8 +130,8 @@ async def test_clinics_accepted_no_llm(client, mock_send, mock_claude):
     calls = _customer_sends(mock_send)
     assert len(calls) == 1
 
-    assert _meta[CUSTOMER]["business_name"] == "Clinics"
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)]["business_name"] == "Clinics"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_TYPE"
 
 
 @pytest.mark.asyncio
@@ -152,8 +152,8 @@ async def test_al_madina_kiryana_accepted_no_llm(client, mock_send, mock_claude)
     calls = _customer_sends(mock_send)
     assert len(calls) == 1
 
-    assert _meta[CUSTOMER]["business_name"] == "Al-Madina Kiryana Store"
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)]["business_name"] == "Al-Madina Kiryana Store"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_TYPE"
 
 
 @pytest.mark.asyncio
@@ -176,9 +176,9 @@ async def test_business_name_too_long_reprompts(client, mock_send, mock_claude):
     assert len(calls) == 1
 
     # Phase must NOT have advanced
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_NAME"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_NAME"
     # business_name must NOT have been set
-    assert "business_name" not in _meta[CUSTOMER]
+    assert "business_name" not in _meta[("12345", CUSTOMER)]
 
 
 @pytest.mark.asyncio
@@ -194,8 +194,8 @@ async def test_business_name_accepts_up_to_six_words(client, mock_send, mock_cla
     assert r.status_code == 200
 
     mock_claude.assert_not_called()
-    assert _meta[CUSTOMER]["business_name"] == "Karachi Super Mart And Trading Co"
-    assert _meta[CUSTOMER]["phase"] == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)]["business_name"] == "Karachi Super Mart And Trading Co"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "BUSINESS_TYPE"
 
 
 @pytest.mark.asyncio

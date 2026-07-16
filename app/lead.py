@@ -55,22 +55,26 @@ MAX_REPROMPTS = 2  # after this many unrecognised answers, hand off to team
 # ── Retry config (reuse same pattern as orders.py) ───────────────────────────
 _RETRY_DELAYS = (1, 2, 4)
 
-# ── In-memory lead metadata store  {sender: dict} ────────────────────────────
+# ── In-memory lead metadata store  {(tenant_id, sender): dict} ──────────────
 # Kept separate from conversation history so get_session stays clean.
 _meta: dict = {}
 
 
-def get_lead_meta(sender: str) -> dict:
-    return _meta.setdefault(sender, {"phase": "GREETING"})
+def _mk(tenant_id: str, sender: str) -> tuple:
+    return (tenant_id, sender)
 
 
-def clear_lead_meta(sender: str) -> None:
-    _meta.pop(sender, None)
+def get_lead_meta(sender: str, tenant_id: str = "") -> dict:
+    return _meta.setdefault(_mk(tenant_id, sender), {"phase": "GREETING"})
 
 
-def has_active_lead(sender: str) -> bool:
+def clear_lead_meta(sender: str, tenant_id: str = "") -> None:
+    _meta.pop(_mk(tenant_id, sender), None)
+
+
+def has_active_lead(sender: str, tenant_id: str = "") -> bool:
     """True if sender has a lead session that is still in progress."""
-    m = _meta.get(sender)
+    m = _meta.get(_mk(tenant_id, sender))
     if not m:
         return False
     return m.get("phase") not in (None, "CONFIRMED", "STALLED")
@@ -511,11 +515,14 @@ def extract_meta_from_turn(meta: dict, user_text: str, reply: str) -> None:
     elif phase == "CURRENT_SYSTEM" and user_text:
         meta.setdefault("current_system", user_text.strip())
     elif phase == "SCHEDULING" and user_text:
+        # Prefer per-tenant slots stored in meta; fall back to module globals
+        _slot_1 = meta.get("_slot_1") or DEMO_SLOT_1
+        _slot_2 = meta.get("_slot_2") or DEMO_SLOT_2
         # Capture whichever slot the user chose
-        if DEMO_SLOT_1.lower() in user_lower or "11" in user_lower:
-            meta["demo_slot"] = DEMO_SLOT_1
-        elif DEMO_SLOT_2.lower() in user_lower or "4pm" in user_lower or "4 pm" in user_lower:
-            meta["demo_slot"] = DEMO_SLOT_2
+        if _slot_1.lower() in user_lower or "11" in user_lower:
+            meta["demo_slot"] = _slot_1
+        elif _slot_2.lower() in user_lower or "4pm" in user_lower or "4 pm" in user_lower:
+            meta["demo_slot"] = _slot_2
         else:
             meta["demo_slot"] = user_text.strip()
 
@@ -575,7 +582,7 @@ _LOC_LABELS: dict[str, str]  = {r[0]: r[1] for r in _LOCATIONS_BUTTONS}
 _SYS_LABELS: dict[str, str]  = _CURRENT_SYSTEM_SHEET_VALUES
 
 
-def get_phase_interactive(phase: str, sender: str, lang: str = "ur") -> Optional[dict]:
+def get_phase_interactive(phase: str, sender: str, lang: str = "ur", meta: Optional[dict] = None) -> Optional[dict]:
     """
     Return the interactive payload dict for *phase*, or None if this phase
     uses free-text (handled deterministically).
@@ -583,6 +590,8 @@ def get_phase_interactive(phase: str, sender: str, lang: str = "ur") -> Optional
     The returned dict is the full message payload (ready for the Graph API).
     Import build_buttons / build_list here to avoid a circular import at
     module level (interactive imports nothing from lead).
+
+    meta: optional lead meta dict; used to read per-tenant _slot_1/_slot_2.
     """
     from app.interactive import build_buttons, build_list  # local import — no circular dep
 
@@ -609,10 +618,21 @@ def get_phase_interactive(phase: str, sender: str, lang: str = "ur") -> Optional
         )
 
     if phase == "SCHEDULING":
+        # Use per-tenant slots from meta if available, else fall back to globals
+        if meta:
+            slot_1 = meta.get("_slot_1") or DEMO_SLOT_1
+            slot_2 = meta.get("_slot_2") or DEMO_SLOT_2
+            buttons = [
+                ("slot_1",     slot_1[:20]),
+                ("slot_2",     slot_2[:20]),
+                ("slot_other", "Koi aur time"),
+            ]
+        else:
+            buttons = _scheduling_buttons()
         return build_buttons(
             sender,
             _t(_Q_SCHEDULING, lang),
-            _scheduling_buttons(),
+            buttons,
         )
 
     return None  # GREETING, BUSINESS_NAME, CONFIRMED, STALLED → deterministic text
@@ -806,15 +826,18 @@ def apply_interactive_answer(
         return True, None
 
     if phase == "SCHEDULING":
+        # Prefer per-tenant slots stored in meta; fall back to module globals
+        _slot_1 = meta.get("_slot_1") or DEMO_SLOT_1
+        _slot_2 = meta.get("_slot_2") or DEMO_SLOT_2
         if reply_id == "slot_1":
-            meta["demo_slot"] = DEMO_SLOT_1
+            meta["demo_slot"] = _slot_1
             meta["phase"] = "CONFIRMED"
-            log.info(f"lead: interactive SCHEDULING → {DEMO_SLOT_1}")
+            log.info(f"lead: interactive SCHEDULING → {_slot_1}")
             return True, None
         if reply_id == "slot_2":
-            meta["demo_slot"] = DEMO_SLOT_2
+            meta["demo_slot"] = _slot_2
             meta["phase"] = "CONFIRMED"
-            log.info(f"lead: interactive SCHEDULING → {DEMO_SLOT_2}")
+            log.info(f"lead: interactive SCHEDULING → {_slot_2}")
             return True, None
         if reply_id == "slot_other":
             # Mark that next free-text = custom slot; don't advance phase yet

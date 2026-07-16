@@ -137,7 +137,7 @@ async def test_audio_mid_flow_one_send_redirect_plus_question(client, mock_send)
     the redirect-to-text note AND the re-asked business-type question.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Ali Store",
@@ -152,7 +152,7 @@ async def test_audio_mid_flow_one_send_redirect_plus_question(client, mock_send)
     msg = calls[0].args[1].lower()
     assert "text" in msg  # redirect note
     # Phase must not have changed
-    assert _meta[CUSTOMER].get("phase") == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)].get("phase") == "BUSINESS_TYPE"
 
 
 @pytest.mark.parametrize("text_input", [

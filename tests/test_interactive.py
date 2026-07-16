@@ -221,7 +221,7 @@ async def test_button_reply_advances_phase_deterministically(client, mock_send, 
     then the interactive widget for CURRENT_SYSTEM is sent.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "LOCATIONS",
         "lead_source": "ad",
         "business_name": "Ali Shop",
@@ -236,8 +236,8 @@ async def test_button_reply_advances_phase_deterministically(client, mock_send, 
     mock_claude.assert_not_called()
 
     # Phase must have advanced
-    assert _meta[CUSTOMER]["phase"] == "CURRENT_SYSTEM"
-    assert _meta[CUSTOMER]["locations"] == "1"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "CURRENT_SYSTEM"
+    assert _meta[("12345", CUSTOMER)]["locations"] == "1"
 
     # An interactive payload (CURRENT_SYSTEM buttons) must have been sent
     interactive_calls = [
@@ -255,7 +255,7 @@ async def test_list_reply_stores_business_type_correctly(client, mock_send, mock
     A list_reply for business type stores the human-readable label and advances phase.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Lahore Pharmacy",
@@ -264,8 +264,8 @@ async def test_list_reply_stores_business_type_correctly(client, mock_send, mock
     r = await client.post("/webhook", json=_interactive_list_payload(CUSTOMER, "pharmacy", "Pharmacy"))
     assert r.status_code == 200
 
-    assert _meta[CUSTOMER]["business_type"] == "Pharmacy"
-    assert _meta[CUSTOMER]["phase"] == "LOCATIONS"
+    assert _meta[("12345", CUSTOMER)]["business_type"] == "Pharmacy"
+    assert _meta[("12345", CUSTOMER)]["phase"] == "LOCATIONS"
     mock_claude.assert_not_called()
 
 
@@ -277,7 +277,7 @@ async def test_free_text_at_option_phase_goes_through_llm(client, mock_send, moc
     message containing the re-asked business-type question.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "BUSINESS_TYPE",
         "lead_source": "ad",
         "business_name": "Fast Mart",
@@ -289,7 +289,7 @@ async def test_free_text_at_option_phase_goes_through_llm(client, mock_send, moc
     assert r.json() == {"status": "ok"}
 
     # Phase must stay at BUSINESS_TYPE (re-prompt, no advance)
-    assert _meta[CUSTOMER].get("phase") == "BUSINESS_TYPE"
+    assert _meta[("12345", CUSTOMER)].get("phase") == "BUSINESS_TYPE"
 
     # Exactly one send to customer
     recipients = [c.args[0] for c in mock_send.call_args_list]
@@ -308,7 +308,7 @@ async def test_slot_other_captures_custom_time(client, mock_send, mock_claude):
     captured as demo_slot and the session is confirmed.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "SCHEDULING",
         "lead_source": "ad",
         "business_name": "Zain Store",
@@ -331,7 +331,7 @@ async def test_slot_other_captures_custom_time(client, mock_send, mock_claude):
     )
 
     # awaiting_custom_slot flag must be set
-    assert _meta[CUSTOMER].get("awaiting_custom_slot") is True
+    assert _meta[("12345", CUSTOMER)].get("awaiting_custom_slot") is True
 
     # Clear send mock before step 2
     mock_send.reset_mock()
@@ -355,7 +355,7 @@ async def test_malformed_interactive_payload_ignored_returns_200(client, mock_se
     returns 200 with status ignored.
     """
     from app.lead import _meta
-    _meta[CUSTOMER] = {
+    _meta[("12345", CUSTOMER)] = {
         "phase": "LOCATIONS",
         "lead_source": "ad",
         "business_name": "Test Shop",
