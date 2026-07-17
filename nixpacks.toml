@@ -1,13 +1,11 @@
-# Railway build — install Node deps + build React dashboard into app/static/dashboard
-
-[phases.setup]
-nixPkgs = ["nodejs_20"]
-
-[phases.install]
-cmds = ["npm install", "npm install --prefix dashboard-ui"]
+# Railway build — Python API + React dashboard in one service.
+providers = ["python", "node"]
 
 [phases.build]
-cmds = ["npm run build --prefix dashboard-ui"]
+cmds = [
+  "npm ci --prefix dashboard-ui",
+  "npm run build --prefix dashboard-ui",
+]
 
-[variables]
-NIXPACKS_NODE_VERSION = "20"
+[start]
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
