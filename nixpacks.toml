@@ -1,6 +1,0 @@
-# Railway — Python API only.
-# Dashboard static files are committed in app/static/dashboard/.
-# Rebuild locally when UI changes: npm run build
-
-[phases.build]
-cmds = ["echo 'dashboard static files shipped from git'"]

@@ -84,45 +84,24 @@ app.include_router(dashboard_router)
 
 # Serve built React dashboard (Vite → app/static/dashboard)
 from pathlib import Path  # noqa: E402
-from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.responses import RedirectResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
-_DASHBOARD_DIR = Path(__file__).resolve().parent / "static" / "dashboard"
-_DASHBOARD_BUILT = _DASHBOARD_DIR.is_dir() and (_DASHBOARD_DIR / "index.html").exists()
 
-if _DASHBOARD_BUILT:
-    app.mount(
-        "/dashboard/assets",
-        StaticFiles(directory=_DASHBOARD_DIR / "assets"),
-        name="dashboard-assets",
-    )
-
-
-@app.get("/dashboard", include_in_schema=False)
-@app.get("/dashboard/", include_in_schema=False)
-async def dashboard_root():
-    if not _DASHBOARD_BUILT:
-        raise HTTPException(
-            status_code=503,
-            detail="Dashboard UI not built. Run: npm run build",
-        )
-    return FileResponse(_DASHBOARD_DIR / "index.html")
+def _resolve_dashboard_dir() -> Path:
+    """Find built dashboard files (works locally and on Railway)."""
+    here = Path(__file__).resolve().parent
+    for candidate in (
+        here / "static" / "dashboard",
+        Path.cwd() / "app" / "static" / "dashboard",
+    ):
+        if (candidate / "index.html").is_file():
+            return candidate
+    return here / "static" / "dashboard"
 
 
-@app.get("/dashboard/{full_path:path}", include_in_schema=False)
-async def dashboard_spa(full_path: str):
-    """SPA fallback — assets are served by the mount above."""
-    if not _DASHBOARD_BUILT:
-        raise HTTPException(
-            status_code=503,
-            detail="Dashboard UI not built. Run: npm run build",
-        )
-    if full_path.startswith("assets/"):
-        raise HTTPException(status_code=404, detail="Asset not found")
-    candidate = _DASHBOARD_DIR / full_path
-    if candidate.is_file():
-        return FileResponse(candidate)
-    return FileResponse(_DASHBOARD_DIR / "index.html")
+_DASHBOARD_DIR = _resolve_dashboard_dir()
+_DASHBOARD_BUILT = (_DASHBOARD_DIR / "index.html").is_file()
 
 
 # Lead-flow symbols (always imported — tenants choose which flow to run)
@@ -877,3 +856,35 @@ async def send_whatsapp_message(
             log.error(f"Send failed {r.status_code}: {r.text}")
             return False
     return True
+
+
+# ---------------------------------------------------------------------------
+# Dashboard UI (mount last — SPA + static assets under /dashboard/)
+# ---------------------------------------------------------------------------
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard_redirect():
+    if not _DASHBOARD_BUILT:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Dashboard UI not found at {_DASHBOARD_DIR}. Run: npm run build",
+        )
+    return RedirectResponse(url="/dashboard/", status_code=307)
+
+
+if _DASHBOARD_BUILT:
+    log.info("main: mounting dashboard UI from %s", _DASHBOARD_DIR)
+    app.mount(
+        "/dashboard",
+        StaticFiles(directory=str(_DASHBOARD_DIR), html=True),
+        name="dashboard-ui",
+    )
+else:
+
+    @app.get("/dashboard/", include_in_schema=False)
+    @app.get("/dashboard/{rest:path}", include_in_schema=False)
+    async def dashboard_unavailable(rest: str = ""):
+        raise HTTPException(
+            status_code=503,
+            detail=f"Dashboard UI not found at {_DASHBOARD_DIR}. Run: npm run build",
+        )
