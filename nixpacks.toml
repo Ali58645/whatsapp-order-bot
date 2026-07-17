@@ -1,8 +1,13 @@
-# Optional Nixpacks hooks — prefer root `npm run build` (package.json) on Railway.
-# Ensures Node is available when building the React dashboard.
+# Railway build — install Node deps + build React dashboard into app/static/dashboard
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install", "npm install --prefix dashboard-ui"]
+
+[phases.build]
+cmds = ["npm run build --prefix dashboard-ui"]
 
 [variables]
 NIXPACKS_NODE_VERSION = "20"
-
-[phases.build]
-cmds = ["npm run build"]

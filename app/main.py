@@ -59,6 +59,17 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             log.error(f"main: tenant DB sync failed — {exc}")
 
+    from app.dashboard.auth import is_dashboard_enabled
+    if _DASHBOARD_BUILT:
+        log.info("main: dashboard UI ready at /dashboard")
+        if not is_dashboard_enabled():
+            log.warning(
+                "main: dashboard UI is built but DASHBOARD_USER / DASHBOARD_PASSWORD / "
+                "DASHBOARD_JWT_SECRET are not all set — login API will return 404"
+            )
+    else:
+        log.warning("main: dashboard UI not built — run: npm run build")
+
     yield  # app runs here
 
 
@@ -74,20 +85,27 @@ from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 _DASHBOARD_DIR = Path(__file__).resolve().parent / "static" / "dashboard"
-if _DASHBOARD_DIR.is_dir() and (_DASHBOARD_DIR / "index.html").exists():
+_DASHBOARD_BUILT = _DASHBOARD_DIR.is_dir() and (_DASHBOARD_DIR / "index.html").exists()
+
+if _DASHBOARD_BUILT:
     app.mount(
         "/dashboard/assets",
         StaticFiles(directory=_DASHBOARD_DIR / "assets"),
         name="dashboard-assets",
     )
 
-    @app.get("/dashboard")
-    @app.get("/dashboard/{full_path:path}")
-    async def dashboard_spa(full_path: str = ""):
-        """SPA fallback — never shadow /api/*."""
-        # Prefer exact static file if present (favicon, etc.)
-        candidate = (_DASHBOARD_DIR / full_path) if full_path else None
-        if candidate and candidate.is_file():
+    @app.get("/dashboard", include_in_schema=False)
+    @app.get("/dashboard/", include_in_schema=False)
+    async def dashboard_root():
+        return FileResponse(_DASHBOARD_DIR / "index.html")
+
+    @app.get("/dashboard/{full_path:path}", include_in_schema=False)
+    async def dashboard_spa(full_path: str):
+        """SPA fallback — assets are served by the mount above."""
+        if full_path.startswith("assets/"):
+            raise HTTPException(status_code=404, detail="Asset not found")
+        candidate = _DASHBOARD_DIR / full_path
+        if candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(_DASHBOARD_DIR / "index.html")
 
@@ -334,7 +352,18 @@ async def receive_message(request: Request):
 @app.get("/")
 async def health():
     from app.tenants import get_all_tenants
-    return {"status": "running", "tenants": [t.phone_number_id for t in get_all_tenants()]}
+    from app.db.engine import DB_ENABLED
+    from app.dashboard.auth import is_dashboard_enabled
+    return {
+        "status": "running",
+        "tenants": [t.phone_number_id for t in get_all_tenants()],
+        "dashboard": {
+            "url": "/dashboard",
+            "built": _DASHBOARD_BUILT,
+            "auth_configured": is_dashboard_enabled(),
+            "database": DB_ENABLED,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
