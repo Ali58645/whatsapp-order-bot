@@ -5,6 +5,46 @@ export type Tenant = {
   flow_mode: string;
 };
 
+export type TenantConfig = {
+  greeting_text: string;
+  greeting_language: string;
+  campaign_phrase: string;
+  demo_slots: string[];
+  facts_features: string;
+  facts_pricing_note: string;
+  facts_claims_note: string;
+  faq: { question: string; answer: string }[];
+  menu?: {
+    shop_name: string;
+    delivery_fee?: number | null;
+    delivery_area?: string;
+    categories: { name: string; items: { name: string; price: number; available?: boolean }[] }[];
+  } | null;
+  business_wa_id: string;
+  owner_whatsapp: string;
+};
+
+export type TenantConfigResponse = {
+  id: number;
+  phone_number_id: string;
+  name: string;
+  flow_mode: string;
+  updated_at: string | null;
+  config: TenantConfig;
+};
+
+const ROLE_KEY = "dash_role";
+const USER_TENANT_KEY = "dash_user_tenant_id";
+
+export function getRole(): string | null {
+  return localStorage.getItem(ROLE_KEY);
+}
+
+export function getUserTenantId(): number | null {
+  const v = localStorage.getItem(USER_TENANT_KEY);
+  return v ? Number(v) : null;
+}
+
 export type Overview = {
   leads_today: number;
   leads_this_week: number;
@@ -131,11 +171,13 @@ export async function api<T>(
 }
 
 export async function login(username: string, password: string) {
-  const data = await api<{ access_token: string }>("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ username, password }),
-    tenant: false,
-  });
+  const data = await api<{ access_token: string; role?: string; tenant_id?: number | null }>(
+    "/api/auth/login",
+    { method: "POST", body: JSON.stringify({ username, password }), tenant: false },
+  );
   setToken(data.access_token);
+  if (data.role) localStorage.setItem(ROLE_KEY, data.role);
+  if (data.tenant_id != null) localStorage.setItem(USER_TENANT_KEY, String(data.tenant_id));
+  else localStorage.removeItem(USER_TENANT_KEY);
   return data;
 }

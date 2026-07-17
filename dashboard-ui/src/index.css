@@ -3,10 +3,9 @@
 @tailwind utilities;
 
 :root {
-  --bg0: #e8eef5;
-  --bg1: #f0f4f8;
-  --ink: #141c2e;
-  --sea: #148077;
+  --canvas: #faf8f5;
+  --ink: #0f1d32;
+  --bahi: #0f655e;
 }
 
 html,
@@ -16,17 +15,24 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(26, 155, 142, 0.12), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgba(61, 82, 120, 0.1), transparent 50%),
-    linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #eef2f7);
+  background-color: var(--canvas);
   color: var(--ink);
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Urdu / mixed-script transcript support */
+.transcript-text {
+  font-family: "Plus Jakarta Sans", "Noto Nastaliq Urdu", "Segoe UI", system-ui, sans-serif;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
 }
 
 @keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -37,7 +43,7 @@ body {
 @keyframes slide-in {
   from {
     opacity: 0;
-    transform: translateX(16px);
+    transform: translateX(100%);
   }
   to {
     opacity: 1;
@@ -45,10 +51,33 @@ body {
   }
 }
 
+@keyframes slide-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fade-up {
-  animation: fade-up 0.35s ease-out both;
+  animation: fade-up 0.2s ease-out both;
 }
 
 .animate-slide-in {
-  animation: slide-in 0.28s ease-out both;
+  animation: slide-in 0.25s ease-out both;
+}
+
+@media (max-width: 767px) {
+  .animate-slide-in {
+    animation: slide-in-mobile 0.28s ease-out both;
+  }
+}
+
+@layer utilities {
+  .transition-ui {
+    @apply transition-all duration-150 ease-out;
+  }
 }
