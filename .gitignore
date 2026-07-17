@@ -12,10 +12,19 @@ __pycache__/
 # Virtual environments
 .venv/
 venv/
+backend/.venv/
+backend/venv/
 
-# Node / dashboard UI
-dashboard-ui/node_modules/
-dashboard-ui/dist/
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+
+# Local SQLite / test databases
+*.db
+
+# Frontend (Vite)
+frontend/node_modules/
+frontend/dist/
 
 # macOS
 .DS_Store
