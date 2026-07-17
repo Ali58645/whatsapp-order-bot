@@ -1,16 +1,11 @@
 """
-Dashboard auth — env-gated JWT login.
-
-Required env vars (all three, or dashboard routes return 404):
-  DASHBOARD_USER
-  DASHBOARD_PASSWORD   — plain text, or bcrypt hash ($2b$… / $2a$…)
-  DASHBOARD_JWT_SECRET
+Dashboard auth — JWT with role + tenant_id scoping.
 """
 
 from __future__ import annotations
 
 import os
-import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -18,83 +13,108 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.dashboard.users import verify_password
+
 ALGORITHM = "HS256"
 TOKEN_TTL_H = 24
 
 _bearer = HTTPBearer(auto_error=False)
 
 
+@dataclass
+class AuthUser:
+    username: str
+    role: str  # admin | owner
+    tenant_id: Optional[int] = None  # DB tenant PK for owners
+
+
 def is_dashboard_enabled() -> bool:
-    return bool(
-        os.environ.get("DASHBOARD_USER")
-        and os.environ.get("DASHBOARD_PASSWORD")
-        and os.environ.get("DASHBOARD_JWT_SECRET")
-    )
+    if not os.environ.get("DASHBOARD_JWT_SECRET"):
+        return False
+    # Enabled if env creds OR DB users (checked at login)
+    return bool(os.environ.get("DASHBOARD_USER") and os.environ.get("DASHBOARD_PASSWORD"))
 
 
 def _require_enabled() -> None:
-    if not is_dashboard_enabled():
+    if not os.environ.get("DASHBOARD_JWT_SECRET"):
         raise HTTPException(status_code=404, detail="Not found")
 
 
-def _password_ok(provided: str, stored: str) -> bool:
-    if stored.startswith(("$2a$", "$2b$", "$2y$")):
-        try:
-            import bcrypt
-            return bcrypt.checkpw(provided.encode("utf-8"), stored.encode("utf-8"))
-        except Exception:
-            return False
-    return secrets.compare_digest(provided, stored)
-
-
-def verify_login(username: str, password: str) -> bool:
-    _require_enabled()
-    expected_user = os.environ["DASHBOARD_USER"]
-    expected_pass = os.environ["DASHBOARD_PASSWORD"]
-    if not secrets.compare_digest(username, expected_user):
-        return False
-    return _password_ok(password, expected_pass)
-
-
-def create_access_token(username: str) -> str:
+def create_access_token(user: AuthUser) -> str:
     _require_enabled()
     secret = os.environ["DASHBOARD_JWT_SECRET"]
     now = datetime.now(timezone.utc)
     payload = {
-        "sub": username,
+        "sub": user.username,
+        "role": user.role,
+        "tenant_id": user.tenant_id,
         "iat": now,
         "exp": now + timedelta(hours=TOKEN_TTL_H),
     }
     return jwt.encode(payload, secret, algorithm=ALGORITHM)
 
 
-def decode_token(token: str) -> dict:
+def decode_token(token: str) -> AuthUser:
     _require_enabled()
     secret = os.environ["DASHBOARD_JWT_SECRET"]
     try:
-        return jwt.decode(token, secret, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, secret, algorithms=[ALGORITHM])
     except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return AuthUser(
+        username=str(sub),
+        role=str(payload.get("role", "owner")),
+        tenant_id=payload.get("tenant_id"),
+    )
+
+
+async def authenticate(username: str, password: str) -> Optional[AuthUser]:
+    """DB user first, then env-var fallback for bootstrap."""
+    from app.db.engine import DB_ENABLED, get_db
+    from app.db.repo import get_user_by_username
+
+    if DB_ENABLED:
+        async with get_db() as db:
+            row = await get_user_by_username(db, username)
+            if row and verify_password(password, row.password_hash):
+                return AuthUser(username=row.username, role=row.role, tenant_id=row.tenant_id)
+
+    # Env fallback (same as v1)
+    if not is_dashboard_enabled():
+        return None
+    import secrets
+    if not secrets.compare_digest(username, os.environ["DASHBOARD_USER"]):
+        return None
+    stored = os.environ["DASHBOARD_PASSWORD"]
+    if stored.startswith(("$2a$", "$2b$", "$2y$")):
+        if not verify_password(password, stored):
+            return None
+    elif not secrets.compare_digest(password, stored):
+        return None
+    return AuthUser(username=username, role="admin", tenant_id=None)
 
 
 async def require_auth(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-) -> str:
-    """Dependency: valid Bearer JWT → username. Missing/bad → 401. Disabled → 404."""
+) -> AuthUser:
     _require_enabled()
     if creds is None or not creds.credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
-    payload = decode_token(creds.credentials)
-    sub = payload.get("sub")
-    if not sub:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        )
-    return str(sub)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return decode_token(creds.credentials)
+
+
+def require_admin(user: AuthUser = Depends(require_auth)) -> AuthUser:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user
+
+
+async def assert_tenant_access(user: AuthUser, tenant_db_id: int) -> None:
+    """Owners may only access their tenant."""
+    if user.role == "admin":
+        return
+    if user.tenant_id != tenant_db_id:
+        raise HTTPException(status_code=403, detail="Not allowed for this tenant")

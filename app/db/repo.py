@@ -55,10 +55,11 @@ def _m():
 
 async def sync_tenants_to_db(session: AsyncSession, tenants: list) -> None:
     """
-    Upsert each Tenant pydantic object into the tenants table.
-    Called once at startup after load_tenants().
+    First-boot seed: insert tenants from JSON/env if missing.
+    Existing rows are NOT overwritten — DB config is source of truth after seed.
     """
     m = _m()
+    now = datetime.now(timezone.utc)
     for t in tenants:
         result = await session.execute(
             select(m.DBTenant).where(m.DBTenant.phone_number_id == t.phone_number_id)
@@ -71,14 +72,90 @@ async def sync_tenants_to_db(session: AsyncSession, tenants: list) -> None:
                 name=t.name,
                 flow_mode=t.flow_mode,
                 config=config,
+                created_at=now,
+                updated_at=now,
             )
             session.add(row)
-            log.info(f"repo: inserted tenant {t.phone_number_id!r}")
+            log.info(f"repo: seeded tenant {t.phone_number_id!r}")
         else:
-            row.name = t.name
-            row.flow_mode = t.flow_mode
-            row.config = config
-            log.info(f"repo: updated tenant {t.phone_number_id!r}")
+            log.info(f"repo: tenant {t.phone_number_id!r} exists — config unchanged")
+
+
+async def get_tenant_row(session: AsyncSession, tenant_db_id: int):
+    m = _m()
+    result = await session.execute(
+        select(m.DBTenant).where(m.DBTenant.id == tenant_db_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_tenant_row_by_phone(session: AsyncSession, phone_number_id: str):
+    m = _m()
+    result = await session.execute(
+        select(m.DBTenant).where(m.DBTenant.phone_number_id == phone_number_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def save_tenant_config(
+    session: AsyncSession,
+    tenant_db_id: int,
+    *,
+    name: str | None,
+    config: dict,
+    changed_by: str,
+) -> None:
+    """Save config + snapshot previous version to config_history."""
+    m = _m()
+    result = await session.execute(
+        select(m.DBTenant).where(m.DBTenant.id == tenant_db_id)
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise ValueError(f"tenant {tenant_db_id} not found")
+
+    # Snapshot previous config
+    hist = m.DBConfigHistory(
+        tenant_id=tenant_db_id,
+        config=dict(row.config or {}),
+        changed_by=changed_by,
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(hist)
+
+    if name is not None:
+        row.name = name
+    row.config = config
+    row.updated_at = datetime.now(timezone.utc)
+
+
+async def get_user_by_username(session: AsyncSession, username: str):
+    m = _m()
+    result = await session.execute(
+        select(m.DBUser).where(m.DBUser.username == username)
+    )
+    return result.scalar_one_or_none()
+
+
+async def create_user(
+    session: AsyncSession,
+    *,
+    username: str,
+    password_hash: str,
+    role: str,
+    tenant_id: int | None = None,
+):
+    m = _m()
+    user = m.DBUser(
+        username=username,
+        password_hash=password_hash,
+        role=role,
+        tenant_id=tenant_id,
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(user)
+    await session.flush()
+    return user
 
 
 async def get_db_tenant_id(session: AsyncSession, phone_number_id: str) -> Optional[int]:

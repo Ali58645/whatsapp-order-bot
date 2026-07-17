@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 
 from app.dashboard import auth as dash_auth
 from app.dashboard import queries
+from app.dashboard.config_api import apply_config_save, tenant_config_response
+from app.dashboard.users import hash_password
 
 
 def _require_db() -> None:
@@ -40,15 +42,22 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in_hours: int = dash_auth.TOKEN_TTL_H
+    role: str = "admin"
+    tenant_id: Optional[int] = None
 
 
 @router.post("/api/auth/login", response_model=TokenOut)
 async def login(body: LoginBody):
     dash_auth._require_enabled()
-    if not dash_auth.verify_login(body.username, body.password):
+    user = await dash_auth.authenticate(body.username, body.password)
+    if user is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = dash_auth.create_access_token(body.username)
-    return TokenOut(access_token=token)
+    token = dash_auth.create_access_token(user)
+    return TokenOut(
+        access_token=token,
+        role=user.role,
+        tenant_id=user.tenant_id,
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,21 +72,106 @@ def _parse_dt(value: str | None) -> datetime | None:
         raise HTTPException(status_code=400, detail=f"Invalid datetime: {value}")
 
 
+async def _scoped_tenant_phone(user: dash_auth.AuthUser, tenant_id: str) -> str:
+    """Admin: pass through. Owner: force own tenant or 403."""
+    if user.role == "admin":
+        return tenant_id
+    if user.tenant_id is None:
+        raise HTTPException(status_code=403, detail="Owner missing tenant")
+    from app.db.repo import get_tenant_row
+    async with _get_db() as db:
+        row = await get_tenant_row(db, user.tenant_id)
+    if row is None:
+        raise HTTPException(status_code=403, detail="Tenant not found")
+    phone = row.phone_number_id
+    if tenant_id not in ("all", phone):
+        raise HTTPException(status_code=403, detail="Not allowed for this tenant")
+    return phone
+
+
+async def _assert_resource_tenant(user: dash_auth.AuthUser, resource_tenant_id: int) -> None:
+    if user.role == "admin":
+        return
+    if user.tenant_id != resource_tenant_id:
+        raise HTTPException(status_code=403, detail="Not allowed for this tenant")
+
 # ── Read endpoints ────────────────────────────────────────────────────────────
 
 @router.get("/api/dashboard/tenants")
-async def get_tenants(_user: str = Depends(dash_auth.require_auth)):
+async def get_tenants(user: dash_auth.AuthUser = Depends(dash_auth.require_auth)):
     _require_db()
     async with _get_db() as db:
-        return await queries.list_tenants(db)
+        rows = await queries.list_tenants(db)
+    if user.role == "owner" and user.tenant_id is not None:
+        rows = [t for t in rows if t["id"] == user.tenant_id]
+    return rows
+
+
+@router.get("/api/dashboard/tenants/{tenant_db_id}/config")
+async def get_tenant_config(
+    tenant_db_id: int,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    _require_db()
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    from app.db.repo import get_tenant_row
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return tenant_config_response(row)
+
+
+@router.post("/api/dashboard/tenants/{tenant_db_id}/config")
+async def save_tenant_config(
+    tenant_db_id: int,
+    body: dict,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    _require_db()
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    async with _get_db() as db:
+        result = await apply_config_save(db, tenant_db_id, body, changed_by=user.username)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return result
+
+
+class CreateOwnerBody(BaseModel):
+    username: str
+    password: str
+    tenant_id: int = Field(..., description="DB tenant id")
+
+
+@router.post("/api/dashboard/users")
+async def create_owner(
+    body: CreateOwnerBody,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    _require_db()
+    from app.db.repo import create_user, get_user_by_username, get_tenant_row
+    async with _get_db() as db:
+        if await get_user_by_username(db, body.username):
+            raise HTTPException(status_code=409, detail="Username taken")
+        if await get_tenant_row(db, body.tenant_id) is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        await create_user(
+            db,
+            username=body.username,
+            password_hash=hash_password(body.password),
+            role="owner",
+            tenant_id=body.tenant_id,
+        )
+    return {"ok": True, "username": body.username}
 
 
 @router.get("/api/dashboard/overview")
 async def get_overview(
     tenant_id: str = Query("all"),
-    _user: str = Depends(dash_auth.require_auth),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
+    tenant_id = await _scoped_tenant_phone(user, tenant_id)
     async with _get_db() as db:
         return await queries.overview(db, tenant_phone_id=tenant_id)
 
@@ -91,9 +185,10 @@ async def get_leads(
     search: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _user: str = Depends(dash_auth.require_auth),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
+    tenant_id = await _scoped_tenant_phone(user, tenant_id)
     async with _get_db() as db:
         return await queries.list_leads(
             db,
@@ -110,13 +205,14 @@ async def get_leads(
 @router.get("/api/dashboard/leads/{lead_id}")
 async def get_lead_detail(
     lead_id: int,
-    _user: str = Depends(dash_auth.require_auth),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
     async with _get_db() as db:
         data = await queries.get_lead(db, lead_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Lead not found")
+    await _assert_resource_tenant(user, data["tenant_id"])
     return data
 
 
@@ -128,9 +224,10 @@ async def get_orders(
     date_to: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _user: str = Depends(dash_auth.require_auth),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
+    tenant_id = await _scoped_tenant_phone(user, tenant_id)
     async with _get_db() as db:
         return await queries.list_orders(
             db,
@@ -146,13 +243,14 @@ async def get_orders(
 @router.get("/api/dashboard/conversations/{contact_id}")
 async def get_conversation(
     contact_id: int,
-    _user: str = Depends(dash_auth.require_auth),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
     async with _get_db() as db:
         data = await queries.conversation_for_contact(db, contact_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Contact not found")
+    await _assert_resource_tenant(user, data["contact"]["tenant_id"])
     return data
 
 
@@ -162,9 +260,10 @@ async def get_events(
     type: Optional[str] = Query(None, alias="type"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _user: str = Depends(dash_auth.require_auth),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
+    tenant_id = await _scoped_tenant_phone(user, tenant_id)
     async with _get_db() as db:
         return await queries.list_events(
             db,
@@ -187,11 +286,16 @@ class MuteBody(BaseModel):
 @router.post("/api/dashboard/mutes")
 async def post_mute(
     body: MuteBody,
-    _user: str = Depends(dash_auth.require_auth),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
     from app.tenants import get_tenant
     from app.db.store import MuteStore, EventStore
+
+    if user.role == "owner":
+        scoped = await _scoped_tenant_phone(user, body.tenant_id)
+        if scoped != body.tenant_id:
+            raise HTTPException(status_code=403, detail="Not allowed for this tenant")
 
     tenant = get_tenant(body.tenant_id)
     if tenant is None:

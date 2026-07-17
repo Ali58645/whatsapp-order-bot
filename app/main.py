@@ -21,7 +21,8 @@ from anthropic import AsyncAnthropic
 from app.menu import load_menu, menu_as_text
 from app.sessions import get_session, save_session, clear_session, get_sender_lock
 from app.orders import detect_confirmed_order, forward_order_to_owner
-from app.tenants import get_tenant, Tenant
+from app.tenants import Tenant
+from app.tenant_resolver import resolve_tenant
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("orderbot")
@@ -49,6 +50,11 @@ async def lifespan(app: FastAPI):
     await run_migrations()
 
     if DB_ENABLED:
+        try:
+            from app.dashboard.users import seed_admin_user
+            await seed_admin_user()
+        except Exception as exc:
+            log.error(f"main: admin seed failed — {exc}")
         try:
             from app.db.engine import get_db
             from app.db.repo import sync_tenants_to_db
@@ -333,7 +339,7 @@ async def receive_message(request: Request):
     if not phone_number_id:
         phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "default")
 
-    tenant = get_tenant(phone_number_id)
+    tenant = await resolve_tenant(phone_number_id)
     if tenant is None:
         return {"status": "ignored"}
 
@@ -431,6 +437,14 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
 
         user_text = gate.text or ""
         log.info(f"[{tid}] lead: {sender} [{meta.get('phase')}]: {user_text!r}")
+        meta.setdefault("lang", tenant.lang_code())
+
+        # FAQ before any LLM / phase logic (non-terminal phases)
+        phase_now = meta.get("phase", "")
+        if phase_now not in ("CONFIRMED", "STALLED") and user_text:
+            if await _maybe_faq_reply(sender, meta, user_text, meta.get("lang", "ur"), tenant):
+                asyncio.create_task(_db_persist_lead(sender, meta, tenant))
+                return {"status": "ok"}
 
         # Non-text
         if gate.message_type not in ("text",):
@@ -508,9 +522,13 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
 
 
 async def _handle_entry_message(sender: str, meta: dict, user_text: str, tenant: Tenant) -> dict:
+    lang = tenant.lang_code()
+    meta["lang"] = lang
+    if await _maybe_faq_reply(sender, meta, user_text, lang, tenant):
+        return {"status": "ok"}
     intent = classify_entry_intent(user_text)
     meta["entry_intent"] = intent
-    reply_text, next_phase = build_entry_response(intent)
+    reply_text, next_phase = build_entry_response(intent, lang=lang, tenant=tenant)
     meta["phase"] = next_phase
     await send_whatsapp_message(sender, reply_text, tenant=tenant)
     if not _is_own_number(sender, tenant):
@@ -752,15 +770,40 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
     return {"status": "ok"}
 
 
+async def _maybe_faq_reply(
+    sender: str, meta: dict, user_text: str, lang: str, tenant: Tenant
+) -> bool:
+    """If FAQ matches, send answer + phase reprompt. Returns True if handled."""
+    from app.faq import classify_faq_match, match_faq
+    from app.lead import build_reprompt
+
+    answer = match_faq(user_text, tenant.faq_list)
+    if not answer:
+        answer = await classify_faq_match(
+            user_text, tenant.faq_list, client=anthropic_client, model=ANTHROPIC_MODEL
+        )
+    if not answer:
+        return False
+    phase = meta.get("phase", "")
+    if phase and phase not in ("GREETING", "CONFIRMED", "STALLED"):
+        reprompt = build_reprompt(phase, lang)
+        msg = f"{answer}\n\n{reprompt}"
+    else:
+        msg = answer
+    await send_whatsapp_message(sender, msg, tenant=tenant)
+    return True
+
+
 async def _generate_lead_reply(sender: str, user_text: str, tenant: Tenant) -> str:
-    from app.lead import SYSTEM_PROMPT_LEAD
+    from app.lead import build_lead_system_prompt
     tid = tenant.phone_number_id
     history = get_session(sender, tenant_id=tid)
     history.append({"role": "user", "content": user_text})
+    system = build_lead_system_prompt(tenant)
     try:
         response = await anthropic_client.messages.create(
             model=ANTHROPIC_MODEL, max_tokens=400,
-            system=SYSTEM_PROMPT_LEAD, messages=history[-20:],
+            system=system, messages=history[-20:],
         )
         reply = response.content[0].text
     except Exception as e:
@@ -791,6 +834,8 @@ async def _handle_order_flow(entry: dict, tenant: Tenant) -> dict:
         await send_whatsapp_message(sender, "Order reset. What would you like to order?", tenant=tenant)
         return {"status": "ok"}
     async with get_sender_lock(sender, tenant_id=tid):
+        if await _maybe_faq_reply(sender, {"phase": "ORDERING"}, user_text, "ur", tenant):
+            return {"status": "ok"}
         reply = await _generate_order_reply(sender, user_text, tenant)
         order, clean_reply = detect_confirmed_order(reply)
         if order:

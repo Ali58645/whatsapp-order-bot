@@ -47,6 +47,11 @@ class MenuConfig(BaseModel):
     categories: List[MenuCategory]
 
 
+class FaqItem(BaseModel):
+    question: str
+    answer: str
+
+
 class Tenant(BaseModel):
     phone_number_id: str
     name: str
@@ -55,7 +60,12 @@ class Tenant(BaseModel):
     owner_whatsapp: str = ""
     campaign_phrase: str = "Bahi POS"
     demo_slots: List[str] = ["Kal 11am", "Kal 4pm"]
-    facts: str = ""                        # lead mode — system-prompt FACTS block
+    facts: str = ""                        # legacy single block
+    facts_features: str = ""
+    facts_pricing_note: str = ""
+    facts_claims_note: str = ""
+    greeting_text: str = ""                 # optional custom greeting
+    faq: List[FaqItem] = []
     menu: Optional[MenuConfig] = None      # order mode catalog
     sheet: Optional[SheetConfig] = None    # None → no sheet writes
     greeting_language: str = "roman_urdu"
@@ -89,6 +99,32 @@ class Tenant(BaseModel):
     @property
     def graph_url(self) -> str:
         return f"https://graph.facebook.com/v21.0/{self.phone_number_id}/messages"
+
+    @property
+    def faq_list(self) -> list[dict]:
+        return [{"question": f.question, "answer": f.answer} for f in self.faq]
+
+    def lang_code(self) -> str:
+        """Map greeting_language to lead flow lang key."""
+        if self.greeting_language in ("en", "english"):
+            return "en"
+        return "ur"
+
+    @classmethod
+    def from_db_row(cls, row) -> "Tenant":
+        """Build Tenant from DBTenant ORM row."""
+        cfg = dict(row.config or {})
+        data = {
+            "phone_number_id": row.phone_number_id,
+            "name": row.name,
+            "flow_mode": row.flow_mode,
+            **cfg,
+        }
+        # Normalize faq list
+        raw_faq = cfg.get("faq") or []
+        if raw_faq and isinstance(raw_faq[0], dict):
+            data["faq"] = raw_faq
+        return cls.model_validate(data)
 
 
 # ── Registry ────────────────────────────────────────────────────────────────

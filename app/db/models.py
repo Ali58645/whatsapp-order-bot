@@ -52,10 +52,50 @@ class DBTenant(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     contacts: Mapped[list["DBContact"]] = relationship(back_populates="tenant")
     sessions: Mapped[list["DBSession"]] = relationship(back_populates="tenant")
     events: Mapped[list["DBEvent"]] = relationship(back_populates="tenant")
+    config_history: Mapped[list["DBConfigHistory"]] = relationship(back_populates="tenant")
+    users: Mapped[list["DBUser"]] = relationship(back_populates="tenant")
+
+
+# ── Users (dashboard) ─────────────────────────────────────────────────────────
+
+class DBUser(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)  # admin | owner
+    tenant_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("tenants.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    tenant: Mapped["DBTenant | None"] = relationship(back_populates="users")
+
+
+# ── Config history ────────────────────────────────────────────────────────────
+
+class DBConfigHistory(Base):
+    __tablename__ = "config_history"
+
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
+    config: Mapped[dict] = mapped_column(JSON, nullable=False)
+    changed_by: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    tenant: Mapped["DBTenant"] = relationship(back_populates="config_history")
 
 
 # ── Contacts ─────────────────────────────────────────────────────────────────
