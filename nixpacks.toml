@@ -1,11 +1,6 @@
-# Railway build — Python API + React dashboard in one service.
-providers = ["python", "node"]
+# Railway — Python API only.
+# Dashboard static files are committed in app/static/dashboard/.
+# Rebuild locally when UI changes: npm run build
 
 [phases.build]
-cmds = [
-  "npm ci --prefix dashboard-ui",
-  "npm run build --prefix dashboard-ui",
-]
-
-[start]
-cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+cmds = ["echo 'dashboard static files shipped from git'"]

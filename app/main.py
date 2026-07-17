@@ -68,7 +68,10 @@ async def lifespan(app: FastAPI):
                 "DASHBOARD_JWT_SECRET are not all set — login API will return 404"
             )
     else:
-        log.warning("main: dashboard UI not built — run: npm run build")
+        log.warning(
+            "main: dashboard UI not found at %s — run: npm run build",
+            _DASHBOARD_DIR,
+        )
 
     yield  # app runs here
 
@@ -94,20 +97,32 @@ if _DASHBOARD_BUILT:
         name="dashboard-assets",
     )
 
-    @app.get("/dashboard", include_in_schema=False)
-    @app.get("/dashboard/", include_in_schema=False)
-    async def dashboard_root():
-        return FileResponse(_DASHBOARD_DIR / "index.html")
 
-    @app.get("/dashboard/{full_path:path}", include_in_schema=False)
-    async def dashboard_spa(full_path: str):
-        """SPA fallback — assets are served by the mount above."""
-        if full_path.startswith("assets/"):
-            raise HTTPException(status_code=404, detail="Asset not found")
-        candidate = _DASHBOARD_DIR / full_path
-        if candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(_DASHBOARD_DIR / "index.html")
+@app.get("/dashboard", include_in_schema=False)
+@app.get("/dashboard/", include_in_schema=False)
+async def dashboard_root():
+    if not _DASHBOARD_BUILT:
+        raise HTTPException(
+            status_code=503,
+            detail="Dashboard UI not built. Run: npm run build",
+        )
+    return FileResponse(_DASHBOARD_DIR / "index.html")
+
+
+@app.get("/dashboard/{full_path:path}", include_in_schema=False)
+async def dashboard_spa(full_path: str):
+    """SPA fallback — assets are served by the mount above."""
+    if not _DASHBOARD_BUILT:
+        raise HTTPException(
+            status_code=503,
+            detail="Dashboard UI not built. Run: npm run build",
+        )
+    if full_path.startswith("assets/"):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    candidate = _DASHBOARD_DIR / full_path
+    if candidate.is_file():
+        return FileResponse(candidate)
+    return FileResponse(_DASHBOARD_DIR / "index.html")
 
 
 # Lead-flow symbols (always imported — tenants choose which flow to run)
