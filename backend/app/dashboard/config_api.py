@@ -23,6 +23,7 @@ def tenant_config_response(row) -> dict:
         "phone_number_id": row.phone_number_id,
         "name": row.name,
         "flow_mode": row.flow_mode,
+        "status": getattr(row, "status", None) or t.status or "live",
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         "config": {
             **cfg,
@@ -37,6 +38,8 @@ def tenant_config_response(row) -> dict:
             "menu": t.menu.model_dump() if t.menu else None,
             "menu_v2": cfg.get("menu_v2"),
             "menu_v2_draft": cfg.get("menu_v2_draft"),
+            "messages": cfg.get("messages") or t.messages,
+            "messages_draft": cfg.get("messages_draft") or cfg.get("messages") or t.messages,
             "business_wa_id": t.business_wa_id,
             "owner_whatsapp": t.owner_whatsapp,
         },
@@ -80,6 +83,29 @@ async def publish_menu_v2(db, tenant_db_id: int, changed_by: str) -> dict:
     current["menu_v2"] = draft
     current["menu_v2_draft"] = draft
     await save_tenant_config(db, tenant_db_id, name=None, config=current, changed_by=changed_by)
+    invalidate_tenant(row.phone_number_id)
+    row = await get_tenant_row(db, tenant_db_id)
+    return tenant_config_response(row)
+
+
+async def publish_messages(db, tenant_db_id: int, changed_by: str) -> dict:
+    """Copy messages_draft → messages (published)."""
+    from app.messages import MessagesError, validate_messages_patch, default_messages
+
+    row = await get_tenant_row(db, tenant_db_id)
+    if row is None:
+        return None
+    cfg = dict(row.config or {})
+    draft = cfg.get("messages_draft") or cfg.get("messages")
+    if not draft:
+        draft = default_messages(cfg.get("greeting_language") or "roman_urdu")
+    try:
+        cleaned = validate_messages_patch(draft)
+    except MessagesError as exc:
+        raise MessagesError(str(exc)) from exc
+    cfg["messages"] = cleaned
+    cfg["messages_draft"] = cleaned
+    await save_tenant_config(db, tenant_db_id, name=None, config=cfg, changed_by=changed_by)
     invalidate_tenant(row.phone_number_id)
     row = await get_tenant_row(db, tenant_db_id)
     return tenant_config_response(row)

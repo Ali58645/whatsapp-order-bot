@@ -50,15 +50,19 @@ async def run_migrations() -> None:
 
 def _run_sync_migrations(database_url: str) -> None:
     """Sync helper executed in a worker thread."""
-    import os as _os
+    from pathlib import Path
 
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import create_engine, text
 
     sync_url = _to_sync_url(database_url)
-    ini_path = _os.path.join(_os.path.dirname(__file__), "..", "..", "alembic.ini")
-    cfg = Config(ini_path)
+    backend_root = Path(__file__).resolve().parent.parent.parent  # app/db -> backend
+    ini_path = backend_root / "alembic.ini"
+    script_location = backend_root / "alembic"
+
+    cfg = Config(str(ini_path))
+    cfg.set_main_option("script_location", str(script_location))
     cfg.set_main_option("sqlalchemy.url", sync_url)
 
     engine = create_engine(sync_url)

@@ -11,6 +11,7 @@ const Orders = lazy(() => import("./pages/Orders"));
 const Conversations = lazy(() => import("./pages/Conversations"));
 const Activity = lazy(() => import("./pages/Activity"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Businesses = lazy(() => import("./pages/Businesses"));
 
 function Private({ children }: { children: React.ReactNode }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -76,6 +77,14 @@ export default function App() {
           element={
             <Suspense fallback={<PageFallback />}>
               <Activity />
+            </Suspense>
+          }
+        />
+        <Route
+          path="businesses"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <Businesses />
             </Suspense>
           }
         />

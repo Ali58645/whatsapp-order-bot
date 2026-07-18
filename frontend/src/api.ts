@@ -3,6 +3,12 @@ export type Tenant = {
   phone_number_id: string;
   name: string;
   flow_mode: string;
+  status?: string;
+  business_wa_id?: string;
+  owner_whatsapp?: string;
+  leads_today?: number;
+  orders_today?: number;
+  stat_today?: number;
 };
 
 export type TenantConfig = {
@@ -22,6 +28,8 @@ export type TenantConfig = {
   } | null;
   menu_v2?: MenuV2 | null;
   menu_v2_draft?: MenuV2 | null;
+  messages?: Record<string, unknown> | null;
+  messages_draft?: Record<string, unknown> | null;
   business_wa_id: string;
   owner_whatsapp: string;
 };
@@ -66,6 +74,7 @@ export type TenantConfigResponse = {
   phone_number_id: string;
   name: string;
   flow_mode: string;
+  status?: string;
   updated_at: string | null;
   config: TenantConfig;
 };

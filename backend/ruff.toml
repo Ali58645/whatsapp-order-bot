@@ -1,0 +1,3 @@
+[lint]
+# main.py loads dotenv before app imports by design
+per-file-ignores = { "app/main.py" = ["E402"] }

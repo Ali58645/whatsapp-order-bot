@@ -210,6 +210,174 @@ async def test_send_menu(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.post("/api/dashboard/tenants/{tenant_db_id}/messages/publish")
+async def publish_messages(
+    tenant_db_id: int,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """Promote messages_draft → published messages."""
+    _require_db()
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    from app.dashboard.config_api import publish_messages as _publish
+    from app.messages import MessagesError
+
+    try:
+        async with _get_db() as db:
+            result = await _publish(db, tenant_db_id, changed_by=user.username)
+    except MessagesError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return result
+
+
+class CreateTenantBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=256)
+    flow_mode: str = Field(..., pattern="^(lead|order)$")
+    phone_number_id: str = Field(..., min_length=1, max_length=64)
+    business_wa_id: str = ""
+    owner_whatsapp: str = ""
+    greeting_language: str = "roman_urdu"
+    publish: bool = False  # if True, create as live; else draft
+
+
+class TenantStatusBody(BaseModel):
+    status: str = Field(..., pattern="^(draft|live|paused|archived)$")
+
+
+class VerifyWhatsAppBody(BaseModel):
+    phone_number_id: str = Field(..., min_length=1, max_length=64)
+
+
+@router.post("/api/dashboard/tenants")
+async def create_tenant_route(
+    body: CreateTenantBody,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """Admin: create a new business tenant (draft by default)."""
+    _require_db()
+    from app.db.repo import create_tenant
+    from app.prompt_data import sanitize_text
+    from app.tenant_resolver import invalidate_tenant
+
+    status = "live" if body.publish else "draft"
+    lang = body.greeting_language.strip().lower()
+    if lang not in ("roman_urdu", "en", "ur", "english"):
+        raise HTTPException(status_code=400, detail="Invalid greeting_language")
+    try:
+        async with _get_db() as db:
+            row = await create_tenant(
+                db,
+                name=sanitize_text(body.name, max_len=256),
+                flow_mode=body.flow_mode,
+                phone_number_id=sanitize_text(body.phone_number_id, max_len=64),
+                business_wa_id=sanitize_text(body.business_wa_id or "", max_len=32),
+                owner_whatsapp=sanitize_text(body.owner_whatsapp or "", max_len=32),
+                greeting_language="en" if lang in ("en", "english") else "roman_urdu",
+                status=status,
+            )
+            phone = row.phone_number_id
+            tid = row.id
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    invalidate_tenant(phone)
+    return {
+        "id": tid,
+        "phone_number_id": phone,
+        "name": body.name,
+        "flow_mode": body.flow_mode,
+        "status": status,
+    }
+
+
+@router.post("/api/dashboard/tenants/{tenant_db_id}/status")
+async def set_tenant_status_route(
+    tenant_db_id: int,
+    body: TenantStatusBody,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """Admin: pause / resume / archive / publish (live) a tenant."""
+    _require_db()
+    from app.db.repo import set_tenant_status
+    from app.tenant_resolver import invalidate_tenant
+
+    async with _get_db() as db:
+        row = await set_tenant_status(db, tenant_db_id, body.status)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        phone = row.phone_number_id
+        status = row.status
+        name = row.name
+        flow = row.flow_mode
+    invalidate_tenant(phone)
+    return {
+        "id": tenant_db_id,
+        "phone_number_id": phone,
+        "name": name,
+        "flow_mode": flow,
+        "status": status,
+    }
+
+
+@router.post("/api/dashboard/tenants/{tenant_db_id}/publish")
+async def publish_tenant(
+    tenant_db_id: int,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """Admin shortcut: draft → live."""
+    _require_db()
+    from app.db.repo import set_tenant_status
+    from app.tenant_resolver import invalidate_tenant
+
+    async with _get_db() as db:
+        row = await set_tenant_status(db, tenant_db_id, "live")
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        phone = row.phone_number_id
+    invalidate_tenant(phone)
+    return {"id": tenant_db_id, "status": "live", "phone_number_id": phone}
+
+
+@router.post("/api/dashboard/whatsapp/verify")
+async def verify_whatsapp_connection(
+    body: VerifyWhatsAppBody,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """
+    Call Meta Graph API to confirm phone_number_id resolves.
+    Returns display name / verified_name when available.
+    """
+    _require_db()
+    import httpx
+    import os
+
+    token = os.environ.get("WHATSAPP_TOKEN") or os.environ.get("META_WHATSAPP_TOKEN") or ""
+    if not token:
+        raise HTTPException(status_code=503, detail="WHATSAPP_TOKEN not configured")
+    url = f"https://graph.facebook.com/v21.0/{body.phone_number_id}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(
+                url,
+                params={"fields": "display_phone_number,verified_name,quality_rating"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Graph API error: {exc}") from exc
+    data = resp.json() if resp.content else {}
+    if resp.status_code >= 400:
+        err = (data.get("error") or {}).get("message") or resp.text
+        raise HTTPException(status_code=400, detail=f"Verification failed: {err}")
+    return {
+        "ok": True,
+        "phone_number_id": body.phone_number_id,
+        "display_phone_number": data.get("display_phone_number"),
+        "verified_name": data.get("verified_name") or data.get("name"),
+        "quality_rating": data.get("quality_rating"),
+        "raw": data,
+    }
+
+
 class CreateOwnerBody(BaseModel):
     username: str
     password: str

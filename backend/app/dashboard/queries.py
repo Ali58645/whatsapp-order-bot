@@ -71,15 +71,43 @@ async def list_tenants(db: AsyncSession) -> list[dict]:
         select(DBTenant).order_by(DBTenant.name)
     )
     rows = result.scalars().all()
-    return [
-        {
+    today = _day_start(_utc_now())
+    out = []
+    for t in rows:
+        leads_today = int(
+            (
+                await db.execute(
+                    select(func.count(DBLead.id)).where(
+                        DBLead.tenant_id == t.id,
+                        DBLead.created_at >= today,
+                    )
+                )
+            ).scalar_one()
+        )
+        orders_today = int(
+            (
+                await db.execute(
+                    select(func.count(DBOrder.id)).where(
+                        DBOrder.tenant_id == t.id,
+                        DBOrder.created_at >= today,
+                    )
+                )
+            ).scalar_one()
+        )
+        cfg = t.config or {}
+        out.append({
             "id": t.id,
             "phone_number_id": t.phone_number_id,
             "name": t.name,
             "flow_mode": t.flow_mode,
-        }
-        for t in rows
-    ]
+            "status": getattr(t, "status", None) or "live",
+            "business_wa_id": cfg.get("business_wa_id") or "",
+            "owner_whatsapp": cfg.get("owner_whatsapp") or "",
+            "leads_today": leads_today,
+            "orders_today": orders_today,
+            "stat_today": leads_today if t.flow_mode == "lead" else orders_today,
+        })
+    return out
 
 
 # ── Overview ──────────────────────────────────────────────────────────────────

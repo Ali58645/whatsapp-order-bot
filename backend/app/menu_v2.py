@@ -288,15 +288,27 @@ def find_category(menu: dict, category_id: str) -> Optional[dict]:
 
 # ── Payload builders (runtime === preview) ────────────────────────────────────
 
-def build_greeting_and_entry(to: str, menu: dict) -> list[dict]:
+def _order_msg(tenant=None):
+    from app.messages import MessageResolver
+    return MessageResolver(tenant)
+
+
+def build_greeting_and_entry(to: str, menu: dict, tenant=None) -> list[dict]:
     """
     Returns a list of outbound payloads to start the order flow:
       1) greeting text
       2) category list OR first category item list (if single visible category)
     """
     settings = menu.get("settings") or {}
-    greeting = settings.get("greeting_text") or "Menu dekhne ke liye neeche tap karein."
-    button = settings.get("menu_button_label") or "Menu dekhein"
+    mr = _order_msg(tenant)
+    greeting = (
+        settings.get("greeting_text")
+        or mr.text("order.greeting")
+    )
+    button = (
+        settings.get("menu_button_label")
+        or mr.button("order.menu_button_label")
+    )
     payloads: list[dict] = [
         {
             "messaging_product": "whatsapp",
@@ -308,19 +320,26 @@ def build_greeting_and_entry(to: str, menu: dict) -> list[dict]:
     cats = visible_categories(menu)
     if len(cats) == 0:
         # Flat: all available items
-        payloads.append(build_item_list_payload(to, menu, category_id=None, page=0, button_label=button))
+        payloads.append(
+            build_item_list_payload(to, menu, category_id=None, page=0, button_label=button, tenant=tenant)
+        )
     elif len(cats) == 1:
         payloads.append(
-            build_item_list_payload(to, menu, category_id=cats[0]["id"], page=0, button_label=button)
+            build_item_list_payload(
+                to, menu, category_id=cats[0]["id"], page=0, button_label=button, tenant=tenant
+            )
         )
     else:
-        payloads.append(build_category_list_payload(to, menu, button_label=button))
+        payloads.append(build_category_list_payload(to, menu, button_label=button, tenant=tenant))
     return payloads
 
 
-def build_category_list_payload(to: str, menu: dict, button_label: str | None = None) -> dict:
+def build_category_list_payload(
+    to: str, menu: dict, button_label: str | None = None, tenant=None
+) -> dict:
     settings = menu.get("settings") or {}
-    label = button_label or settings.get("menu_button_label") or "Menu dekhein"
+    mr = _order_msg(tenant)
+    label = button_label or settings.get("menu_button_label") or mr.button("order.menu_button_label")
     cats = visible_categories(menu)
     rows = []
     for c in cats[:ROWS_MAX]:
@@ -328,7 +347,7 @@ def build_category_list_payload(to: str, menu: dict, button_label: str | None = 
         rows.append((f"cat:{c['id']}", c["name"], f"{count} items" if count else ""))
     if not rows:
         rows.append(("cat:empty", "No categories", "Add items in Menu Builder"))
-    return build_list(to, "Category choose karein:", label[:OPTION_LABEL_MAX], rows)
+    return build_list(to, mr.text("order.category_choose"), label[:OPTION_LABEL_MAX], rows)
 
 
 def build_item_list_payload(
@@ -337,17 +356,24 @@ def build_item_list_payload(
     category_id: str | None,
     page: int = 0,
     button_label: str | None = None,
+    tenant=None,
 ) -> dict:
     """
     Build item list for a category (or all items if category_id is None).
     Auto-paginates: if more than 10 available items, page shows 9 + 'Aur dekhein →'.
     """
     settings = menu.get("settings") or {}
-    label = button_label or settings.get("menu_button_label") or "Menu dekhein"
+    mr = _order_msg(tenant)
+    label = button_label or settings.get("menu_button_label") or mr.button("order.menu_button_label")
     currency = settings.get("currency") or "PKR"
     items = available_items(menu, category_id)
     cat = find_category(menu, category_id) if category_id else None
-    body = f"{cat['name']} — item choose karein:" if cat else "Item choose karein:"
+    body = (
+        mr.text("order.item_choose", {"category": cat["name"]})
+        if cat
+        else mr.text("order.item_choose_flat")
+    )
+    more_title = mr.button("order.more_row_title") or MORE_ROW_TITLE
 
     start = max(0, page) * PAGE_SIZE
     remaining = items[start:]
@@ -364,7 +390,7 @@ def build_item_list_payload(
         ]
         next_page = page + 1
         more_id = f"{MORE_ROW_ID}:{category_id or 'all'}:{next_page}"
-        rows.append((more_id, MORE_ROW_TITLE[:ITEM_NAME_MAX], "Agli list"))
+        rows.append((more_id, more_title[:ITEM_NAME_MAX], "Agli list"))
     else:
         rows = [
             (
@@ -388,7 +414,7 @@ def _price_desc(it: dict, currency: str) -> str:
     return price[:ITEM_DESC_MAX]
 
 
-def build_modifier_buttons_payload(to: str, item: dict) -> Optional[dict]:
+def build_modifier_buttons_payload(to: str, item: dict, tenant=None) -> Optional[dict]:
     """Max 1 group, max 3 options → reply buttons. None if no modifiers."""
     mods = item.get("modifiers") or []
     if not mods:
@@ -409,33 +435,49 @@ def build_modifier_buttons_payload(to: str, item: dict) -> Optional[dict]:
             base = title[: max(1, OPTION_LABEL_MAX - len(suffix))]
             title = (base + suffix)[:OPTION_LABEL_MAX]
         buttons.append((f"mod:{item['id']}:{mod['id']}:{opt['id']}", title))
-    body = f"{item['name']} — {mod.get('name', 'Option')} choose karein:"
+    mr = _order_msg(tenant)
+    body = mr.text(
+        "order.modifier_prompt",
+        {"item": item["name"], "modifier": mod.get("name", "Option")},
+    )
     return build_buttons(to, body, buttons)
 
 
-def build_quantity_ask_payload(to: str, item_name: str) -> dict:
+def build_quantity_ask_payload(to: str, item_name: str, tenant=None) -> dict:
+    body = _order_msg(tenant).text("order.quantity_ask", {"item": item_name})
     return {
         "messaging_product": "whatsapp",
         "to": to,
         "type": "text",
-        "text": {"body": f"{item_name} — kitni quantity? (1-9)"},
+        "text": {"body": body},
     }
 
 
-def build_more_items_buttons(to: str) -> dict:
+def build_more_items_buttons(to: str, tenant=None) -> dict:
+    mr = _order_msg(tenant)
     return build_buttons(
         to,
-        "Aur kuch add karein?",
-        [("cart:more", "Haan"), ("cart:done", "Nahi, bas")],
+        mr.text("order.more_items_ask"),
+        [
+            ("cart:more", mr.button("order.btn_more_yes")),
+            ("cart:done", mr.button("order.btn_more_no")),
+        ],
     )
 
 
-def build_confirm_buttons(to: str, summary: str, confirm_note: str = "Confirm karein?") -> dict:
-    body = f"{summary}\n\n{confirm_note}"
+def build_confirm_buttons(
+    to: str, summary: str, confirm_note: str | None = None, tenant=None
+) -> dict:
+    mr = _order_msg(tenant)
+    note = confirm_note or mr.text("order.confirm_note")
+    body = f"{summary}\n\n{note}"
     return build_buttons(
         to,
         body[:1024],
-        [("order:confirm", "Confirm"), ("order:cancel", "Cancel")],
+        [
+            ("order:confirm", mr.button("order.btn_confirm")),
+            ("order:cancel", mr.button("order.btn_cancel")),
+        ],
     )
 
 
@@ -524,19 +566,20 @@ def cart_grand_total(menu: dict, lines: list[dict]) -> int:
     return sub + delivery_charge_for(menu, sub)
 
 
-def format_cart_summary(menu: dict, lines: list[dict]) -> str:
+def format_cart_summary(menu: dict, lines: list[dict], tenant=None) -> str:
     currency = (menu.get("settings") or {}).get("currency") or "PKR"
-    parts = ["Aapka order:"]
+    mr = _order_msg(tenant)
+    parts = [mr.text("order.cart_header")]
     for line in lines:
         mod = f" ({line['modifier_label']})" if line.get("modifier_label") else ""
         parts.append(f"• {line['qty']}x {line['name']}{mod} — {currency} {line_total(line)}")
     sub = cart_subtotal(lines)
     delivery = delivery_charge_for(menu, sub)
     if delivery:
-        parts.append(f"Delivery: {currency} {delivery}")
+        parts.append(mr.text("order.delivery_line", {"amount": f"{currency} {delivery}"}))
     elif ((menu.get("settings") or {}).get("delivery") or {}).get("enabled"):
-        parts.append("Delivery: Free")
-    parts.append(f"Total: {currency} {sub + delivery}")
+        parts.append(mr.text("order.delivery_free"))
+    parts.append(mr.text("order.total_line", {"total": f"{currency} {sub + delivery}"}))
     return "\n".join(parts)
 
 

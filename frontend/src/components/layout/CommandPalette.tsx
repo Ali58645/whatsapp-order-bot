@@ -10,11 +10,12 @@ import {
   Settings,
   Search,
   VolumeX,
+  Building2,
 } from "lucide-react";
-import { api, Lead, setTenantFilter, Tenant } from "../../api";
+import { api, getRole, Lead, setTenantFilter, Tenant } from "../../api";
 import { Dialog, DialogContent } from "../ui/dialog";
 
-const PAGES = [
+const PAGES_BASE = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/orders", label: "Orders", icon: Package },
@@ -23,18 +24,26 @@ const PAGES = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+const PAGE_ADMIN = { to: "/businesses", label: "Businesses", icon: Building2 };
+
 export function CommandPalette({
   open,
   onOpenChange,
   tenants,
+  isAdmin,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   tenants: Tenant[];
+  isAdmin?: boolean;
 }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [leads, setLeads] = useState<Lead[]>([]);
+  const pages =
+    isAdmin ?? getRole() === "admin"
+      ? [...PAGES_BASE.slice(0, -1), PAGE_ADMIN, PAGES_BASE[PAGES_BASE.length - 1]]
+      : PAGES_BASE;
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +89,7 @@ export function CommandPalette({
             </Command.Empty>
 
             <Command.Group heading="Navigate" className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
-              {PAGES.map((p) => (
+              {pages.map((p) => (
                 <Command.Item
                   key={p.to}
                   value={p.label}

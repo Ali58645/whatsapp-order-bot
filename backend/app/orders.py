@@ -39,8 +39,13 @@ def detect_confirmed_order(reply: str) -> Tuple[Optional[dict], str]:
     return order, clean_reply
 
 
-async def forward_order_to_owner(order: dict, customer_number: str,
-                                 owner_number: str, send_fn) -> None:
+async def forward_order_to_owner(
+    order: dict,
+    customer_number: str,
+    owner_number: str,
+    send_fn,
+    tenant=None,
+) -> None:
     """
     Send a formatted order slip to the shop owner's WhatsApp.
     Retries up to 3 times (1s / 2s / 4s backoff).
@@ -50,14 +55,28 @@ async def forward_order_to_owner(order: dict, customer_number: str,
         log.warning("OWNER_WHATSAPP not set — order not forwarded")
         return
 
-    lines = ["🔔 *NEW ORDER*", ""]
+    from app.messages import MessageResolver
+
+    mr = MessageResolver(tenant)
+    items_lines = []
     for item in order.get("items", []):
-        lines.append(f"• {item['qty']}x {item['name']} — Rs. {item['price'] * item['qty']}")
-    lines.append("")
-    lines.append(f"*Total: Rs. {order.get('total', '?')}*")
-    lines.append(f"📍 {order.get('address', 'No address')}")
-    lines.append(f"📱 Customer: +{customer_number}")
-    slip = "\n".join(lines)
+        items_lines.append(
+            f"• {item['qty']}x {item['name']} — Rs. {item['price'] * item['qty']}"
+        )
+    items_block = "\n".join(items_lines)
+    slip = (
+        mr.text("order.owner_slip_title")
+        + "\n\n"
+        + mr.text(
+            "order.owner_slip_body",
+            {
+                "items": items_block,
+                "total": order.get("total", "?"),
+                "address": order.get("address", "No address"),
+                "customer": customer_number,
+            },
+        )
+    ).strip()
 
     # Try up to 3 times with exponential backoff
     for attempt, delay in enumerate(_RETRY_DELAYS, start=1):
@@ -77,5 +96,5 @@ async def forward_order_to_owner(order: dict, customer_number: str,
     # Notify the customer so they're not left hanging
     await send_fn(
         customer_number,
-        "Aapka order record ho gaya hai, hum thodi der mein confirm karenge. Shukriya! 🙏",
+        mr.text("order.owner_fail_customer"),
     )

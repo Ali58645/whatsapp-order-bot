@@ -23,7 +23,7 @@ import logging
 import os
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_validator
 
 log = logging.getLogger("orderbot.tenants")
 
@@ -53,6 +53,8 @@ class FaqItem(BaseModel):
 
 
 class Tenant(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     phone_number_id: str
     name: str
     flow_mode: Literal["lead", "order"]
@@ -68,15 +70,18 @@ class Tenant(BaseModel):
     faq: List[FaqItem] = []
     menu: Optional[MenuConfig] = None      # legacy order catalog (LLM text)
     menu_v2: Optional[dict] = None         # published interactive catalog
+    messages: Optional[dict] = None        # published bot text catalog
     sheet: Optional[SheetConfig] = None    # None → no sheet writes
     greeting_language: str = "roman_urdu"
+    status: str = "live"                   # draft | live | paused | archived
+
+    _raw_config: Optional[dict] = PrivateAttr(default=None)
 
     @field_validator("demo_slots")
     @classmethod
     def at_least_two_slots(cls, v: List[str]) -> List[str]:
         if len(v) < 1:
             raise ValueError("demo_slots must have at least one entry")
-        # Pad to at least 2 for backward compat
         while len(v) < 2:
             v.append(v[0])
         return v
@@ -90,7 +95,6 @@ class Tenant(BaseModel):
         return self
 
     def published_menu_v2(self) -> Optional[dict]:
-        """Return validated published menu_v2, or None."""
         if not self.menu_v2:
             return None
         from app.menu_v2 import validate_menu_v2
@@ -98,6 +102,18 @@ class Tenant(BaseModel):
             return validate_menu_v2(self.menu_v2)
         except Exception:
             return self.menu_v2 if isinstance(self.menu_v2, dict) else None
+
+    def msg(self):
+        from app.messages import MessageResolver
+        return MessageResolver(self)
+
+    @property
+    def is_live(self) -> bool:
+        return (self.status or "live") == "live"
+
+    @property
+    def is_paused(self) -> bool:
+        return (self.status or "") == "paused"
 
     @property
     def demo_slot_1(self) -> str:
@@ -125,17 +141,28 @@ class Tenant(BaseModel):
     def from_db_row(cls, row) -> "Tenant":
         """Build Tenant from DBTenant ORM row."""
         cfg = dict(row.config or {})
+        # Seed messages if missing (zero behavior change — defaults match live Bahi POS)
+        from app.messages import seed_messages_into_config
+        cfg = seed_messages_into_config(
+            cfg,
+            flow_mode=row.flow_mode,
+            greeting_language=cfg.get("greeting_language", "roman_urdu"),
+        )
         data = {
             "phone_number_id": row.phone_number_id,
             "name": row.name,
             "flow_mode": row.flow_mode,
+            "status": getattr(row, "status", None) or "live",
             **cfg,
         }
         # Normalize faq list
         raw_faq = cfg.get("faq") or []
         if raw_faq and isinstance(raw_faq[0], dict):
             data["faq"] = raw_faq
-        return cls.model_validate(data)
+        # Don't pass draft-only keys into model (extra=ignore anyway)
+        t = cls.model_validate(data)
+        t._raw_config = cfg
+        return t
 
 
 # ── Registry ────────────────────────────────────────────────────────────────
@@ -163,20 +190,18 @@ def _build_fallback_tenant() -> Tenant:
     Construct a single tenant from legacy single-tenant env vars so that
     existing deployments continue to work unchanged.
     """
-    import json as _json
-
     phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "default")
     flow_mode = os.environ.get("FLOW_MODE", "lead")
 
     menu: Optional[dict] = None
     if flow_mode == "order":
-        menu_path = os.environ.get("MENU_PATH", "menu.json")
+        from app.menu import MENU_PATH, load_menu
         try:
-            with open(menu_path, "r", encoding="utf-8") as f:
-                menu = _json.load(f)
+            menu = load_menu()
         except Exception:
             # If menu.json is missing we can't start in order mode — let validation fail
-            pass
+            log.warning(f"tenants: failed to load menu from {MENU_PATH!r}")
+            menu = None
 
     sheet: Optional[dict] = None
     gsheet_id = os.environ.get("GSHEET_ID", "")
@@ -220,9 +245,14 @@ def load_tenants() -> None:
         log.info("tenants: loading from TENANTS_JSON_B64")
         _registry = _load_from_list(raw if isinstance(raw, list) else [raw])
     elif file_path:
-        with open(file_path, "r", encoding="utf-8") as f:
+        # Relative TENANTS_FILE paths are anchored to backend/, not CWD
+        from pathlib import Path
+        p = Path(file_path)
+        if not p.is_absolute():
+            p = Path(__file__).resolve().parent.parent / p
+        with open(p, "r", encoding="utf-8") as f:
             raw = json.load(f)
-        log.info(f"tenants: loading from TENANTS_FILE={file_path!r}")
+        log.info(f"tenants: loading from TENANTS_FILE={str(p)!r}")
         _registry = _load_from_list(raw if isinstance(raw, list) else [raw])
     else:
         log.info("tenants: no TENANTS_JSON_B64 or TENANTS_FILE — using single-tenant fallback")

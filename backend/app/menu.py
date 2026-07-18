@@ -2,8 +2,25 @@
 
 import json
 import os
+from pathlib import Path
 
-MENU_PATH = os.environ.get("MENU_PATH", "menu.json")
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _resolve_menu_path() -> str:
+    """
+    Resolve menu.json relative to the backend package root, not process CWD.
+    Absolute MENU_PATH env values are kept as-is; relative values are anchored
+    to backend/ so `MENU_PATH=menu.json` works from any working directory.
+    """
+    raw = os.environ.get("MENU_PATH")
+    if raw:
+        p = Path(raw)
+        return str(p if p.is_absolute() else _BACKEND_ROOT / p)
+    return str(_BACKEND_ROOT / "menu.json")
+
+
+MENU_PATH = _resolve_menu_path()
 
 
 def load_menu() -> dict:

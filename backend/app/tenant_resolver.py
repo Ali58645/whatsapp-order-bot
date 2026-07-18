@@ -1,8 +1,11 @@
 """
 Live tenant config from DB with 60s in-process cache.
 
-When DATABASE_URL is set, resolve_tenant() reads from DB (cached).
-When not set, falls back to the in-memory registry from tenants.json/env.
+When DATABASE_URL is set, resolve_tenant() reads from DB only (cached).
+JSON/env registry is first-boot seed via sync_tenants_to_db — not consulted
+for request routing after DB is enabled.
+
+When DATABASE_URL is absent, falls back to the in-memory registry (local/tests).
 """
 
 from __future__ import annotations
@@ -50,10 +53,20 @@ async def resolve_tenant(phone_number_id: str) -> Optional[Tenant]:
             )
             row = result.scalar_one_or_none()
         if row is None:
-            return _registry_get(phone_number_id)
+            # After seeding, unknown numbers are ignored — do not fall back to env registry
+            log.warning(
+                f"tenant_resolver: no DB row for phone_number_id={phone_number_id!r}"
+            )
+            return None
+        # Archived tenants never route
+        status = getattr(row, "status", "live") or "live"
+        if status == "archived":
+            log.info(f"tenant_resolver: tenant {phone_number_id!r} archived — ignore")
+            return None
         tenant = Tenant.from_db_row(row)
         _cache[phone_number_id] = (tenant, now)
         return tenant
     except Exception as exc:
         log.error(f"tenant_resolver: DB load failed for {phone_number_id} — {exc}")
+        # Soft fallback only on hard DB failure (keeps bot up during outages)
         return _registry_get(phone_number_id)

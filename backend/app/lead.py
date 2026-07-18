@@ -314,15 +314,35 @@ def _t(strings: dict, lang: str) -> str:
     return strings.get(lang) or strings["ur"]
 
 
-def _greeting_text(lang: str) -> str:
-    return f"{_t(_GREETING_LINE, lang)}\n{_t(_VALUE_LINE, lang)}\n{_t(_Q_BUSINESS_NAME, lang)}"
+def _mr(tenant=None, lang: str = "ur"):
+    """MessageResolver bound to tenant (or lang-hint defaults when tenant is None)."""
+    from app.messages import MessageResolver
+    if tenant is not None:
+        return MessageResolver(tenant)
+    r = MessageResolver(None)
+    r.lang_hint = "en" if lang == "en" else "roman_urdu"
+    return r
 
 
-def _media_first_text(lang: str) -> str:
-    return _t(_MEDIA_REDIRECT, lang).format(
-        greeting=_t(_GREETING_LINE, lang),
-        value=_t(_VALUE_LINE, lang),
-        name_q=_t(_Q_BUSINESS_NAME, lang),
+def lead_text(key: str, lang: str = "ur", tenant=None, **variables) -> str:
+    """Resolve lead.* template via tenant messages with code-default fallback."""
+    return _mr(tenant, lang).text(f"lead.{key}", variables or None)
+
+
+def _greeting_text(lang: str, tenant=None) -> str:
+    return (
+        f"{lead_text('greeting_line', lang, tenant)}\n"
+        f"{lead_text('value_line', lang, tenant)}\n"
+        f"{lead_text('q_business_name', lang, tenant)}"
+    )
+
+
+def _media_first_text(lang: str, tenant=None) -> str:
+    return (
+        f"{lead_text('greeting_line', lang, tenant)}\n"
+        f"{lead_text('value_line', lang, tenant)}\n"
+        f"{lead_text('q_business_name', lang, tenant)}\n"
+        f"{lead_text('media_redirect_suffix', lang, tenant)}"
     )
 
 
@@ -349,7 +369,7 @@ _MEDIA_FIRST_TEXT = _media_first_text("ur")
 def build_entry_response(intent: str, lang: str = "ur", tenant=None) -> tuple[str, str]:
     """
     Return (reply_text, next_phase) for a first-message entry intent.
-    Optional tenant supplies custom greeting_text.
+    Optional tenant supplies custom greeting_text / messages catalog.
     """
     custom_greeting = ""
     if tenant is not None:
@@ -358,21 +378,17 @@ def build_entry_response(intent: str, lang: str = "ur", tenant=None) -> tuple[st
 
     if intent == INTENT_PRICE_FIRST:
         text = (
-            f"{_t(_PRICING_TEXT, lang)}\n"
-            f"{_t(_Q_BUSINESS_NAME, lang)}"
+            f"{lead_text('pricing_text', lang, tenant)}\n"
+            f"{lead_text('q_business_name', lang, tenant)}"
         )
         return text, "BUSINESS_NAME"
     if intent == INTENT_DEMO_FIRST:
-        greet = custom_greeting or _t(_GREETING_LINE, lang)
-        suffix = (
-            "Hamari team aap ko demo ka slot choose karne mein madad karegi:"
-            if lang == "ur" else
-            "Our team will help you select a demo slot:"
-        )
+        greet = custom_greeting or lead_text("greeting_line", lang, tenant)
+        suffix = lead_text("entry_demo_suffix", lang, tenant)
         return f"{greet}\n{suffix}", "SCHEDULING"
     if custom_greeting:
-        return f"{custom_greeting}\n\n{_t(_Q_BUSINESS_NAME, lang)}", "BUSINESS_NAME"
-    return _greeting_text(lang), "BUSINESS_NAME"
+        return f"{custom_greeting}\n\n{lead_text('q_business_name', lang, tenant)}", "BUSINESS_NAME"
+    return _greeting_text(lang, tenant), "BUSINESS_NAME"
 
 
 def build_lead_system_prompt(tenant=None) -> str:
@@ -438,6 +454,7 @@ async def forward_lead_card(
     meta: dict,
     owner_number: str,
     send_fn,
+    tenant=None,
 ) -> None:
     """
     Send a lead card to the owner. Retries 3× with exponential backoff.
@@ -452,20 +469,27 @@ async def forward_lead_card(
     slot = meta.get("demo_slot") or f"not booked — stalled at {phase}"
     source = meta.get("lead_source", "unknown")
     referral_headline = meta.get("referral_headline", "")
+    lang = meta.get("lang", "ur")
 
-    card_lines = [
-        "🔔 *NEW LEAD — Bahi POS*",
-        "",
-        f"Business: {meta.get('business_name', '?')} ({meta.get('business_type', '?')})",
-        f"Locations: {meta.get('locations', '?')}",
-        f"Current system: {meta.get('current_system', '?')}",
-        f"Demo: {slot}",
-        f"Source: {source}",
-    ]
-    if referral_headline:
-        card_lines.append(f"Ad: {referral_headline}")
-    card_lines.append(f"Number: wa.me/{sender}")
-    card = "\n".join(card_lines)
+    vars_ = {
+        "business_name": meta.get("business_name", "?"),
+        "business_type": meta.get("business_type", "?"),
+        "locations": meta.get("locations", "?"),
+        "current_system": meta.get("current_system", "?"),
+        "slot": slot,
+        "source": source,
+        "referral_headline": referral_headline,
+        "sender": sender,
+    }
+    title = lead_text("owner_card_title", lang, tenant)
+    body = lead_text("owner_card_body", lang, tenant, **vars_)
+    # Match legacy: omit empty Ad line when no referral headline
+    if not referral_headline:
+        body = "\n".join(
+            ln for ln in body.split("\n")
+            if not ln.strip().startswith("Ad:")
+        )
+    card = f"{title}\n\n{body}".strip()
 
     for attempt, delay in enumerate(_RETRY_DELAYS, start=1):
         sent = await send_fn(owner_number, card)
@@ -590,6 +614,10 @@ _CURRENT_SYSTEM_SHEET_VALUES: dict[str, str] = {
     "sys_none":   "No System",
 }
 
+# Id → human label for loc / system (used by apply_interactive_answer / text matchers)
+_LOC_LABELS: dict[str, str] = {r[0]: r[1] for r in _LOCATIONS_BUTTONS}
+_SYS_LABELS: dict[str, str] = _CURRENT_SYSTEM_SHEET_VALUES
+
 # Scheduling buttons built at call-time so DEMO_SLOT_1/2 are resolved after env load
 def _scheduling_buttons() -> list[tuple[str, str]]:
     return [
@@ -599,13 +627,65 @@ def _scheduling_buttons() -> list[tuple[str, str]]:
     ]
 
 
-# Id → human label for loc / system (used by apply_interactive_answer)
-_LOC_LABELS: dict[str, str]  = {r[0]: r[1] for r in _LOCATIONS_BUTTONS}
-# _SYS_LABELS maps button id → sheet-matching value (not the button display title)
-_SYS_LABELS: dict[str, str]  = _CURRENT_SYSTEM_SHEET_VALUES
+def _interactive_maps(tenant=None, lang: str = "ur") -> dict:
+    """Build id→label maps from tenant messages.interactive (or defaults)."""
+    mr = _mr(tenant, lang)
+    btypes = mr.interactive("business_types") or []
+    locs = mr.interactive("locations") or []
+    systems = mr.interactive("current_system") or []
+    btype_rows = [
+        (r["id"], r["title"], r.get("description") or "")
+        for r in btypes
+        if isinstance(r, dict) and r.get("id") and r.get("title")
+    ]
+    loc_buttons = [
+        (r["id"], r["title"])
+        for r in locs
+        if isinstance(r, dict) and r.get("id") and r.get("title")
+    ]
+    sys_buttons = [
+        (r["id"], r["title"])
+        for r in systems
+        if isinstance(r, dict) and r.get("id") and r.get("title")
+    ]
+    btype_labels = {
+        r["id"]: (r.get("value") or r["title"])
+        for r in btypes
+        if isinstance(r, dict) and r.get("id") and r.get("title")
+    }
+    loc_labels = {
+        r["id"]: (r.get("value") or r["title"])
+        for r in locs
+        if isinstance(r, dict) and r.get("id")
+    }
+    sys_labels = {
+        r["id"]: (r.get("sheet_value") or r.get("title") or "")
+        for r in systems
+        if isinstance(r, dict) and r.get("id")
+    }
+    return {
+        "btype_rows": btype_rows or _BUSINESS_TYPE_ROWS,
+        "loc_buttons": loc_buttons or _LOCATIONS_BUTTONS,
+        "sys_buttons": sys_buttons or _CURRENT_SYSTEM_BUTTONS,
+        "btype_labels": btype_labels or _BUSINESS_TYPE_LABELS,
+        "loc_labels": loc_labels or _LOC_LABELS,
+        "sys_labels": sys_labels or _SYS_LABELS,
+        "select_label": mr.interactive("select_button_label") or (
+            "Muntakhib karein" if lang == "ur" else "Select"
+        ),
+        "slot_other": mr.interactive("slot_other_label") or (
+            "Koi aur time" if lang == "ur" else "Another time"
+        ),
+    }
 
 
-def get_phase_interactive(phase: str, sender: str, lang: str = "ur", meta: Optional[dict] = None) -> Optional[dict]:
+def get_phase_interactive(
+    phase: str,
+    sender: str,
+    lang: str = "ur",
+    meta: Optional[dict] = None,
+    tenant=None,
+) -> Optional[dict]:
     """
     Return the interactive payload dict for *phase*, or None if this phase
     uses free-text (handled deterministically).
@@ -618,26 +698,28 @@ def get_phase_interactive(phase: str, sender: str, lang: str = "ur", meta: Optio
     """
     from app.interactive import build_buttons, build_list  # local import — no circular dep
 
+    maps = _interactive_maps(tenant, lang)
+
     if phase == "BUSINESS_TYPE":
         return build_list(
             sender,
-            _t(_Q_BUSINESS_TYPE, lang),
-            "Muntakhib karein" if lang == "ur" else "Select",
-            _BUSINESS_TYPE_ROWS,
+            lead_text("q_business_type", lang, tenant),
+            str(maps["select_label"])[:20],
+            maps["btype_rows"],
         )
 
     if phase == "LOCATIONS":
         return build_buttons(
             sender,
-            _t(_Q_LOCATIONS, lang),
-            _LOCATIONS_BUTTONS,
+            lead_text("q_locations", lang, tenant),
+            maps["loc_buttons"],
         )
 
     if phase == "CURRENT_SYSTEM":
         return build_buttons(
             sender,
-            _t(_Q_CURRENT_SYSTEM, lang),
-            _CURRENT_SYSTEM_BUTTONS,
+            lead_text("q_current_system", lang, tenant),
+            maps["sys_buttons"],
         )
 
     if phase == "SCHEDULING":
@@ -648,18 +730,148 @@ def get_phase_interactive(phase: str, sender: str, lang: str = "ur", meta: Optio
             buttons = [
                 ("slot_1",     slot_1[:20]),
                 ("slot_2",     slot_2[:20]),
-                ("slot_other", "Koi aur time"),
+                ("slot_other", str(maps["slot_other"])[:20]),
             ]
         else:
-            buttons = _scheduling_buttons()
+            buttons = [
+                ("slot_1",     DEMO_SLOT_1[:20]),
+                ("slot_2",     DEMO_SLOT_2[:20]),
+                ("slot_other", str(maps["slot_other"])[:20]),
+            ]
         return build_buttons(
             sender,
-            _t(_Q_SCHEDULING, lang),
+            lead_text("q_scheduling", lang, tenant),
             buttons,
         )
 
     return None  # GREETING, BUSINESS_NAME, CONFIRMED, STALLED → deterministic text
 
+
+def build_reprompt(phase: str, lang: str = "ur", tenant=None) -> str:
+    """Return a re-prompt string repeating the current phase's question."""
+    phase_q_map = {
+        "BUSINESS_TYPE":  "q_business_type",
+        "LOCATIONS":      "q_locations",
+        "CURRENT_SYSTEM": "q_current_system",
+        "SCHEDULING":     "q_scheduling",
+        "BUSINESS_NAME":  "q_business_name",
+    }
+    q_key = phase_q_map.get(phase, "q_business_name")
+    current_q = lead_text(q_key, lang, tenant)
+    return lead_text("reprompt", lang, tenant, current_question=current_q)
+
+
+def build_handoff(lang: str = "ur", tenant=None) -> str:
+    """Return the handoff message sent when re-prompt budget is exhausted."""
+    return lead_text("handoff", lang, tenant)
+
+
+def handle_business_name(
+    meta: dict,
+    text: str,
+    lang: str = "ur",
+    tenant=None,
+) -> tuple[str, bool]:
+    """
+    Deterministically process a BUSINESS_NAME phase answer.
+
+    Rules:
+    - If text is a detour question (_is_detour_question): caller must handle
+      via detour path. Returns ("", False) to signal this.
+    - If text is 1-6 words (any language, any capitalisation): accept verbatim,
+      record in meta, advance phase to BUSINESS_TYPE, return (ack_text, True).
+    - If empty or > 6 words: return (reprompt_text, False) — phase unchanged.
+
+    Returns (reply_text, accepted) where accepted=True means phase advanced.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return build_reprompt("BUSINESS_NAME", lang, tenant), False
+
+    if _is_detour_question(stripped):
+        return "", False  # signal: caller should use detour path
+
+    word_count = len(stripped.split())
+    if word_count > _BUSINESS_NAME_MAX_WORDS:
+        return build_reprompt("BUSINESS_NAME", lang, tenant), False
+
+    # Accept verbatim — no keyword filtering, no LLM judgment
+    meta["business_name"] = stripped
+    meta["phase"] = "BUSINESS_TYPE"
+    reset_reprompts(meta)
+    log.info(f"lead: business name captured: {stripped!r}")
+    return lead_text("ack_business_name", lang, tenant, name=stripped), True
+
+
+def apply_interactive_answer(
+    meta: dict,
+    reply_id: str,
+    reply_title: str,
+    tenant=None,
+) -> tuple[bool, Optional[str]]:
+    """
+    Process a button/list tap deterministically — no LLM call needed.
+
+    Returns (handled: bool, follow_up_text: Optional[str]).
+      handled=True  → caller must NOT call Claude; advance is done here.
+      follow_up_text → if not None, send this plain-text message to the user.
+
+    slot_other is a special case: we mark the meta and return a follow-up
+    question; the *next* free-text message will be captured as demo_slot.
+    """
+    phase = meta.get("phase", "GREETING")
+    lang = meta.get("lang", "ur")
+    maps = _interactive_maps(tenant, lang)
+
+    # ── menu_demo: starts the qualification flow from any welcome menu ────────
+    if reply_id == "menu_demo":
+        # Treat as a GENERIC_INFO entry: advance to BUSINESS_NAME
+        meta["phase"] = "BUSINESS_NAME"
+        meta.setdefault("entry_intent", "DEMO_FIRST")
+        log.info("lead: menu_demo tapped — starting qualification flow")
+        return True, _greeting_text(lang, tenant)
+
+    if phase == "BUSINESS_TYPE" and reply_id in maps["btype_labels"]:
+        meta["business_type"] = maps["btype_labels"][reply_id]
+        meta["phase"] = "LOCATIONS"
+        log.info(f"lead: interactive BUSINESS_TYPE → {meta['business_type']}")
+        return True, None
+
+    if phase == "LOCATIONS" and reply_id in maps["loc_labels"]:
+        meta["locations"] = maps["loc_labels"][reply_id]
+        meta["phase"] = "CURRENT_SYSTEM"
+        log.info(f"lead: interactive LOCATIONS → {meta['locations']}")
+        return True, None
+
+    if phase == "CURRENT_SYSTEM" and reply_id in maps["sys_labels"]:
+        meta["current_system"] = maps["sys_labels"][reply_id]
+        meta["phase"] = "SCHEDULING"
+        log.info(f"lead: interactive CURRENT_SYSTEM → {meta['current_system']}")
+        return True, None
+
+    if phase == "SCHEDULING":
+        # Prefer per-tenant slots stored in meta; fall back to module globals
+        _slot_1 = meta.get("_slot_1") or DEMO_SLOT_1
+        _slot_2 = meta.get("_slot_2") or DEMO_SLOT_2
+        if reply_id == "slot_1":
+            meta["demo_slot"] = _slot_1
+            meta["phase"] = "CONFIRMED"
+            log.info(f"lead: interactive SCHEDULING → {_slot_1}")
+            return True, None
+        if reply_id == "slot_2":
+            meta["demo_slot"] = _slot_2
+            meta["phase"] = "CONFIRMED"
+            log.info(f"lead: interactive SCHEDULING → {_slot_2}")
+            return True, None
+        if reply_id == "slot_other":
+            # Mark that next free-text = custom slot; don't advance phase yet
+            meta["awaiting_custom_slot"] = True
+            log.info("lead: interactive SCHEDULING → slot_other, awaiting free text")
+            return True, lead_text("q_custom_slot", lang, tenant)
+
+    # Unknown id for this phase — fall through to LLM
+    log.warning(f"lead: interactive reply_id={reply_id!r} unhandled at phase={phase}")
+    return False, None
 
 
 def extract_detour_done(reply: str) -> tuple[bool, str]:
@@ -726,25 +938,6 @@ def match_free_text_business_type(text: str) -> str | None:
     return None  # 0 = unrecognised, 2+ = ambiguous → both treated as no-match
 
 
-def build_reprompt(phase: str, lang: str = "ur") -> str:
-    """Return a re-prompt string repeating the current phase's question."""
-    phase_q_map = {
-        "BUSINESS_TYPE":  _Q_BUSINESS_TYPE,
-        "LOCATIONS":      _Q_LOCATIONS,
-        "CURRENT_SYSTEM": _Q_CURRENT_SYSTEM,
-        "SCHEDULING":     _Q_SCHEDULING,
-        "BUSINESS_NAME":  _Q_BUSINESS_NAME,
-    }
-    q_dict = phase_q_map.get(phase, _Q_BUSINESS_NAME)
-    current_q = _t(q_dict, lang)
-    return _t(_REPROMPT, lang).format(current_question=current_q)
-
-
-def build_handoff(lang: str = "ur") -> str:
-    """Return the handoff message sent when re-prompt budget is exhausted."""
-    return _t(_HANDOFF, lang)
-
-
 def increment_reprompt(meta: dict) -> int:
     """Increment and return the new reprompt_count."""
     count = meta.get("reprompt_count", 0) + 1
@@ -756,8 +949,6 @@ def reset_reprompts(meta: dict) -> None:
     meta["reprompt_count"] = 0
 
 
-# ── Business name capture ─────────────────────────────────────────────────────
-
 # Acknowledgment after name is captured (shown before the business-type list)
 _ACK_BUSINESS_NAME = {
     "ur": "Shukriya. Aap ke business ka naam record ho gaya.",
@@ -766,109 +957,3 @@ _ACK_BUSINESS_NAME = {
 
 # Maximum word count accepted verbatim as a business name
 _BUSINESS_NAME_MAX_WORDS = 6
-
-
-def handle_business_name(
-    meta: dict,
-    text: str,
-    lang: str = "ur",
-) -> tuple[str, bool]:
-    """
-    Deterministically process a BUSINESS_NAME phase answer.
-
-    Rules:
-    - If text is a detour question (_is_detour_question): caller must handle
-      via detour path. Returns ("", False) to signal this.
-    - If text is 1-6 words (any language, any capitalisation): accept verbatim,
-      record in meta, advance phase to BUSINESS_TYPE, return (ack_text, True).
-    - If empty or > 6 words: return (reprompt_text, False) — phase unchanged.
-
-    Returns (reply_text, accepted) where accepted=True means phase advanced.
-    """
-    stripped = text.strip()
-    if not stripped:
-        return build_reprompt("BUSINESS_NAME", lang), False
-
-    if _is_detour_question(stripped):
-        return "", False  # signal: caller should use detour path
-
-    word_count = len(stripped.split())
-    if word_count > _BUSINESS_NAME_MAX_WORDS:
-        return build_reprompt("BUSINESS_NAME", lang), False
-
-    # Accept verbatim — no keyword filtering, no LLM judgment
-    meta["business_name"] = stripped
-    meta["phase"] = "BUSINESS_TYPE"
-    reset_reprompts(meta)
-    log.info(f"lead: business name captured: {stripped!r}")
-    return _t(_ACK_BUSINESS_NAME, lang), True
-
-
-def apply_interactive_answer(
-    meta: dict,
-    reply_id: str,
-    reply_title: str,
-) -> tuple[bool, Optional[str]]:
-    """
-    Process a button/list tap deterministically — no LLM call needed.
-
-    Returns (handled: bool, follow_up_text: Optional[str]).
-      handled=True  → caller must NOT call Claude; advance is done here.
-      follow_up_text → if not None, send this plain-text message to the user.
-
-    slot_other is a special case: we mark the meta and return a follow-up
-    question; the *next* free-text message will be captured as demo_slot.
-    """
-    phase = meta.get("phase", "GREETING")
-
-    # ── menu_demo: starts the qualification flow from any welcome menu ────────
-    if reply_id == "menu_demo":
-        # Treat as a GENERIC_INFO entry: advance to BUSINESS_NAME
-        meta["phase"] = "BUSINESS_NAME"
-        meta.setdefault("entry_intent", "DEMO_FIRST")
-        lang = meta.get("lang", "ur")
-        log.info("lead: menu_demo tapped — starting qualification flow")
-        return True, _greeting_text(lang)
-
-    if phase == "BUSINESS_TYPE" and reply_id in _BUSINESS_TYPE_LABELS:
-        meta["business_type"] = _BUSINESS_TYPE_LABELS[reply_id]
-        meta["phase"] = "LOCATIONS"
-        log.info(f"lead: interactive BUSINESS_TYPE → {meta['business_type']}")
-        return True, None
-
-    if phase == "LOCATIONS" and reply_id in _LOC_LABELS:
-        meta["locations"] = _LOC_LABELS[reply_id]
-        meta["phase"] = "CURRENT_SYSTEM"
-        log.info(f"lead: interactive LOCATIONS → {meta['locations']}")
-        return True, None
-
-    if phase == "CURRENT_SYSTEM" and reply_id in _SYS_LABELS:
-        meta["current_system"] = _SYS_LABELS[reply_id]
-        meta["phase"] = "SCHEDULING"
-        log.info(f"lead: interactive CURRENT_SYSTEM → {meta['current_system']}")
-        return True, None
-
-    if phase == "SCHEDULING":
-        # Prefer per-tenant slots stored in meta; fall back to module globals
-        _slot_1 = meta.get("_slot_1") or DEMO_SLOT_1
-        _slot_2 = meta.get("_slot_2") or DEMO_SLOT_2
-        if reply_id == "slot_1":
-            meta["demo_slot"] = _slot_1
-            meta["phase"] = "CONFIRMED"
-            log.info(f"lead: interactive SCHEDULING → {_slot_1}")
-            return True, None
-        if reply_id == "slot_2":
-            meta["demo_slot"] = _slot_2
-            meta["phase"] = "CONFIRMED"
-            log.info(f"lead: interactive SCHEDULING → {_slot_2}")
-            return True, None
-        if reply_id == "slot_other":
-            # Mark that next free-text = custom slot; don't advance phase yet
-            meta["awaiting_custom_slot"] = True
-            log.info("lead: interactive SCHEDULING → slot_other, awaiting free text")
-            lang = meta.get("lang", "ur")
-            return True, _t(_Q_CUSTOM_SLOT, lang)
-
-    # Unknown id for this phase — fall through to LLM
-    log.warning(f"lead: interactive reply_id={reply_id!r} unhandled at phase={phase}")
-    return False, None

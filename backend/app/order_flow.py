@@ -95,7 +95,7 @@ async def handle_order_interactive(
                 clear_order_meta(sender, tenant_id=tid)
                 clear_session(sender, tenant_id=tid)
                 meta = get_order_meta(sender, tenant_id=tid)
-                for p in build_greeting_and_entry(sender, menu):
+                for p in build_greeting_and_entry(sender, menu, tenant=tenant):
                     if p.get("type") == "text":
                         await send(sender, text=p["text"]["body"], tenant=tenant)
                     else:
@@ -105,7 +105,7 @@ async def handle_order_interactive(
         # First message with no cart phase → start browse
         if meta.get("phase") == "ORDER_BROWSE" and not meta.get("started"):
             meta["started"] = True
-            for p in build_greeting_and_entry(sender, menu):
+            for p in build_greeting_and_entry(sender, menu, tenant=tenant):
                 if p.get("type") == "text":
                     await send(sender, text=p["text"]["body"], tenant=tenant)
                 else:
@@ -128,7 +128,7 @@ async def handle_order_interactive(
         # Fallback nudge
         await send(
             sender,
-            text="Menu se choose karein, ya 'menu' likhein.",
+            text=tenant.msg().text("order.nudge_menu"),
             tenant=tenant,
         )
         return {"status": "ok"}
@@ -144,6 +144,7 @@ async def _handle_reply(
     reply_title: str,
     on_confirm,
 ) -> dict:
+    mr = tenant.msg()
     # Category pick
     if reply_id.startswith("cat:"):
         cat_id = reply_id[4:]
@@ -152,7 +153,9 @@ async def _handle_reply(
         meta["category_id"] = cat_id
         meta["page"] = 0
         meta["phase"] = "ORDER_BROWSE"
-        payload = build_item_list_payload(sender, menu, category_id=cat_id, page=0)
+        payload = build_item_list_payload(
+            sender, menu, category_id=cat_id, page=0, tenant=tenant
+        )
         await send(sender, interactive_payload=payload, tenant=tenant)
         return {"status": "ok"}
 
@@ -165,7 +168,9 @@ async def _handle_reply(
         cat_id = None if cat_part == "all" else cat_part
         meta["category_id"] = cat_id
         meta["page"] = page
-        payload = build_item_list_payload(sender, menu, category_id=cat_id, page=page)
+        payload = build_item_list_payload(
+            sender, menu, category_id=cat_id, page=page, tenant=tenant
+        )
         await send(sender, interactive_payload=payload, tenant=tenant)
         return {"status": "ok"}
 
@@ -176,17 +181,21 @@ async def _handle_reply(
             return {"status": "ok"}
         item = find_item(menu, item_id)
         if not item:
-            await send(sender, text="Item nahi mila. Dobara try karein.", tenant=tenant)
+            await send(sender, text=mr.text("order.item_not_found"), tenant=tenant)
             return {"status": "ok"}
         meta["pending_item_id"] = item_id
         meta["pending_mod"] = None
-        mod_payload = build_modifier_buttons_payload(sender, item)
+        mod_payload = build_modifier_buttons_payload(sender, item, tenant=tenant)
         if mod_payload:
             meta["phase"] = "ORDER_MODIFIER"
             await send(sender, interactive_payload=mod_payload, tenant=tenant)
         else:
             meta["phase"] = "ORDER_QTY"
-            await send(sender, text=build_quantity_ask_payload(sender, item["name"])["text"]["body"], tenant=tenant)
+            await send(
+                sender,
+                text=build_quantity_ask_payload(sender, item["name"], tenant=tenant)["text"]["body"],
+                tenant=tenant,
+            )
         return {"status": "ok"}
 
     # Modifier pick
@@ -203,7 +212,11 @@ async def _handle_reply(
         meta["pending_item_id"] = item_id
         meta["pending_mod"] = {"mod_id": mod_id, "opt_id": opt_id, "delta": delta, "label": label}
         meta["phase"] = "ORDER_QTY"
-        await send(sender, text=build_quantity_ask_payload(sender, item["name"])["text"]["body"], tenant=tenant)
+        await send(
+            sender,
+            text=build_quantity_ask_payload(sender, item["name"], tenant=tenant)["text"]["body"],
+            tenant=tenant,
+        )
         return {"status": "ok"}
 
     # Cart more / done
@@ -211,12 +224,18 @@ async def _handle_reply(
         meta["phase"] = "ORDER_BROWSE"
         cats = visible_categories(menu)
         if len(cats) > 1:
-            await send(sender, interactive_payload=build_category_list_payload(sender, menu), tenant=tenant)
+            await send(
+                sender,
+                interactive_payload=build_category_list_payload(sender, menu, tenant=tenant),
+                tenant=tenant,
+            )
         else:
             cat_id = cats[0]["id"] if cats else meta.get("category_id")
             await send(
                 sender,
-                interactive_payload=build_item_list_payload(sender, menu, category_id=cat_id, page=0),
+                interactive_payload=build_item_list_payload(
+                    sender, menu, category_id=cat_id, page=0, tenant=tenant
+                ),
                 tenant=tenant,
             )
         return {"status": "ok"}
@@ -227,19 +246,19 @@ async def _handle_reply(
     if reply_id == "order:confirm":
         cart = meta.get("cart") or []
         if not cart:
-            await send(sender, text="Cart khali hai.", tenant=tenant)
+            await send(sender, text=mr.text("order.cart_empty"), tenant=tenant)
             return {"status": "ok"}
         order = _cart_to_order(menu, cart)
         if on_confirm:
             await on_confirm(order, sender, tenant)
         clear_order_meta(sender, tenant_id=tenant.phone_number_id)
         clear_session(sender, tenant_id=tenant.phone_number_id)
-        await send(sender, text="Shukriya! Order confirm ho gaya.", tenant=tenant)
+        await send(sender, text=mr.text("order.order_received"), tenant=tenant)
         return {"status": "ok"}
 
     if reply_id == "order:cancel":
         clear_order_meta(sender, tenant_id=tenant.phone_number_id)
-        await send(sender, text="Order cancel. 'menu' likhein naya order ke liye.", tenant=tenant)
+        await send(sender, text=mr.text("order.order_cancel"), tenant=tenant)
         return {"status": "ok"}
 
     log.info(f"order_flow: unhandled reply_id={reply_id!r} title={reply_title!r}")
@@ -247,17 +266,18 @@ async def _handle_reply(
 
 
 async def _handle_qty_text(sender, meta, menu, tenant, send, message) -> dict:
+    mr = tenant.msg()
     text = (message.get("text") or {}).get("body", "").strip()
     m = re.search(r"\b([1-9])\b", text)
     if not m:
-        await send(sender, text="1 se 9 tak number likhein.", tenant=tenant)
+        await send(sender, text=mr.text("order.qty_invalid"), tenant=tenant)
         return {"status": "ok"}
     qty = int(m.group(1))
     item_id = meta.get("pending_item_id")
     item = find_item(menu, item_id) if item_id else None
     if not item:
         meta["phase"] = "ORDER_BROWSE"
-        await send(sender, text="Item select karein pehle.", tenant=tenant)
+        await send(sender, text=mr.text("order.pick_item_first"), tenant=tenant)
         return {"status": "ok"}
     pend = meta.get("pending_mod") or {}
     line = {
@@ -272,21 +292,28 @@ async def _handle_qty_text(sender, meta, menu, tenant, send, message) -> dict:
     meta["pending_item_id"] = None
     meta["pending_mod"] = None
     meta["phase"] = "ORDER_MORE"
-    summary = format_cart_summary(menu, meta["cart"])
+    summary = format_cart_summary(menu, meta["cart"], tenant=tenant)
     await send(sender, text=summary, tenant=tenant)
-    await send(sender, interactive_payload=build_more_items_buttons(sender), tenant=tenant)
+    await send(
+        sender, interactive_payload=build_more_items_buttons(sender, tenant=tenant), tenant=tenant
+    )
     return {"status": "ok"}
 
 
 async def _send_confirm(sender, meta, menu, tenant, send) -> dict:
+    mr = tenant.msg()
     cart = meta.get("cart") or []
     if not cart:
-        await send(sender, text="Cart khali hai. Menu se item choose karein.", tenant=tenant)
+        await send(sender, text=mr.text("order.cart_empty"), tenant=tenant)
         return {"status": "ok"}
-    summary = format_cart_summary(menu, cart)
-    note = (menu.get("settings") or {}).get("order_confirm_note") or "Confirm karein?"
+    summary = format_cart_summary(menu, cart, tenant=tenant)
+    note = (menu.get("settings") or {}).get("order_confirm_note") or mr.text("order.confirm_note")
     meta["phase"] = "ORDER_CONFIRM"
-    await send(sender, interactive_payload=build_confirm_buttons(sender, summary, note), tenant=tenant)
+    await send(
+        sender,
+        interactive_payload=build_confirm_buttons(sender, summary, note, tenant=tenant),
+        tenant=tenant,
+    )
     return {"status": "ok"}
 
 

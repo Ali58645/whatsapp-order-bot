@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import create_engine, pool
@@ -12,6 +13,9 @@ from sqlalchemy.engine import Connection
 from app.db.models import Base  # noqa: F401
 
 config = context.config
+
+# backend/ — parent of alembic/
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -32,7 +36,8 @@ def _to_sync_url(raw: str) -> str:
 
 def _get_url() -> str:
     configured = config.get_main_option("sqlalchemy.url") or ""
-    raw = configured or os.environ.get("DATABASE_URL", "") or "sqlite:///./test_migration.db"
+    fallback = _BACKEND_ROOT / "test_migration.db"
+    raw = configured or os.environ.get("DATABASE_URL", "") or f"sqlite:///{fallback}"
     return _to_sync_url(raw)
 
 

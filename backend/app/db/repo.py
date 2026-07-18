@@ -57,20 +57,30 @@ async def sync_tenants_to_db(session: AsyncSession, tenants: list) -> None:
     """
     First-boot seed: insert tenants from JSON/env if missing.
     Existing rows are NOT overwritten — DB config is source of truth after seed.
+    New rows get messages catalog seeded to match current Bahi POS defaults.
     """
     m = _m()
+    from app.messages import seed_messages_into_config
+
     now = datetime.now(timezone.utc)
     for t in tenants:
         result = await session.execute(
             select(m.DBTenant).where(m.DBTenant.phone_number_id == t.phone_number_id)
         )
         row = result.scalar_one_or_none()
-        config = t.model_dump(exclude={"phone_number_id", "name", "flow_mode"})
+        config = t.model_dump(exclude={"phone_number_id", "name", "flow_mode", "status"})
+        config.pop("_raw_config", None)
+        config = seed_messages_into_config(
+            config,
+            flow_mode=t.flow_mode,
+            greeting_language=getattr(t, "greeting_language", "roman_urdu"),
+        )
         if row is None:
             row = m.DBTenant(
                 phone_number_id=t.phone_number_id,
                 name=t.name,
                 flow_mode=t.flow_mode,
+                status=getattr(t, "status", None) or "live",
                 config=config,
                 created_at=now,
                 updated_at=now,
@@ -78,7 +88,83 @@ async def sync_tenants_to_db(session: AsyncSession, tenants: list) -> None:
             session.add(row)
             log.info(f"repo: seeded tenant {t.phone_number_id!r}")
         else:
-            log.info(f"repo: tenant {t.phone_number_id!r} exists — config unchanged")
+            # Ensure messages exist on old rows without overwriting custom config
+            if not (row.config or {}).get("messages"):
+                row.config = seed_messages_into_config(
+                    dict(row.config or {}),
+                    flow_mode=row.flow_mode,
+                    greeting_language=(row.config or {}).get("greeting_language", "roman_urdu"),
+                )
+                row.updated_at = now
+                log.info(f"repo: seeded messages for existing tenant {t.phone_number_id!r}")
+            else:
+                log.info(f"repo: tenant {t.phone_number_id!r} exists — config unchanged")
+
+
+async def create_tenant(
+    session: AsyncSession,
+    *,
+    name: str,
+    flow_mode: str,
+    phone_number_id: str,
+    business_wa_id: str = "",
+    owner_whatsapp: str = "",
+    greeting_language: str = "roman_urdu",
+    status: str = "draft",
+    config: dict | None = None,
+) -> Any:
+    """Create a new tenant row (admin). Returns DBTenant."""
+    m = _m()
+    from app.messages import seed_messages_into_config
+
+    existing = await get_tenant_row_by_phone(session, phone_number_id)
+    if existing is not None:
+        raise ValueError(f"phone_number_id already exists: {phone_number_id}")
+
+    now = datetime.now(timezone.utc)
+    cfg = dict(config or {})
+    cfg.setdefault("business_wa_id", business_wa_id)
+    cfg.setdefault("owner_whatsapp", owner_whatsapp)
+    cfg.setdefault("greeting_language", greeting_language)
+    cfg = seed_messages_into_config(cfg, flow_mode=flow_mode, greeting_language=greeting_language)
+    if flow_mode == "order":
+        if not cfg.get("menu_v2"):
+            from app.menu_v2 import empty_menu_v2 as _empty
+            menu = _empty()
+            cfg["menu_v2"] = menu
+            cfg["menu_v2_draft"] = menu
+        # Minimal legacy menu for pydantic compat if needed later
+        if not cfg.get("menu"):
+            cfg["menu"] = {
+                "shop_name": name,
+                "delivery_fee": 100,
+                "delivery_area": "",
+                "categories": [{"name": "Items", "items": [{"name": "Sample", "price": 100}]}],
+            }
+    row = m.DBTenant(
+        phone_number_id=phone_number_id,
+        name=name,
+        flow_mode=flow_mode,
+        status=status,
+        config=cfg,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def set_tenant_status(session: AsyncSession, tenant_db_id: int, status: str) -> Any:
+    allowed = {"draft", "live", "paused", "archived"}
+    if status not in allowed:
+        raise ValueError(f"status must be one of {sorted(allowed)}")
+    row = await get_tenant_row(session, tenant_db_id)
+    if row is None:
+        return None
+    row.status = status
+    row.updated_at = datetime.now(timezone.utc)
+    return row
 
 
 async def get_tenant_row(session: AsyncSession, tenant_db_id: int):

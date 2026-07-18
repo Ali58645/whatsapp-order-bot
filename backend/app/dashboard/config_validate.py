@@ -67,9 +67,16 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
         faq = patch["faq"]
         if not isinstance(faq, list):
             _err("faq must be a list")
+        # Drop empty rows
+        faq = [
+            item for item in faq
+            if isinstance(item, dict)
+            and (str(item.get("question", "")).strip() or str(item.get("answer", "")).strip())
+        ]
         if len(faq) > FAQ_MAX_PAIRS:
             _err(f"faq max {FAQ_MAX_PAIRS} pairs")
         cleaned_faq = []
+        seen_q: set[str] = set()
         for i, item in enumerate(faq):
             if not isinstance(item, dict):
                 _err(f"faq[{i}] must be an object")
@@ -77,6 +84,10 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
             a = sanitize_text(item.get("answer", ""), max_len=FAQ_ANSWER_MAX)
             if not q or not a:
                 _err(f"faq[{i}] question and answer required")
+            qkey = q.lower()
+            if qkey in seen_q:
+                _err(f"faq: duplicate question {q!r}")
+            seen_q.add(qkey)
             cleaned_faq.append({"question": q, "answer": a})
         out["faq"] = cleaned_faq
 
@@ -138,6 +149,15 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
             try:
                 out[key] = validate_menu_v2(patch[key])
             except MenuV2Error as exc:
+                _err(str(exc))
+
+    # messages / messages_draft — full bot text catalog
+    for key in ("messages", "messages_draft"):
+        if key in patch:
+            from app.messages import MessagesError, validate_messages_patch
+            try:
+                out[key] = validate_messages_patch(patch[key])
+            except MessagesError as exc:
                 _err(str(exc))
 
     # Pass-through fields (sanitized)

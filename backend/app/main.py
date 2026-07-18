@@ -100,15 +100,8 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 
 def _resolve_dashboard_dir() -> Path:
-    """Find built dashboard files (works locally and on Railway)."""
-    here = Path(__file__).resolve().parent
-    for candidate in (
-        here / "static" / "dashboard",
-        Path.cwd() / "app" / "static" / "dashboard",
-    ):
-        if (candidate / "index.html").is_file():
-            return candidate
-    return here / "static" / "dashboard"
+    """Find built dashboard files — always relative to this package, not CWD."""
+    return Path(__file__).resolve().parent / "static" / "dashboard"
 
 
 _DASHBOARD_DIR = _resolve_dashboard_dir()
@@ -348,6 +341,31 @@ async def receive_message(request: Request):
     if tenant is None:
         return {"status": "ignored"}
 
+    # Draft / paused: webhook still accepted & logged, but bot does not reply
+    if not tenant.is_live:
+        log.info(
+            f"tenant {tenant.phone_number_id!r} status={tenant.status!r} — "
+            "inbound logged, no reply"
+        )
+        try:
+            from app.db.store import EventStore
+            wa_id = ""
+            try:
+                wa_id = entry["messages"][0]["from"]
+            except (KeyError, IndexError, TypeError):
+                pass
+            asyncio.create_task(
+                EventStore.append(
+                    tenant,
+                    "inbound_paused",
+                    {"status": tenant.status, "phone_number_id": phone_number_id},
+                    wa_id=wa_id or None,
+                )
+            )
+        except Exception:
+            pass
+        return {"status": "ok", "bot": "paused"}
+
     if tenant.flow_mode == "lead":
         return await _handle_lead_flow(entry, tenant)
     else:
@@ -459,12 +477,13 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
                 meta["phase"] = "BUSINESS_NAME"
                 meta["entry_intent"] = "GENERIC_INFO"
                 from app.lead import _media_first_text
-                reply_text = _media_first_text(lang)
+                reply_text = _media_first_text(lang, tenant)
             else:
-                from app.lead import _t, build_reprompt
-                _UNSUPPORTED = {"ur": "Barah-e-karam apna jawab text mein likhein.",
-                                "en": "Kindly respond in text so we may assist you."}
-                reply_text = f"{_t(_UNSUPPORTED, lang)}\n\n{build_reprompt(phase, lang)}"
+                from app.lead import lead_text, build_reprompt
+                reply_text = (
+                    f"{lead_text('unsupported_media', lang, tenant)}\n\n"
+                    f"{build_reprompt(phase, lang, tenant)}"
+                )
             await send_whatsapp_message(sender, reply_text, tenant=tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return {"status": "ok"}
@@ -475,11 +494,14 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
             meta.pop("awaiting_custom_slot")
             meta["phase"] = "CONFIRMED"
             lang = meta.get("lang", "ur")
-            from app.lead import _t, _CONFIRM_SLOT
-            confirm_msg = _t(_CONFIRM_SLOT, lang).format(slot=meta["demo_slot"])
+            from app.lead import lead_text
+            confirm_msg = lead_text(
+                "confirm_slot", lang, tenant, slot=meta["demo_slot"]
+            )
             await send_whatsapp_message(sender, confirm_msg, tenant=tenant)
             await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                                    tenant=tenant)
             demo_date, demo_time = parse_slot_datetime(meta["demo_slot"])
             _sheet_upsert(sender, {"status": STATUS_DEMO_BOOKED,
                 "notes": f"Demo confirmed via bot: {meta['demo_slot']}",
@@ -551,7 +573,7 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict, tenant
         log.warning(f"[{tid}] lead: malformed interactive from {sender}")
         return {"status": "ignored"}
 
-    handled, follow_up = apply_interactive_answer(meta, reply_id, reply_title)
+    handled, follow_up = apply_interactive_answer(meta, reply_id, reply_title, tenant=tenant)
 
     if not handled:
         user_text = reply_title or reply_id
@@ -562,7 +584,8 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict, tenant
             meta["phase"] = "CONFIRMED"
             await send_whatsapp_message(sender, clean_reply, tenant=tenant)
             await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                                    tenant=tenant)
             clear_session(sender, tenant_id=tid)
             clear_lead_meta(sender, tenant_id=tid)
         else:
@@ -576,11 +599,14 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict, tenant
 
     if meta.get("phase") == "CONFIRMED":
         lang = meta.get("lang", "ur")
-        from app.lead import _t, _CONFIRM_SLOT
-        confirm_msg = _t(_CONFIRM_SLOT, lang).format(slot=meta.get("demo_slot", ""))
+        from app.lead import lead_text
+        confirm_msg = lead_text(
+            "confirm_slot", lang, tenant, slot=meta.get("demo_slot", "")
+        )
         await send_whatsapp_message(sender, confirm_msg, tenant=tenant)
         await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                                tenant=tenant)
         demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
         _sheet_upsert(sender, {"status": STATUS_DEMO_BOOKED,
             "notes": f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
@@ -598,7 +624,8 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict, tenant
 
 async def _maybe_send_interactive(sender: str, meta: dict, tenant: Tenant) -> None:
     phase = meta.get("phase", "GREETING")
-    payload = get_phase_interactive(phase, sender, meta=meta)
+    lang = meta.get("lang", "ur")
+    payload = get_phase_interactive(phase, sender, lang, meta=meta, tenant=tenant)
     if payload:
         await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
 
@@ -608,19 +635,19 @@ async def _handle_business_name_phase(
 ) -> dict:
     from app.lead import (
         handle_business_name, _is_detour_question,
-        extract_detour_done, _t, _Q_BUSINESS_NAME,
+        extract_detour_done, lead_text,
     )
     if _is_detour_question(user_text):
         detour_reply = await _generate_lead_reply(sender, user_text, tenant)
         _, clean_detour = extract_detour_done(detour_reply)
-        re_ask = _t(_Q_BUSINESS_NAME, lang)
+        re_ask = lead_text("q_business_name", lang, tenant)
         combined = f"{clean_detour}\n\n{re_ask}" if clean_detour else re_ask
         await send_whatsapp_message(sender, combined, tenant=tenant)
         return {"status": "ok"}
-    ack_text, accepted = handle_business_name(meta, user_text, lang)
+    ack_text, accepted = handle_business_name(meta, user_text, lang, tenant=tenant)
     if accepted:
         _sheet_field_update(sender, meta, tenant)
-        payload = get_phase_interactive("BUSINESS_TYPE", sender, lang, meta=meta)
+        payload = get_phase_interactive("BUSINESS_TYPE", sender, lang, meta=meta, tenant=tenant)
         if payload:
             await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
         else:
@@ -678,8 +705,7 @@ async def _handle_text_at_interactive_phase(
     from app.lead import (
         build_reprompt, build_handoff,
         increment_reprompt, reset_reprompts, MAX_REPROMPTS,
-        extract_detour_done, _is_detour_question,
-        _t, _Q_BUSINESS_TYPE, _Q_LOCATIONS, _Q_CURRENT_SYSTEM, _Q_BUSINESS_NAME,
+        extract_detour_done, _is_detour_question, lead_text,
     )
     tid = tenant.phone_number_id
     display_val, sheet_val = match_fn(user_text)
@@ -688,20 +714,23 @@ async def _handle_text_at_interactive_phase(
         meta["phase"] = advance_to
         reset_reprompts(meta)
         _sheet_field_update(sender, meta, tenant)
-        payload = get_phase_interactive(advance_to, sender, lang, meta=meta)
+        payload = get_phase_interactive(advance_to, sender, lang, meta=meta, tenant=tenant)
         if payload:
             await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
         else:
-            await send_whatsapp_message(sender, _t(_Q_BUSINESS_NAME, lang), tenant=tenant)
+            await send_whatsapp_message(sender, lead_text("q_business_name", lang, tenant), tenant=tenant)
         return {"status": "ok"}
 
     if _is_detour_question(user_text):
         detour_reply = await _generate_lead_reply(sender, user_text, tenant)
         _, clean_detour = extract_detour_done(detour_reply)
-        _phase_q = {"BUSINESS_TYPE": _Q_BUSINESS_TYPE, "LOCATIONS": _Q_LOCATIONS,
-                    "CURRENT_SYSTEM": _Q_CURRENT_SYSTEM}
+        _phase_q = {
+            "BUSINESS_TYPE": "q_business_type",
+            "LOCATIONS": "q_locations",
+            "CURRENT_SYSTEM": "q_current_system",
+        }
         phase = meta.get("phase", "")
-        re_ask = _t(_phase_q.get(phase, _Q_BUSINESS_NAME), lang)
+        re_ask = lead_text(_phase_q.get(phase, "q_business_name"), lang, tenant)
         combined = f"{clean_detour}\n\n{re_ask}" if clean_detour else re_ask
         await send_whatsapp_message(sender, combined, tenant=tenant)
         return {"status": "ok"}
@@ -709,13 +738,16 @@ async def _handle_text_at_interactive_phase(
     count = increment_reprompt(meta)
     if count > MAX_REPROMPTS:
         meta["phase"] = "STALLED"
-        await send_whatsapp_message(sender, build_handoff(lang), tenant=tenant)
+        await send_whatsapp_message(sender, build_handoff(lang, tenant), tenant=tenant)
         await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                                tenant=tenant)
         clear_session(sender, tenant_id=tid)
         clear_lead_meta(sender, tenant_id=tid)
     else:
-        await send_whatsapp_message(sender, build_reprompt(meta.get("phase", ""), lang), tenant=tenant)
+        await send_whatsapp_message(
+            sender, build_reprompt(meta.get("phase", ""), lang, tenant), tenant=tenant
+        )
     return {"status": "ok"}
 
 
@@ -726,7 +758,7 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
     is_detour, clean_reply = extract_detour_done(reply)
     if is_detour:
         phase = meta.get("phase", "")
-        re_ask = build_reprompt(phase, lang).split(". ", 1)[-1]
+        re_ask = build_reprompt(phase, lang, tenant).split(". ", 1)[-1]
         combined = f"{clean_reply}\n\n{re_ask}" if clean_reply else re_ask
         await send_whatsapp_message(sender, combined, tenant=tenant)
         return {"status": "ok"}
@@ -738,7 +770,8 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
         meta["phase"] = "CONFIRMED"
         await send_whatsapp_message(sender, clean_reply, tenant=tenant)
         await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                                tenant=tenant)
         demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
         _sheet_upsert(sender, {"status": STATUS_DEMO_BOOKED,
             "notes": f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
@@ -754,7 +787,8 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
         meta["phase"] = "STALLED"
         if meta.get("business_name"):
             await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                                    tenant=tenant)
         tomorrow = (_karachi_now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
         _sheet_upsert(sender, {"status": STATUS_NOT_RESPONDING,
             "notes": f"Bot: stalled at {meta.get('phase', '?')}",
@@ -767,7 +801,7 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
 
     _sheet_field_update(sender, meta, tenant)
     new_phase = meta.get("phase", "")
-    interactive_payload = get_phase_interactive(new_phase, sender, lang, meta=meta)
+    interactive_payload = get_phase_interactive(new_phase, sender, lang, meta=meta, tenant=tenant)
     if interactive_payload:
         await send_whatsapp_message(sender, interactive_payload=interactive_payload, tenant=tenant)
     else:
@@ -791,7 +825,7 @@ async def _maybe_faq_reply(
         return False
     phase = meta.get("phase", "")
     if phase and phase not in ("GREETING", "CONFIRMED", "STALLED"):
-        reprompt = build_reprompt(phase, lang)
+        reprompt = build_reprompt(phase, lang, tenant)
         msg = f"{answer}\n\n{reprompt}"
     else:
         msg = answer
@@ -813,7 +847,7 @@ async def _generate_lead_reply(sender: str, user_text: str, tenant: Tenant) -> s
         reply = response.content[0].text
     except Exception as e:
         log.error(f"Claude API error (lead): {e}")
-        return "Sorry, thora sa masla aa gaya. Thodi der baad dobara try karein."
+        return tenant.msg().text("lead.error_fallback")
     history.append({"role": "assistant", "content": reply})
     save_session(sender, history, tenant_id=tid)
     return reply
@@ -833,6 +867,7 @@ async def _handle_order_flow(entry: dict, tenant: Tenant) -> dict:
             await forward_order_to_owner(
                 order, sender, t.owner_whatsapp,
                 lambda to, txt: send_whatsapp_message(to, txt, tenant=t),
+                tenant=t,
             )
             hist = list(get_session(sender, tenant_id=t.phone_number_id))
             asyncio.create_task(_db_confirm_order(sender, t, order, history=hist))
@@ -847,13 +882,17 @@ async def _handle_order_flow(entry: dict, tenant: Tenant) -> dict:
     sender = message["from"]
     tid = tenant.phone_number_id
     if message.get("type") != "text":
-        await send_whatsapp_message(sender, "Please send your order as a text message.", tenant=tenant)
+        await send_whatsapp_message(
+            sender, tenant.msg().text("order.text_only"), tenant=tenant
+        )
         return {"status": "ok"}
     user_text = message["text"]["body"].strip()
     if user_text.lower() in ("reset", "restart", "naya order"):
         asyncio.create_task(_db_close_order_session(sender, tenant, "closed"))
         clear_session(sender, tenant_id=tid)
-        await send_whatsapp_message(sender, "Order reset. What would you like to order?", tenant=tenant)
+        await send_whatsapp_message(
+            sender, tenant.msg().text("order.reset_done"), tenant=tenant
+        )
         return {"status": "ok"}
     async with get_sender_lock(sender, tenant_id=tid):
         if await _maybe_faq_reply(sender, {"phase": "ORDERING"}, user_text, "ur", tenant):
@@ -861,8 +900,11 @@ async def _handle_order_flow(entry: dict, tenant: Tenant) -> dict:
         reply = await _generate_order_reply(sender, user_text, tenant)
         order, clean_reply = detect_confirmed_order(reply)
         if order:
-            await forward_order_to_owner(order, sender, tenant.owner_whatsapp,
-                                         lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant))
+            await forward_order_to_owner(
+                order, sender, tenant.owner_whatsapp,
+                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                tenant=tenant,
+            )
             hist = list(get_session(sender, tenant_id=tid))
             asyncio.create_task(_db_confirm_order(sender, tenant, order, history=hist))
             clear_session(sender, tenant_id=tid)
@@ -884,7 +926,7 @@ async def _generate_order_reply(sender: str, user_text: str, tenant: Tenant) -> 
         reply = response.content[0].text
     except Exception as e:
         log.error(f"Claude API error (order): {e}")
-        return "Sorry, an issue occurred. Please try again."
+        return tenant.msg().text("order.error_fallback")
     history.append({"role": "assistant", "content": reply})
     save_session(sender, history, tenant_id=tid)
     return reply

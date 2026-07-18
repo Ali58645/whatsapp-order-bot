@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   Bell,
+  Building2,
   ChevronsUpDown,
   LayoutDashboard,
   LogOut,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import {
   api,
+  getRole,
   getTenantFilter,
   setTenantFilter,
   setToken,
@@ -34,7 +36,7 @@ import { cn } from "../../lib/utils";
 import { CommandPalette } from "./CommandPalette";
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 
-const NAV = [
+const NAV_BASE = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/orders", label: "Orders", icon: Package },
@@ -43,6 +45,8 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+const NAV_ADMIN = { to: "/businesses", label: "Businesses", icon: Building2 };
+
 const CRUMBS: Record<string, string> = {
   "/": "Overview",
   "/leads": "Leads",
@@ -50,6 +54,7 @@ const CRUMBS: Record<string, string> = {
   "/conversations": "Conversations",
   "/activity": "Activity",
   "/settings": "Settings",
+  "/businesses": "Businesses",
 };
 
 export default function Layout() {
@@ -61,6 +66,15 @@ export default function Layout() {
   const [tenantId, setTenantId] = useState(getTenantFilter());
   const [cmdOpen, setCmdOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isAdmin = getRole() === "admin";
+
+  const nav = useMemo(
+    () =>
+      isAdmin
+        ? [...NAV_BASE.slice(0, -1), NAV_ADMIN, NAV_BASE[NAV_BASE.length - 1]]
+        : NAV_BASE,
+    [isAdmin]
+  );
 
   useEffect(() => {
     api<Tenant[]>("/api/dashboard/tenants", { tenant: false })
@@ -167,7 +181,7 @@ export default function Layout() {
       </div>
 
       <nav className="flex-1 space-y-0.5 px-2">
-        {NAV.map((item) => (
+        {nav.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -341,7 +355,7 @@ export default function Layout() {
 
         {/* Mobile bottom nav */}
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/90 backdrop-blur-xl md:hidden">
-          {NAV.slice(0, 5).map((item) => (
+          {nav.slice(0, 5).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -360,7 +374,7 @@ export default function Layout() {
         </nav>
       </div>
 
-      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} tenants={tenants} />
+      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} tenants={tenants} isAdmin={isAdmin} />
     </div>
   );
 }

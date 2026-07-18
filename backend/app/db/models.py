@@ -48,6 +48,9 @@ class DBTenant(Base):
     phone_number_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     flow_mode: Mapped[str] = mapped_column(String(16), nullable=False)  # "lead" | "order"
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="live", server_default="live"
+    )  # draft | live | paused | archived
     config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
