@@ -142,9 +142,12 @@ async def test_owner_sees_only_own_tenant_list(client, own_db):
     data = await _login(client, "bizowner", "ownerpass")
     r = await client.get("/api/dashboard/tenants", headers=_auth(data["access_token"]))
     assert r.status_code == 200
-    items = r.json()
+    body = r.json()
+    items = body["items"] if isinstance(body, dict) else body
     assert len(items) == 1
     assert items[0]["id"] == own_db["tenant_a_id"]
+    if isinstance(body, dict):
+        assert body["counts"]["all"] == 1
 
 
 @pytest.mark.asyncio
@@ -283,7 +286,7 @@ async def test_admin_create_owner_and_list(client, own_db):
 
 
 @pytest.mark.asyncio
-async def test_admin_view_as_readonly(client, own_db):
+async def test_admin_view_as_support_mode_and_access_log(client, own_db):
     admin = await _login(client, ADMIN_USER, ADMIN_PASS)
     r = await client.post(
         f"/api/dashboard/admin/view-as/{own_db['tenant_a_id']}",
@@ -292,14 +295,16 @@ async def test_admin_view_as_readonly(client, own_db):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["role"] == "owner"
-    assert body["readonly"] is True
+    assert body["readonly"] is False
+    assert body.get("support_mode") is True
     assert body["impersonated_by"] == ADMIN_USER
     assert body["tenant_id"] == own_db["tenant_a_id"]
 
     h = _auth(body["access_token"])
     me = await client.get("/api/dashboard/me", headers=h)
     assert me.status_code == 200
-    assert me.json()["readonly"] is True
+    assert me.json()["impersonated_by"] == ADMIN_USER
+    assert me.json()["readonly"] is False
 
     # Can read
     r = await client.get(
@@ -308,13 +313,13 @@ async def test_admin_view_as_readonly(client, own_db):
     )
     assert r.status_code == 200
 
-    # Cannot mutate
+    # Can mutate in support mode (audited)
     r = await client.post(
         f"/api/dashboard/tenants/{own_db['tenant_a_id']}/config",
         headers=h,
-        json={"greeting_text": "should fail"},
+        json={"greeting_text": "support edit ok"},
     )
-    assert r.status_code == 403
+    assert r.status_code == 200, r.text
 
     # Cannot reach other tenant
     r = await client.get(
@@ -326,6 +331,36 @@ async def test_admin_view_as_readonly(client, own_db):
     # View-as token cannot use admin endpoints
     r = await client.get("/api/dashboard/users", headers=h)
     assert r.status_code == 403
+    r = await client.get("/api/dashboard/access-log", headers=h)
+    assert r.status_code == 403
+
+    log = await client.get(
+        "/api/dashboard/access-log",
+        headers=_auth(admin["access_token"]),
+    )
+    assert log.status_code == 200, log.text
+    actions = [i["action"] for i in log.json()["items"]]
+    assert "view_as_enter" in actions
+    assert "config_save" in actions
+    enter = next(i for i in log.json()["items"] if i["action"] == "view_as_enter")
+    assert enter["admin_username"] == ADMIN_USER
+    assert enter["tenant_id"] == own_db["tenant_a_id"]
+
+
+@pytest.mark.asyncio
+async def test_owner_cannot_see_access_log_or_platform_users(client, own_db):
+    data = await _login(client, "bizowner", "ownerpass")
+    h = _auth(data["access_token"])
+    r = await client.get("/api/dashboard/access-log", headers=h)
+    assert r.status_code == 403
+    r = await client.get("/api/dashboard/users", headers=h)
+    assert r.status_code == 403
+    r = await client.get("/api/dashboard/tenants", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    items = body["items"] if isinstance(body, dict) else body
+    assert len(items) == 1
+    assert items[0]["id"] == own_db["tenant_a_id"]
 
 
 @pytest.mark.asyncio

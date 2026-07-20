@@ -2,35 +2,30 @@ import { useEffect, useState } from "react";
 import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Users,
-  Package,
-  MessagesSquare,
-  Activity,
-  Settings,
-  Search,
-  VolumeX,
   Building2,
+  CreditCard,
+  LayoutDashboard,
+  ScrollText,
+  Search,
+  Settings,
+  Users,
 } from "lucide-react";
-import { api, getRole, Lead, setTenantFilter, Tenant } from "../../api";
+import { getRole, isOwner, isSupportSession, setTenantFilter, Tenant } from "../../api";
 import { Dialog, DialogContent } from "../ui/dialog";
 
-const PAGES_BASE = [
-  { to: "/", label: "Overview", icon: LayoutDashboard },
-  { to: "/leads", label: "Leads", icon: Users },
-  { to: "/orders", label: "Orders", icon: Package },
-  { to: "/conversations", label: "Conversations", icon: MessagesSquare },
-  { to: "/activity", label: "Activity", icon: Activity },
-  { to: "/settings", label: "Settings", icon: Settings },
+const ADMIN_PAGES = [
+  { to: "/", label: "Businesses", icon: Building2 },
+  { to: "/team", label: "Team", icon: Users },
+  { to: "/access-log", label: "Access Log", icon: ScrollText },
+  { to: "/billing", label: "Billing", icon: CreditCard },
+  { to: "/settings", label: "Wiring", icon: Settings },
 ];
-
-const PAGE_ADMIN = { to: "/businesses", label: "Businesses", icon: Building2 };
 
 const OWNER_PAGES = [
   { to: "/", label: "Home", icon: LayoutDashboard },
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/my-bot", label: "My Bot", icon: Settings },
-  { to: "/billing", label: "Billing", icon: Package },
+  { to: "/billing", label: "Billing", icon: CreditCard },
 ];
 
 export function CommandPalette({
@@ -46,24 +41,9 @@ export function CommandPalette({
 }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const admin = isAdmin ?? getRole() === "admin";
-  const pages = admin
-    ? [...PAGES_BASE.slice(0, -1), PAGE_ADMIN, PAGES_BASE[PAGES_BASE.length - 1]]
-    : OWNER_PAGES;
-
-  useEffect(() => {
-    if (!open) return;
-    const t = setTimeout(() => {
-      const q = query.trim();
-      api<{ items: Lead[] }>(
-        `/api/dashboard/leads?search=${encodeURIComponent(q)}&status=`
-      )
-        .then((r) => setLeads(r.items.slice(0, 8)))
-        .catch(() => setLeads([]));
-    }, 200);
-    return () => clearTimeout(t);
-  }, [query, open]);
+  const admin = isAdmin ?? (getRole() === "admin" && !isSupportSession());
+  const ownerShell = isOwner() || isSupportSession();
+  const pages = admin && !ownerShell ? ADMIN_PAGES : OWNER_PAGES;
 
   useEffect(() => {
     if (!open) setQuery("");
@@ -74,6 +54,12 @@ export function CommandPalette({
     navigate(path);
   }
 
+  const q = query.trim().toLowerCase();
+  const filteredTenants =
+    admin && !ownerShell && q
+      ? tenants.filter((t) => (t.name || "").toLowerCase().includes(q))
+      : [];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden p-0 sm:max-w-lg">
@@ -83,7 +69,11 @@ export function CommandPalette({
             <Command.Input
               value={query}
               onValueChange={setQuery}
-              placeholder="Jump to lead, page, or action…"
+              placeholder={
+                admin && !ownerShell
+                  ? "Jump to page or business…"
+                  : "Jump to page…"
+              }
               className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
@@ -95,78 +85,47 @@ export function CommandPalette({
               No results
             </Command.Empty>
 
-            <Command.Group heading="Navigate" className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
-              {pages.map((p) => (
-                <Command.Item
-                  key={p.to}
-                  value={p.label}
-                  onSelect={() => go(p.to)}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground aria-selected:bg-accent"
-                >
-                  <p.icon className="h-4 w-4 text-muted-foreground" />
-                  {p.label}
-                </Command.Item>
-              ))}
+            <Command.Group
+              heading="Navigate"
+              className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5"
+            >
+              {pages
+                .filter((p) => !q || p.label.toLowerCase().includes(q))
+                .map((p) => (
+                  <Command.Item
+                    key={p.to}
+                    value={p.label}
+                    onSelect={() => go(p.to)}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm aria-selected:bg-accent"
+                  >
+                    <p.icon className="h-4 w-4 text-muted-foreground" />
+                    {p.label}
+                  </Command.Item>
+                ))}
             </Command.Group>
 
-            {leads.length > 0 && (
-              <Command.Group heading="Leads" className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
-                {leads.map((l) => (
-                  <Command.Item
-                    key={l.id}
-                    value={`${l.business_name} ${l.contact.wa_id}`}
-                    onSelect={() => go(`/leads?open=${l.id}`)}
-                    className="flex cursor-pointer flex-col rounded-lg px-2 py-2 text-sm aria-selected:bg-accent"
-                  >
-                    <span className="font-medium">
-                      {l.business_name || l.contact.profile_name || l.contact.wa_id}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{l.contact.wa_id}</span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-
-            {admin && tenants.length > 0 && (
-              <Command.Group heading="Switch tenant" className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
-                <Command.Item
-                  value="All tenants"
-                  onSelect={() => {
-                    setTenantFilter("all");
-                    window.dispatchEvent(new Event("tenant-change"));
-                    onOpenChange(false);
-                  }}
-                  className="cursor-pointer rounded-lg px-2 py-2 text-sm aria-selected:bg-accent"
-                >
-                  All tenants
-                </Command.Item>
-                {tenants.map((t) => (
-                  <Command.Item
-                    key={t.id}
-                    value={t.name}
-                    onSelect={() => {
-                      setTenantFilter(t.phone_number_id);
-                      window.dispatchEvent(new Event("tenant-change"));
-                      onOpenChange(false);
-                    }}
-                    className="cursor-pointer rounded-lg px-2 py-2 text-sm aria-selected:bg-accent"
-                  >
-                    {t.name}
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-
-            <Command.Group heading="Actions" className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
-              <Command.Item
-                value="Mute from leads"
-                onSelect={() => go("/leads")}
-                className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm aria-selected:bg-accent"
+            {filteredTenants.length > 0 && (
+              <Command.Group
+                heading="Businesses"
+                className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5"
               >
-                <VolumeX className="h-4 w-4 text-muted-foreground" />
-                Mute contact (open a lead)
-              </Command.Item>
-            </Command.Group>
+                {filteredTenants.slice(0, 8).map((tn) => (
+                  <Command.Item
+                    key={tn.id}
+                    value={tn.name}
+                    onSelect={() => {
+                      setTenantFilter(tn.phone_number_id);
+                      onOpenChange(false);
+                      navigate("/");
+                    }}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm aria-selected:bg-accent"
+                  >
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    {tn.name}
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
           </Command.List>
         </Command>
       </DialogContent>

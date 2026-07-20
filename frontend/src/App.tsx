@@ -1,11 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { getRole, getToken, isOwner, isReadonlySession } from "./api";
+import { getRole, getToken, isOwner, isSupportSession } from "./api";
 import Layout from "./components/layout/Layout";
 import Login from "./pages/Login";
 import { Skeleton } from "./components/ui/avatar";
 
-const Overview = lazy(() => import("./pages/Overview"));
 const Leads = lazy(() => import("./pages/Leads"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Conversations = lazy(() => import("./pages/Conversations"));
@@ -13,6 +12,7 @@ const Activity = lazy(() => import("./pages/Activity"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Businesses = lazy(() => import("./pages/Businesses"));
 const Team = lazy(() => import("./pages/Team"));
+const AccessLog = lazy(() => import("./pages/AccessLog"));
 const OwnerHome = lazy(() => import("./pages/owner/OwnerHome"));
 const Customers = lazy(() => import("./pages/owner/Customers"));
 const Billing = lazy(() => import("./pages/owner/Billing"));
@@ -22,20 +22,22 @@ function Private({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Platform console — real admins only (not support / owner sessions). */
 function AdminOnly({ children }: { children: React.ReactNode }) {
-  if (isOwner() || isReadonlySession()) return <Navigate to="/" replace />;
+  if (isOwner() || isSupportSession()) return <Navigate to="/" replace />;
   if (getRole() !== "admin") return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
+/** Owner workspace — real owners and admin support sessions. */
 function OwnerOnly({ children }: { children: React.ReactNode }) {
-  if (!(isOwner() || isReadonlySession())) return <Navigate to="/" replace />;
+  if (!(isOwner() || isSupportSession())) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
 function HomeRoute() {
-  if (isOwner() || isReadonlySession()) return <OwnerHome />;
-  return <Overview />;
+  if (isOwner() || isSupportSession()) return <OwnerHome />;
+  return <Businesses />;
 }
 
 function PageFallback() {
@@ -53,7 +55,6 @@ function SuspensePage({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  // Re-read role after login / view-as without full remount of router tree
   const [, bump] = useState(0);
   useEffect(() => {
     const on = () => bump((n) => n + 1);
@@ -81,7 +82,7 @@ export default function App() {
           }
         />
 
-        {/* Owner shell */}
+        {/* Owner / support shell */}
         <Route
           path="customers"
           element={
@@ -115,64 +116,58 @@ export default function App() {
         <Route
           path="billing"
           element={
-            <OwnerOnly>
-              <SuspensePage>
-                <Billing />
-              </SuspensePage>
-            </OwnerOnly>
+            <SuspensePage>
+              <Billing />
+            </SuspensePage>
           }
         />
 
-        {/* Admin console */}
+        {/* Legacy tenant inbox routes — only via support session deep links; not in admin nav */}
         <Route
           path="leads"
           element={
-            <AdminOnly>
+            <OwnerOnly>
               <SuspensePage>
                 <Leads />
               </SuspensePage>
-            </AdminOnly>
+            </OwnerOnly>
           }
         />
         <Route
           path="orders"
           element={
-            <AdminOnly>
+            <OwnerOnly>
               <SuspensePage>
                 <Orders />
               </SuspensePage>
-            </AdminOnly>
+            </OwnerOnly>
           }
         />
         <Route
           path="conversations"
           element={
-            <AdminOnly>
+            <OwnerOnly>
               <SuspensePage>
                 <Conversations />
               </SuspensePage>
-            </AdminOnly>
+            </OwnerOnly>
           }
         />
         <Route
           path="activity"
           element={
-            <AdminOnly>
+            <OwnerOnly>
               <SuspensePage>
                 <Activity />
               </SuspensePage>
-            </AdminOnly>
+            </OwnerOnly>
           }
         />
+
+        {/* Admin platform console */}
         <Route
           path="businesses"
-          element={
-            <AdminOnly>
-              <SuspensePage>
-                <Businesses />
-              </SuspensePage>
-            </AdminOnly>
-          }
+          element={<Navigate to="/" replace />}
         />
         <Route
           path="team"
@@ -180,6 +175,16 @@ export default function App() {
             <AdminOnly>
               <SuspensePage>
                 <Team />
+              </SuspensePage>
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="access-log"
+          element={
+            <AdminOnly>
+              <SuspensePage>
+                <AccessLog />
               </SuspensePage>
             </AdminOnly>
           }

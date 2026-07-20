@@ -98,7 +98,8 @@ export default function LeadDrawer({ leadId, onClose, onMuted }: Props) {
     try {
       let tenantPhone = getTenantFilter();
       if (tenantPhone === "all") {
-        const tenants = await api<Tenant[]>("/api/dashboard/tenants", { tenant: false });
+        const raw = await api<{ items?: Tenant[] } | Tenant[]>("/api/dashboard/tenants", { tenant: false });
+        const tenants = Array.isArray(raw) ? raw : raw.items || [];
         const match = tenants.find((t) => t.id === lead.tenant_id);
         if (!match) throw new Error("Select a tenant to mute, or set tenant filter");
         tenantPhone = match.phone_number_id;

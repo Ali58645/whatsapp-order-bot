@@ -102,13 +102,27 @@ async def _assert_resource_tenant(user: dash_auth.AuthUser, resource_tenant_id: 
 # ── Read endpoints ────────────────────────────────────────────────────────────
 
 @router.get("/api/dashboard/tenants")
-async def get_tenants(user: dash_auth.AuthUser = Depends(dash_auth.require_auth)):
+async def get_tenants(
+    status: Optional[str] = Query(None, description="Filter: live|paused|archived|draft|all"),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
     _require_db()
     async with _get_db() as db:
         rows = await queries.list_tenants(db)
+        counts = await queries.tenant_status_counts(db)
     if user.role == "owner" and user.tenant_id is not None:
         rows = [t for t in rows if t["id"] == user.tenant_id]
-    return rows
+        counts = {"all": len(rows), "live": 0, "paused": 0, "archived": 0, "draft": 0}
+        for t in rows:
+            st = (t.get("status") or "live").lower()
+            if st in counts:
+                counts[st] += 1
+    filt = (status or "all").lower()
+    if filt and filt != "all":
+        if filt not in ("live", "paused", "archived", "draft"):
+            raise HTTPException(status_code=400, detail="Invalid status filter")
+        rows = [t for t in rows if (t.get("status") or "live").lower() == filt]
+    return {"items": rows, "counts": counts}
 
 
 @router.get("/api/dashboard/tenants/{tenant_db_id}/config")
@@ -135,6 +149,7 @@ async def save_tenant_config(
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
     dash_auth.assert_writable(user)
+    await dash_auth.audit_support_action(user, "config_save", tenant_id=tenant_db_id)
     dash_auth.assert_owner_config_patch(user, body if isinstance(body, dict) else {})
     async with _get_db() as db:
         result = await apply_config_save(db, tenant_db_id, body, changed_by=user.username)
@@ -152,6 +167,7 @@ async def publish_menu(
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
     dash_auth.assert_writable(user)
+    await dash_auth.audit_support_action(user, "menu_publish", tenant_id=tenant_db_id)
     from app.dashboard.config_api import publish_menu_v2
     from app.menu_v2 import MenuV2Error
 
@@ -244,6 +260,7 @@ async def test_send_menu(
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
     dash_auth.assert_writable(user)
+    await dash_auth.audit_support_action(user, "menu_test_send", tenant_id=tenant_db_id)
     from app.db.repo import get_tenant_row
     from app.dashboard.config_api import send_menu_test
     from app.menu_v2 import MenuV2Error
@@ -268,6 +285,7 @@ async def publish_messages(
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
     dash_auth.assert_writable(user)
+    await dash_auth.audit_support_action(user, "messages_publish", tenant_id=tenant_db_id)
     from app.dashboard.config_api import publish_messages as _publish
     from app.messages import MessagesError
 
@@ -402,13 +420,16 @@ async def set_tenant_status_route(
     body: TenantStatusBody,
     _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
 ):
-    """Admin: pause / resume / archive / publish (live) a tenant."""
+    """Admin: pause / resume / archive / restore (→paused) / publish (live)."""
     _require_db()
     from app.db.repo import set_tenant_status
     from app.tenant_resolver import invalidate_tenant
 
     async with _get_db() as db:
-        row = await set_tenant_status(db, tenant_db_id, body.status)
+        try:
+            row = await set_tenant_status(db, tenant_db_id, body.status)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if row is None:
             raise HTTPException(status_code=404, detail="Tenant not found")
         phone = row.phone_number_id
@@ -425,6 +446,37 @@ async def set_tenant_status_route(
     }
 
 
+class DeleteTenantBody(BaseModel):
+    confirm_name: str = Field(..., min_length=1, max_length=256)
+
+
+@router.delete("/api/dashboard/tenants/{tenant_db_id}")
+async def delete_tenant_route(
+    tenant_db_id: int,
+    body: DeleteTenantBody,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """
+    Permanently delete an archived tenant (cascade).
+    Requires confirm_name matching the business name exactly.
+    """
+    _require_db()
+    from app.db.repo import delete_tenant_permanently
+    from app.tenant_resolver import invalidate_tenant
+
+    async with _get_db() as db:
+        try:
+            result = await delete_tenant_permanently(
+                db, tenant_db_id, confirm_name=body.confirm_name
+            )
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Tenant not found") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    invalidate_tenant(result["phone_number_id"])
+    return result
+
+
 @router.post("/api/dashboard/tenants/{tenant_db_id}/publish")
 async def publish_tenant(
     tenant_db_id: int,
@@ -436,7 +488,10 @@ async def publish_tenant(
     from app.tenant_resolver import invalidate_tenant
 
     async with _get_db() as db:
-        row = await set_tenant_status(db, tenant_db_id, "live")
+        try:
+            row = await set_tenant_status(db, tenant_db_id, "live")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if row is None:
             raise HTTPException(status_code=404, detail="Tenant not found")
         phone = row.phone_number_id
@@ -512,6 +567,9 @@ async def apply_starter_template(
         )
     await dash_auth.assert_tenant_access(user, tenant_db_id)
     dash_auth.assert_writable(user)
+    await dash_auth.audit_support_action(
+        user, "apply_template", tenant_id=tenant_db_id, detail={"template_id": body.template_id}
+    )
     from app.dashboard.config_validate import validate_config_patch
     from app.db.repo import get_tenant_row, save_tenant_config
     from app.templates import build_draft_patch, get_template
@@ -961,24 +1019,32 @@ async def view_as_owner(
     admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
 ):
     """
-    Issue a short-lived read-only owner token for support.
-    Client stores previous token separately to exit view-as.
+    Issue a support-mode owner token (writable, audited) for the given tenant.
+    Client stores previous admin token separately to exit view-as.
     """
     _require_db()
-    from app.db.repo import get_tenant_row
+    from app.db.repo import append_access_log, get_tenant_row
 
     async with _get_db() as db:
         row = await get_tenant_row(db, tenant_db_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Tenant not found")
         name = row.name
+        await append_access_log(
+            db,
+            admin_username=admin.username,
+            action="view_as_enter",
+            tenant_id=tenant_db_id,
+            tenant_name=name,
+            detail={"support_mode": True},
+        )
 
     view_user = dash_auth.AuthUser(
         username=f"viewas:{admin.username}",
         role="owner",
         tenant_id=tenant_db_id,
         impersonated_by=admin.username,
-        readonly=True,
+        readonly=False,
     )
     token = dash_auth.create_access_token(view_user)
     return {
@@ -987,10 +1053,26 @@ async def view_as_owner(
         "role": "owner",
         "tenant_id": tenant_db_id,
         "tenant_name": name,
-        "readonly": True,
+        "readonly": False,
+        "support_mode": True,
         "impersonated_by": admin.username,
         "expires_in_hours": dash_auth.TOKEN_TTL_H,
     }
+
+
+@router.get("/api/dashboard/access-log")
+async def get_access_log(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """Admin: list support / impersonation audit entries (newest first)."""
+    _require_db()
+    from app.db.repo import list_access_logs
+
+    async with _get_db() as db:
+        items = await list_access_logs(db, limit=limit, offset=offset)
+    return {"items": items, "limit": limit, "offset": offset}
 
 
 @router.get("/api/dashboard/overview")
@@ -1105,6 +1187,12 @@ async def send_conversation_message(
         if preview is None:
             raise HTTPException(status_code=404, detail="Contact not found")
         await _assert_resource_tenant(user, preview["contact"]["tenant_id"])
+        await dash_auth.audit_support_action(
+            user,
+            "reply",
+            tenant_id=preview["contact"]["tenant_id"],
+            detail={"contact_id": contact_id},
+        )
 
         try:
             data = await queries.send_agent_reply(
@@ -1179,6 +1267,13 @@ async def post_mute(
         scoped = await _scoped_tenant_phone(user, body.tenant_id)
         if scoped != body.tenant_id:
             raise HTTPException(status_code=403, detail="Not allowed for this tenant")
+
+    await dash_auth.audit_support_action(
+        user,
+        "mute" if body.mute else "unmute",
+        tenant_id=user.tenant_id,
+        detail={"wa_id": body.wa_id, "phone_number_id": body.tenant_id},
+    )
 
     tenant = get_tenant(body.tenant_id)
     if tenant is None:

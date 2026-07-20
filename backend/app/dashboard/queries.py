@@ -114,6 +114,21 @@ async def list_tenants(db: AsyncSession) -> list[dict]:
     return out
 
 
+async def tenant_status_counts(db: AsyncSession) -> dict:
+    """Counts for All / Live / Paused / Archived (+ draft) filter tabs."""
+    result = await db.execute(
+        select(DBTenant.status, func.count(DBTenant.id)).group_by(DBTenant.status)
+    )
+    counts = {"all": 0, "live": 0, "paused": 0, "archived": 0, "draft": 0}
+    for status, n in result.all():
+        st = (status or "live").lower()
+        n = int(n)
+        counts["all"] += n
+        if st in counts:
+            counts[st] += n
+    return counts
+
+
 # ── Overview ──────────────────────────────────────────────────────────────────
 
 async def overview(db: AsyncSession, tenant_phone_id: str | None = None) -> dict:

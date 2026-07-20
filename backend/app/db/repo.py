@@ -171,16 +171,91 @@ async def create_tenant(
     return row
 
 
-async def set_tenant_status(session: AsyncSession, tenant_db_id: int, status: str) -> Any:
+async def set_tenant_status(
+    session: AsyncSession,
+    tenant_db_id: int,
+    status: str,
+    *,
+    enforce_transitions: bool = True,
+) -> Any:
+    """
+    Update tenant lifecycle status.
+
+    Allowed transitions (when enforce_transitions=True):
+      draft  → live | paused | archived
+      live   → paused | archived
+      paused → live | archived
+      archived → paused   (restore — never jump straight to live)
+    """
     allowed = {"draft", "live", "paused", "archived"}
     if status not in allowed:
         raise ValueError(f"status must be one of {sorted(allowed)}")
     row = await get_tenant_row(session, tenant_db_id)
     if row is None:
         return None
+    current = (getattr(row, "status", None) or "live").lower()
+    if enforce_transitions and current != status:
+        transitions = {
+            "draft": {"live", "paused", "archived"},
+            "live": {"paused", "archived"},
+            "paused": {"live", "archived"},
+            "archived": {"paused"},
+        }
+        ok = transitions.get(current, set())
+        if status not in ok:
+            raise ValueError(
+                f"Cannot change status from {current!r} to {status!r}. "
+                f"Allowed: {sorted(ok) or 'none'}"
+            )
     row.status = status
     row.updated_at = datetime.now(timezone.utc)
     return row
+
+
+async def delete_tenant_permanently(
+    session: AsyncSession,
+    tenant_db_id: int,
+    *,
+    confirm_name: str,
+) -> dict:
+    """
+    Permanently delete an *archived* tenant and all cascaded records.
+    confirm_name must match the tenant name (case-sensitive strip).
+    """
+    from sqlalchemy import delete, update
+
+    m = _m()
+    row = await get_tenant_row(session, tenant_db_id)
+    if row is None:
+        raise LookupError("Tenant not found")
+    status = (getattr(row, "status", None) or "live").lower()
+    if status != "archived":
+        raise ValueError("Only archived tenants can be permanently deleted")
+    if (confirm_name or "").strip() != (row.name or "").strip():
+        raise ValueError("confirm_name does not match business name")
+
+    phone = row.phone_number_id
+    name = row.name
+
+    # Child tables that reference sessions/contacts first
+    await session.execute(delete(m.DBLead).where(m.DBLead.tenant_id == tenant_db_id))
+    await session.execute(delete(m.DBOrder).where(m.DBOrder.tenant_id == tenant_db_id))
+    await session.execute(delete(m.DBEvent).where(m.DBEvent.tenant_id == tenant_db_id))
+    await session.execute(delete(m.DBMute).where(m.DBMute.tenant_id == tenant_db_id))
+    await session.execute(delete(m.DBSession).where(m.DBSession.tenant_id == tenant_db_id))
+    await session.execute(delete(m.DBContact).where(m.DBContact.tenant_id == tenant_db_id))
+    await session.execute(
+        delete(m.DBConfigHistory).where(m.DBConfigHistory.tenant_id == tenant_db_id)
+    )
+    # Detach owner users rather than deleting admin accounts
+    await session.execute(
+        update(m.DBUser)
+        .where(m.DBUser.tenant_id == tenant_db_id)
+        .values(tenant_id=None)
+    )
+    await session.execute(delete(m.DBTenant).where(m.DBTenant.id == tenant_db_id))
+    await session.flush()
+    return {"id": tenant_db_id, "phone_number_id": phone, "name": name, "deleted": True}
 
 
 async def get_tenant_row(session: AsyncSession, tenant_db_id: int):
@@ -537,3 +612,55 @@ async def append_event(
         created_at=datetime.now(timezone.utc),
     )
     session.add(row)
+
+
+# ── Access log (admin support audit) ──────────────────────────────────────────
+
+async def append_access_log(
+    session: AsyncSession,
+    *,
+    admin_username: str,
+    action: str,
+    tenant_id: int | None = None,
+    tenant_name: str = "",
+    detail: dict | None = None,
+) -> Any:
+    m = _m()
+    row = m.DBAccessLog(
+        admin_username=admin_username,
+        tenant_id=tenant_id,
+        tenant_name=tenant_name or "",
+        action=action,
+        detail=dict(detail or {}),
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def list_access_logs(
+    session: AsyncSession,
+    *,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    m = _m()
+    result = await session.execute(
+        select(m.DBAccessLog)
+        .order_by(m.DBAccessLog.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    out = []
+    for row in result.scalars().all():
+        out.append({
+            "id": row.id,
+            "admin_username": row.admin_username,
+            "tenant_id": row.tenant_id,
+            "tenant_name": row.tenant_name or "",
+            "action": row.action,
+            "detail": row.detail or {},
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        })
+    return out

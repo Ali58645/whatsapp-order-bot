@@ -27,7 +27,7 @@ class AuthUser:
     role: str  # admin | owner
     tenant_id: Optional[int] = None  # DB tenant PK for owners
     impersonated_by: Optional[str] = None  # admin username when view-as
-    readonly: bool = False  # view-as tokens are read-only
+    readonly: bool = False  # legacy read-only flag (support mode is writable)
 
 
 def is_dashboard_enabled() -> bool:
@@ -129,12 +129,49 @@ def require_admin(user: AuthUser = Depends(require_auth)) -> AuthUser:
 
 
 def assert_writable(user: AuthUser) -> None:
-    """Block mutations during admin view-as (read-only) sessions."""
+    """Block mutations only for explicitly read-only sessions."""
     if user.readonly:
         raise HTTPException(
             status_code=403,
             detail="Read-only view — exit View as owner to make changes",
         )
+
+
+async def audit_support_action(
+    user: AuthUser,
+    action: str,
+    *,
+    tenant_id: int | None = None,
+    tenant_name: str = "",
+    detail: dict | None = None,
+) -> None:
+    """Persist an access-log row when an admin is in support (view-as) mode."""
+    if not user.impersonated_by:
+        return
+    from app.db.engine import DB_ENABLED, get_db
+    from app.db.repo import append_access_log, get_tenant_row
+
+    if not DB_ENABLED:
+        return
+    tid = tenant_id if tenant_id is not None else user.tenant_id
+    name = tenant_name
+    try:
+        async with get_db() as db:
+            if tid is not None and not name:
+                row = await get_tenant_row(db, tid)
+                if row is not None:
+                    name = row.name or ""
+            await append_access_log(
+                db,
+                admin_username=user.impersonated_by,
+                action=action,
+                tenant_id=tid,
+                tenant_name=name,
+                detail=detail,
+            )
+    except Exception:
+        # Never fail the primary action because of audit write issues
+        pass
 
 
 # Config keys owners must never change (wiring / credentials)

@@ -85,6 +85,30 @@ class DBUser(Base):
     tenant: Mapped["DBTenant | None"] = relationship(back_populates="users")
 
 
+# ── Access log (admin support / impersonation audit) ──────────────────────────
+
+class DBAccessLog(Base):
+    """
+    Append-only audit of admin impersonation and support-mode actions.
+    """
+    __tablename__ = "access_logs"
+    __table_args__ = (
+        Index("ix_access_logs_created", "created_at"),
+        Index("ix_access_logs_admin", "admin_username"),
+        Index("ix_access_logs_tenant", "tenant_id"),
+    )
+
+    id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
+    admin_username: Mapped[str] = mapped_column(String(128), nullable=False)
+    tenant_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    tenant_name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    detail: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 # ── Config history ────────────────────────────────────────────────────────────
 
 class DBConfigHistory(Base):

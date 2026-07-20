@@ -40,6 +40,45 @@ export type Tenant = {
   template_id?: string | null;
 };
 
+export type TenantStatusCounts = {
+  all: number;
+  live: number;
+  paused: number;
+  archived: number;
+  draft: number;
+};
+
+export type TenantsListResponse = {
+  items: Tenant[];
+  counts: TenantStatusCounts;
+};
+
+/** Normalize tenants list (supports new {items,counts} and legacy array). */
+export async function fetchTenants(status?: string): Promise<TenantsListResponse> {
+  const q = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
+  const raw = await api<Tenant[] | TenantsListResponse>(`/api/dashboard/tenants${q}`, {
+    tenant: false,
+  });
+  if (Array.isArray(raw)) {
+    const counts: TenantStatusCounts = {
+      all: raw.length,
+      live: 0,
+      paused: 0,
+      archived: 0,
+      draft: 0,
+    };
+    for (const t of raw) {
+      const st = (t.status || "live").toLowerCase() as keyof TenantStatusCounts;
+      if (st in counts && st !== "all") counts[st] += 1;
+    }
+    return { items: raw, counts };
+  }
+  return {
+    items: raw.items || [],
+    counts: raw.counts || { all: 0, live: 0, paused: 0, archived: 0, draft: 0 },
+  };
+}
+
 export type FlowStepOption = {
   id: string;
   title: string;
@@ -143,6 +182,7 @@ const ROLE_KEY = "dash_role";
 const USER_TENANT_KEY = "dash_user_tenant_id";
 const READONLY_KEY = "dash_readonly";
 const IMPERSONATOR_KEY = "dash_impersonated_by";
+const VIEW_AS_TENANT_NAME_KEY = "dash_view_as_tenant_name";
 const ADMIN_TOKEN_BACKUP = "dash_admin_token_backup";
 const UI_LANG_KEY = "dash_ui_lang";
 
@@ -167,8 +207,17 @@ export function isReadonlySession(): boolean {
   return localStorage.getItem(READONLY_KEY) === "1";
 }
 
+/** Admin viewing a tenant workspace (support mode). */
+export function isSupportSession(): boolean {
+  return Boolean(getImpersonatedBy());
+}
+
 export function getImpersonatedBy(): string | null {
   return localStorage.getItem(IMPERSONATOR_KEY);
+}
+
+export function getViewAsTenantName(): string | null {
+  return localStorage.getItem(VIEW_AS_TENANT_NAME_KEY);
 }
 
 export function getUiLang(): "en" | "ur" {
@@ -291,6 +340,7 @@ export function clearSession() {
   localStorage.removeItem(USER_TENANT_KEY);
   localStorage.removeItem(READONLY_KEY);
   localStorage.removeItem(IMPERSONATOR_KEY);
+  localStorage.removeItem(VIEW_AS_TENANT_NAME_KEY);
   localStorage.removeItem(TENANT_KEY);
 }
 
@@ -300,6 +350,7 @@ function applySession(data: {
   tenant_id?: number | null;
   readonly?: boolean;
   impersonated_by?: string | null;
+  tenant_name?: string | null;
 }) {
   setToken(data.access_token);
   if (data.role) localStorage.setItem(ROLE_KEY, data.role);
@@ -309,6 +360,11 @@ function applySession(data: {
   else localStorage.removeItem(READONLY_KEY);
   if (data.impersonated_by) localStorage.setItem(IMPERSONATOR_KEY, data.impersonated_by);
   else localStorage.removeItem(IMPERSONATOR_KEY);
+  if (data.impersonated_by && data.tenant_name) {
+    localStorage.setItem(VIEW_AS_TENANT_NAME_KEY, data.tenant_name);
+  } else if (!data.impersonated_by) {
+    localStorage.removeItem(VIEW_AS_TENANT_NAME_KEY);
+  }
 }
 
 export async function login(username: string, password: string) {
@@ -339,12 +395,12 @@ export async function enterViewAs(tenantDbId: number) {
     readonly: boolean;
     impersonated_by: string;
     tenant_name?: string;
+    support_mode?: boolean;
   }>(`/api/dashboard/admin/view-as/${tenantDbId}`, {
     method: "POST",
     tenant: false,
   });
   applySession(data);
-  // Lock filter; phone set after /me load by Layout
   return data;
 }
 
@@ -354,6 +410,7 @@ export function exitViewAs(): boolean {
   localStorage.removeItem(ADMIN_TOKEN_BACKUP);
   localStorage.removeItem(READONLY_KEY);
   localStorage.removeItem(IMPERSONATOR_KEY);
+  localStorage.removeItem(VIEW_AS_TENANT_NAME_KEY);
   setToken(backup);
   localStorage.setItem(ROLE_KEY, "admin");
   localStorage.removeItem(USER_TENANT_KEY);

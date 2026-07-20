@@ -59,8 +59,8 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
   const readonly = isReadonlySession();
 
   const loadTenants = useCallback(() => {
-    api<Tenant[]>("/api/dashboard/tenants", { tenant: false })
-      .then(setTenants)
+    api<{ items?: Tenant[] } | Tenant[]>("/api/dashboard/tenants", { tenant: false })
+      .then((raw) => setTenants(Array.isArray(raw) ? raw : raw.items || []))
       .catch(() => setTenants([]));
   }, []);
 

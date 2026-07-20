@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Archive,
@@ -7,20 +7,28 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Loader2,
   Pause,
   Play,
   Plus,
+  RotateCcw,
+  Search,
   Settings,
   ShieldAlert,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
+  enterViewAs,
+  fetchTenants,
   getRole,
   OnboardingChecklist,
+  Overview as OverviewData,
   setTenantFilter,
   Tenant,
+  TenantStatusCounts,
 } from "../api";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -64,6 +72,13 @@ const STATUS_BADGE: Record<string, string> = {
   paused: "bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/25",
   archived: "bg-zinc-500/15 text-zinc-400 ring-1 ring-zinc-500/25",
 };
+
+const FILTER_TABS: { id: "all" | "live" | "paused" | "archived"; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "live", label: "Live" },
+  { id: "paused", label: "Paused" },
+  { id: "archived", label: "Archived" },
+];
 
 function statusLabel(s: string) {
   const map: Record<string, string> = {
@@ -109,8 +124,22 @@ export default function BusinessesPage() {
   const isAdmin = getRole() === "admin";
 
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [counts, setCounts] = useState<TenantStatusCounts>({
+    all: 0,
+    live: 0,
+    paused: 0,
+    archived: 0,
+    draft: 0,
+  });
+  const [filter, setFilter] = useState<"all" | "live" | "paused" | "archived">("all");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Tenant | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [viewBusyId, setViewBusyId] = useState<number | null>(null);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>(1);
@@ -146,15 +175,44 @@ export default function BusinessesPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api<Tenant[]>("/api/dashboard/tenants", { tenant: false })
-      .then(setTenants)
-      .catch(() => setTenants([]))
+    Promise.all([
+      fetchTenants(),
+      api<OverviewData>("/api/dashboard/overview", { tenant: false }).catch(() => null),
+    ])
+      .then(([list, ov]) => {
+        setTenants(list.items);
+        setCounts(list.counts);
+        setOverview(ov);
+      })
+      .catch(() => {
+        setTenants([]);
+        setCounts({ all: 0, live: 0, paused: 0, archived: 0, draft: 0 });
+        setOverview(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     if (isAdmin) load();
   }, [isAdmin, load]);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return tenants.filter((t) => {
+      const st = (t.status || "live").toLowerCase();
+      if (filter === "archived") {
+        if (st !== "archived") return false;
+      } else if (filter === "live") {
+        if (st !== "live") return false;
+      } else if (filter === "paused") {
+        if (st !== "paused") return false;
+      } else if (st === "archived") {
+        return false; // All tab excludes archived
+      }
+      if (q && !(t.name || "").toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [tenants, filter, search]);
 
   function resetWizard() {
     setStep(1);
@@ -202,10 +260,49 @@ export default function BusinessesPage() {
     }
   }
 
+  async function confirmArchive() {
+    if (!archiveTarget) return;
+    const id = archiveTarget.id;
+    setArchiveTarget(null);
+    await setStatus(id, "archived");
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setBusyId(deleteTarget.id);
+    try {
+      await api(`/api/dashboard/tenants/${deleteTarget.id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ confirm_name: deleteConfirmName }),
+        tenant: false,
+      });
+      toast.success("Business permanently deleted");
+      setDeleteTarget(null);
+      setDeleteConfirmName("");
+      load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function openSettings(t: Tenant) {
     setTenantFilter(t.phone_number_id);
     window.dispatchEvent(new Event("tenant-change"));
     navigate("/settings");
+  }
+
+  async function viewAsTenant(t: Tenant) {
+    setViewBusyId(t.id);
+    try {
+      await enterViewAs(t.id);
+      navigate("/", { replace: true });
+      window.location.reload();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "View as failed");
+      setViewBusyId(null);
+    }
   }
 
   async function verifyConnection() {
@@ -403,7 +500,7 @@ export default function BusinessesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Businesses</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Onboard a new business from zero to live bot
+            Platform console — onboard, monitor health, and open support view-as
           </p>
         </div>
         <Button onClick={openWizard}>
@@ -412,24 +509,91 @@ export default function BusinessesPage() {
         </Button>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Leads today
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{overview?.leads_today ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Orders today
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{overview?.orders_today ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Live businesses
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{counts.live}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Active conversations
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
+            {overview?.active_conversations ?? 0}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTER_TABS.map((tab) => {
+          const n =
+            tab.id === "all"
+              ? counts.all - counts.archived
+              : counts[tab.id] ?? 0;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setFilter(tab.id)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                filter === tab.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              )}
+            >
+              {tab.label}
+              <span className="ml-1.5 tabular-nums opacity-80">{n}</span>
+            </button>
+          );
+        })}
+        <div className="relative ml-auto min-w-[200px] flex-1 sm:max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-9 pl-8"
+            placeholder="Search by name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-52 w-full rounded-2xl" />
           ))}
         </div>
-      ) : tenants.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
           <Building2 className="mx-auto h-10 w-10 text-muted-foreground" />
-          <p className="mt-3 text-sm text-muted-foreground">No businesses yet</p>
-          <Button className="mt-4" onClick={openWizard}>
-            <Plus className="h-4 w-4" />
-            Create your first business
-          </Button>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {tenants.length === 0 ? "No businesses yet" : "No businesses in this filter"}
+          </p>
+          {tenants.length === 0 && (
+            <Button className="mt-4" onClick={openWizard}>
+              <Plus className="h-4 w-4" />
+              Create your first business
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tenants.map((t) => {
+          {visible.map((t) => {
             const st = (t.status || "live").toLowerCase();
             const statLabel = t.flow_mode === "order" ? "Orders today" : "Leads today";
             return (
@@ -458,17 +622,34 @@ export default function BusinessesPage() {
                   </p>
                 </div>
 
-                <div className="mt-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Onboarding
-                    {t.checklist
-                      ? ` · ${t.checklist.done_count}/${t.checklist.total_count}`
-                      : ""}
-                  </p>
-                  <ChecklistView checklist={t.checklist} />
-                </div>
+                {st !== "archived" && (
+                  <div className="mt-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Onboarding
+                      {t.checklist
+                        ? ` · ${t.checklist.done_count}/${t.checklist.total_count}`
+                        : ""}
+                    </p>
+                    <ChecklistView checklist={t.checklist} />
+                  </div>
+                )}
 
                 <div className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">
+                  {st !== "archived" && (
+                    <Button
+                      variant="soft"
+                      size="sm"
+                      disabled={viewBusyId === t.id}
+                      onClick={() => void viewAsTenant(t)}
+                    >
+                      {viewBusyId === t.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
+                      View as
+                    </Button>
+                  )}
                   {st === "live" && (
                     <Button
                       variant="outline"
@@ -499,27 +680,139 @@ export default function BusinessesPage() {
                       Resume
                     </Button>
                   )}
+                  {st === "archived" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={busyId === t.id}
+                      onClick={() => setStatus(t.id, "paused")}
+                    >
+                      {busyId === t.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      )}
+                      Restore
+                    </Button>
+                  )}
                   {st !== "archived" && (
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={busyId === t.id}
-                      onClick={() => setStatus(t.id, "archived")}
+                      onClick={() => setArchiveTarget(t)}
                     >
                       <Archive className="h-3.5 w-3.5" />
                       Archive
                     </Button>
                   )}
-                  <Button variant="soft" size="sm" onClick={() => openSettings(t)}>
-                    <Settings className="h-3.5 w-3.5" />
-                    Settings
-                  </Button>
+                  {st === "archived" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive"
+                      disabled={busyId === t.id}
+                      onClick={() => {
+                        setDeleteConfirmName("");
+                        setDeleteTarget(t);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </Button>
+                  )}
+                  {st !== "archived" && (
+                    <Button variant="outline" size="sm" onClick={() => openSettings(t)}>
+                      <Settings className="h-3.5 w-3.5" />
+                      Wiring
+                    </Button>
+                  )}
                 </div>
               </article>
             );
           })}
         </div>
       )}
+
+      <Dialog open={!!archiveTarget} onOpenChange={(o) => !o && setArchiveTarget(null)}>
+        <DialogContent className="max-w-md p-0">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-lg font-semibold">Archive business?</h2>
+          </div>
+          <div className="space-y-3 px-5 py-4 text-sm text-muted-foreground">
+            <p>
+              This stops the bot and hides{" "}
+              <span className="font-medium text-foreground">{archiveTarget?.name}</span>.
+              Data is kept and can be restored.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+            <Button variant="ghost" onClick={() => setArchiveTarget(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void confirmArchive()}>Archive</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteTarget(null);
+            setDeleteConfirmName("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md p-0">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-lg font-semibold text-destructive">Delete permanently</h2>
+          </div>
+          <div className="space-y-3 px-5 py-4 text-sm">
+            <p className="text-muted-foreground">
+              This irreversibly removes all leads, orders, conversations, and config for{" "}
+              <span className="font-medium text-foreground">{deleteTarget?.name}</span>.
+            </p>
+            <div>
+              <Label>Type the business name to confirm</Label>
+              <Input
+                className="mt-1.5"
+                value={deleteConfirmName}
+                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                placeholder={deleteTarget?.name}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteConfirmName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                !deleteTarget ||
+                deleteConfirmName.trim() !== (deleteTarget.name || "").trim() ||
+                busyId === deleteTarget.id
+              }
+              onClick={() => void confirmDelete()}
+            >
+              {busyId === deleteTarget?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Delete forever
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={wizardOpen} onOpenChange={(o) => !o && closeWizard()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-lg">

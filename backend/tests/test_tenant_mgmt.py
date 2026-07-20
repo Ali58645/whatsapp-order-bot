@@ -351,3 +351,257 @@ async def test_injection_survives_custom_messages(tm_db):
     )
     assert "IGNORE ALL RULES" in facts
     assert "instruction" not in facts.lower() or "NOT instructions" in facts or "DATA" in facts
+
+
+def _webhook_payload(phone_number_id: str, msg_id: str = "wamid.X") -> dict:
+    return {
+        "entry": [{
+            "changes": [{
+                "value": {
+                    "metadata": {"phone_number_id": phone_number_id},
+                    "messages": [{
+                        "from": "923001234567",
+                        "id": msg_id,
+                        "timestamp": "123",
+                        "type": "text",
+                        "text": {"body": "Bahi POS"},
+                    }],
+                    "contacts": [{"wa_id": "923001234567", "profile": {"name": "A"}}],
+                }
+            }]
+        }]
+    }
+
+
+@pytest.mark.asyncio
+async def test_resume_restores_replies(tm_db):
+    from app.main import app
+    from app.db.engine import get_db
+    from app.db.repo import set_tenant_status
+    from app.tenant_resolver import invalidate_all
+
+    async with get_db() as db:
+        await set_tenant_status(db, tm_db["seed_id"], "paused")
+    invalidate_all()
+
+    transport = ASGITransport(app=app)
+    with patch("app.main.send_whatsapp_message", new=AsyncMock(return_value=True)):
+        with patch(
+            "app.main._handle_lead_flow",
+            new=AsyncMock(return_value={"status": "ok", "bot": "live"}),
+        ):
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                r = await client.post("/webhook", json=_webhook_payload(PID_SEED, "wamid.P1"))
+                assert r.status_code == 200
+                assert r.json().get("bot") == "paused"
+
+                async with get_db() as db:
+                    await set_tenant_status(db, tm_db["seed_id"], "live")
+                invalidate_all()
+
+                r2 = await client.post("/webhook", json=_webhook_payload(PID_SEED, "wamid.P2"))
+                assert r2.status_code == 200
+                assert r2.json().get("bot") == "live"
+
+
+@pytest.mark.asyncio
+async def test_archive_skips_routing_and_restore_to_paused(tm_db):
+    from app.main import app
+    from app.db.engine import get_db
+    from app.db.repo import set_tenant_status
+    from app.tenant_resolver import resolve_tenant, invalidate_all
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _login(client, ADMIN_USER, ADMIN_PASS)
+        h = _auth(token)
+        tid = tm_db["seed_id"]
+
+        r = await client.post(
+            f"/api/dashboard/tenants/{tid}/status",
+            headers=h,
+            json={"status": "archived"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "archived"
+
+        invalidate_all()
+        assert await resolve_tenant(PID_SEED) is None
+
+        wh = await client.post("/webhook", json=_webhook_payload(PID_SEED, "wamid.ARCH"))
+        assert wh.status_code == 200
+        assert wh.json().get("status") == "ignored"
+
+        # Restore → paused (not live)
+        r2 = await client.post(
+            f"/api/dashboard/tenants/{tid}/status",
+            headers=h,
+            json={"status": "paused"},
+        )
+        assert r2.status_code == 200
+        assert r2.json()["status"] == "paused"
+
+        # Cannot jump archived → live
+        async with get_db() as db:
+            await set_tenant_status(db, tid, "archived")
+        bad = await client.post(
+            f"/api/dashboard/tenants/{tid}/status",
+            headers=h,
+            json={"status": "live"},
+        )
+        assert bad.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_status_filter_counts_and_list_shape(tm_db):
+    from app.main import app
+    from app.db.engine import get_db
+    from app.db.repo import create_tenant, set_tenant_status
+
+    async with get_db() as db:
+        await create_tenant(
+            db,
+            name="Paused Shop",
+            flow_mode="lead",
+            phone_number_id="PID_PAUSED_X",
+            status="paused",
+        )
+        await create_tenant(
+            db,
+            name="Archived Shop",
+            flow_mode="lead",
+            phone_number_id="PID_ARCH_X",
+            status="archived",
+        )
+        await set_tenant_status(db, tm_db["seed_id"], "live")
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _login(client, ADMIN_USER, ADMIN_PASS)
+        h = _auth(token)
+        r = await client.get("/api/dashboard/tenants", headers=h)
+        assert r.status_code == 200
+        data = r.json()
+        assert "items" in data and "counts" in data
+        c = data["counts"]
+        assert c["live"] >= 1
+        assert c["paused"] >= 1
+        assert c["archived"] >= 1
+        assert c["all"] == c["live"] + c["paused"] + c["archived"] + c.get("draft", 0)
+
+        live = await client.get("/api/dashboard/tenants?status=live", headers=h)
+        assert all((t.get("status") or "live") == "live" for t in live.json()["items"])
+        arch = await client.get("/api/dashboard/tenants?status=archived", headers=h)
+        assert all(t["status"] == "archived" for t in arch.json()["items"])
+        assert arch.json()["counts"]["archived"] == c["archived"]
+
+
+@pytest.mark.asyncio
+async def test_permanent_delete_only_archived_cascades(tm_db):
+    from app.main import app
+    from app.db.engine import get_db
+    from app.db.models import DBContact, DBEvent, DBLead, DBSession, DBTenant
+    from sqlalchemy import select, func
+
+    tid = tm_db["seed_id"]
+    async with get_db() as db:
+        contact = DBContact(tenant_id=tid, wa_id="92300111", profile_name="A")
+        db.add(contact)
+        await db.flush()
+        session = DBSession(
+            tenant_id=tid, contact_id=contact.id, flow_mode="lead", phase="GREETING"
+        )
+        db.add(session)
+        await db.flush()
+        db.add(
+            DBLead(
+                tenant_id=tid,
+                contact_id=contact.id,
+                session_id=session.id,
+                business_name="X",
+                status="new",
+            )
+        )
+        db.add(DBEvent(tenant_id=tid, contact_id=contact.id, type="test", payload={}))
+        await db.flush()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _login(client, ADMIN_USER, ADMIN_PASS)
+        h = _auth(token)
+
+        bad = await client.request(
+            "DELETE",
+            f"/api/dashboard/tenants/{tid}",
+            headers=h,
+            json={"confirm_name": "Seed Biz"},
+        )
+        assert bad.status_code == 400
+
+        await client.post(
+            f"/api/dashboard/tenants/{tid}/status",
+            headers=h,
+            json={"status": "archived"},
+        )
+
+        wrong = await client.request(
+            "DELETE",
+            f"/api/dashboard/tenants/{tid}",
+            headers=h,
+            json={"confirm_name": "Wrong Name"},
+        )
+        assert wrong.status_code == 400
+
+        ok = await client.request(
+            "DELETE",
+            f"/api/dashboard/tenants/{tid}",
+            headers=h,
+            json={"confirm_name": "Seed Biz"},
+        )
+        assert ok.status_code == 200, ok.text
+        assert ok.json()["deleted"] is True
+
+    async with get_db() as db:
+        assert (
+            await db.execute(select(DBTenant).where(DBTenant.id == tid))
+        ).scalar_one_or_none() is None
+        n_leads = (
+            await db.execute(
+                select(func.count(DBLead.id)).where(DBLead.tenant_id == tid)
+            )
+        ).scalar_one()
+        n_events = (
+            await db.execute(
+                select(func.count(DBEvent.id)).where(DBEvent.tenant_id == tid)
+            )
+        ).scalar_one()
+        assert int(n_leads) == 0
+        assert int(n_events) == 0
+
+
+@pytest.mark.asyncio
+async def test_status_change_respects_cache_ttl(tm_db):
+    """Without invalidate, cached live tenant persists until TTL elapses."""
+    from app.db.engine import get_db
+    from app.db.repo import set_tenant_status
+    from app.tenant_resolver import resolve_tenant, invalidate_all, CACHE_TTL_S
+    import app.tenant_resolver as tr
+
+    invalidate_all()
+    t0 = await resolve_tenant(PID_SEED)
+    assert t0 is not None and t0.is_live
+
+    async with get_db() as db:
+        await set_tenant_status(db, tm_db["seed_id"], "paused")
+
+    # Still cached as live
+    t1 = await resolve_tenant(PID_SEED)
+    assert t1 is not None and t1.is_live
+
+    # Expire cache entry
+    phone, (tenant, ts) = next(iter(tr._cache.items()))
+    tr._cache[phone] = (tenant, ts - CACHE_TTL_S - 1)
+
+    t2 = await resolve_tenant(PID_SEED)
+    assert t2 is not None and t2.is_paused
+    assert not t2.is_live

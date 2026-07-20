@@ -33,10 +33,11 @@ export default function TeamPage() {
     setLoading(true);
     Promise.all([
       api<{ items: DashUser[] }>("/api/dashboard/users", { tenant: false }),
-      api<Tenant[]>("/api/dashboard/tenants", { tenant: false }),
+      api<{ items?: Tenant[] } | Tenant[]>("/api/dashboard/tenants", { tenant: false }),
     ])
-      .then(([u, t]) => {
+      .then(([u, raw]) => {
         setUsers(u.items || []);
+        const t = Array.isArray(raw) ? raw : raw.items || [];
         setTenants(t);
         if (!tenantId && t[0]) setTenantId(t[0].id);
       })
@@ -80,7 +81,7 @@ export default function TeamPage() {
     setViewBusy(tid);
     try {
       await enterViewAs(tid);
-      toast.success("Viewing as owner (read-only)");
+      toast.success("Opened support view");
       navigate("/", { replace: true });
       window.location.reload();
     } catch (err: unknown) {
