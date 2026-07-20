@@ -1,0 +1,21 @@
+{
+  "id": "generic",
+  "name": "Generic Business",
+  "description": "Neutral starter — basic greeting and option sets. Customize everything later in Settings.",
+  "vertical": "generic",
+  "flow_mode": "lead",
+  "config": {
+    "campaign_phrase": "Hello",
+    "demo_slots": ["Tomorrow 11am", "Tomorrow 4pm"],
+    "facts_features": "Describe your product or service here.",
+    "facts_pricing_note": "Share pricing after qualification.",
+    "facts_claims_note": "",
+    "greeting_text": "Assalam o Alaikum! Kaise madad kar sakte hain?",
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Kaise madad kar sakte hain?",
+        "value_line": "Thori si info dein — hum guide kar denge."
+      }
+    }
+  }
+}

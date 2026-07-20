@@ -4,8 +4,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   Bell,
+  Bot,
   Building2,
   ChevronsUpDown,
+  CreditCard,
+  Home,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -22,12 +25,18 @@ import {
 } from "lucide-react";
 import {
   api,
+  clearSession,
+  exitViewAs,
+  getImpersonatedBy,
   getRole,
   getTenantFilter,
+  isOwner,
+  isReadonlySession,
+  MeResponse,
   setTenantFilter,
-  setToken,
   Tenant,
 } from "../../api";
+import { useI18n } from "../../i18n";
 import { useSidebarCollapsed } from "../../hooks/use-sidebar";
 import { useTheme } from "../../hooks/use-theme";
 import { Avatar } from "../ui/avatar";
@@ -36,51 +45,90 @@ import { cn } from "../../lib/utils";
 import { CommandPalette } from "./CommandPalette";
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 
-const NAV_BASE = [
-  { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/leads", label: "Leads", icon: Users },
-  { to: "/orders", label: "Orders", icon: Package },
-  { to: "/conversations", label: "Conversations", icon: MessagesSquare },
-  { to: "/activity", label: "Activity", icon: Activity },
-  { to: "/settings", label: "Settings", icon: Settings },
+type NavItem = {
+  to: string;
+  labelKey: "home" | "customers" | "myBot" | "menu" | "billing" | "overview" | "leads" | "orders" | "conversations" | "activity" | "settings" | "businesses" | "team";
+  icon: typeof Home;
+  end?: boolean;
+  orderOnly?: boolean;
+  leadOnly?: boolean;
+};
+
+const OWNER_NAV: NavItem[] = [
+  { to: "/", labelKey: "home", icon: Home, end: true },
+  { to: "/customers", labelKey: "customers", icon: Users },
+  { to: "/my-bot", labelKey: "myBot", icon: Bot },
+  { to: "/menu", labelKey: "menu", icon: Package, orderOnly: true },
+  { to: "/billing", labelKey: "billing", icon: CreditCard },
 ];
 
-const NAV_ADMIN = { to: "/businesses", label: "Businesses", icon: Building2 };
-
-const CRUMBS: Record<string, string> = {
-  "/": "Overview",
-  "/leads": "Leads",
-  "/orders": "Orders",
-  "/conversations": "Conversations",
-  "/activity": "Activity",
-  "/settings": "Settings",
-  "/businesses": "Businesses",
-};
+const ADMIN_NAV: NavItem[] = [
+  { to: "/", labelKey: "overview", icon: LayoutDashboard, end: true },
+  { to: "/leads", labelKey: "leads", icon: Users },
+  { to: "/orders", labelKey: "orders", icon: Package },
+  { to: "/conversations", labelKey: "conversations", icon: MessagesSquare },
+  { to: "/activity", labelKey: "activity", icon: Activity },
+  { to: "/businesses", labelKey: "businesses", icon: Building2 },
+  { to: "/team", labelKey: "team", icon: Users },
+  { to: "/settings", labelKey: "settings", icon: Settings },
+];
 
 export default function Layout() {
   const { collapsed, toggle } = useSidebarCollapsed();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantId, setTenantId] = useState(getTenantFilter());
+  const [flowMode, setFlowMode] = useState<string>("lead");
   const [cmdOpen, setCmdOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isAdmin = getRole() === "admin";
+  const ownerShell = isOwner() || isReadonlySession();
+  const isAdmin = getRole() === "admin" && !isReadonlySession();
+  const readonly = isReadonlySession();
+  const impersonator = getImpersonatedBy();
 
-  const nav = useMemo(
-    () =>
-      isAdmin
-        ? [...NAV_BASE.slice(0, -1), NAV_ADMIN, NAV_BASE[NAV_BASE.length - 1]]
-        : NAV_BASE,
-    [isAdmin]
-  );
+  const nav = useMemo(() => {
+    const base = ownerShell ? OWNER_NAV : ADMIN_NAV;
+    return base.filter((item) => {
+      if (item.orderOnly && flowMode !== "order") return false;
+      if (item.leadOnly && flowMode === "order") return false;
+      return true;
+    });
+  }, [ownerShell, flowMode]);
 
   useEffect(() => {
-    api<Tenant[]>("/api/dashboard/tenants", { tenant: false })
-      .then(setTenants)
-      .catch(() => setTenants([]));
-  }, []);
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api<MeResponse>("/api/dashboard/me", { tenant: false });
+        if (cancelled) return;
+        if (me.tenant?.phone_number_id && (me.role === "owner" || me.readonly)) {
+          setTenantFilter(me.tenant.phone_number_id);
+          setTenantId(me.tenant.phone_number_id);
+          setFlowMode(me.tenant.flow_mode || "lead");
+          window.dispatchEvent(new Event("tenant-change"));
+        }
+      } catch {
+        /* ignore bootstrap errors */
+      }
+      try {
+        const list = await api<Tenant[]>("/api/dashboard/tenants", { tenant: false });
+        if (!cancelled) setTenants(list);
+        if (!cancelled && list[0] && !ownerShell && getTenantFilter() === "all") {
+          // admin may keep "all"
+        } else if (!cancelled && list[0]?.flow_mode && ownerShell) {
+          setFlowMode(list[0].flow_mode);
+        }
+      } catch {
+        if (!cancelled) setTenants([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerShell]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -101,17 +149,30 @@ export default function Layout() {
   );
 
   function selectTenant(id: string) {
+    if (ownerShell) return;
     setTenantId(id);
     setTenantFilter(id);
     window.dispatchEvent(new Event("tenant-change"));
   }
 
   function logout() {
-    setToken(null);
+    clearSession();
+    localStorage.removeItem("dash_admin_token_backup");
     navigate("/login");
   }
 
-  const crumb = CRUMBS[location.pathname] || "BahiDesk";
+  function onExitViewAs() {
+    if (exitViewAs()) {
+      navigate("/team", { replace: true });
+      window.location.reload();
+    }
+  }
+
+  const crumb = t(
+    (nav.find((n) =>
+      n.end ? location.pathname === n.to : location.pathname.startsWith(n.to) && n.to !== "/"
+    )?.labelKey as Parameters<typeof t>[0]) || (ownerShell ? "home" : "overview")
+  );
 
   const sidebarInner = (
     <>
@@ -122,63 +183,77 @@ export default function Layout() {
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-sm font-bold tracking-tight">BahiDesk</p>
-            <p className="truncate text-[10px] text-muted-foreground">Console</p>
+            <p className="truncate text-[10px] text-muted-foreground">
+              {ownerShell ? activeTenant?.name || "Your business" : "Console"}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Tenant switcher */}
-      <div className="px-2 pb-3">
-        <Dropdown.Root>
-          <Dropdown.Trigger asChild>
-            <button
-              className={cn(
-                "flex w-full items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent/40 px-2 py-2 text-left transition hover:bg-sidebar-accent focus-ring",
-                collapsed && "justify-center px-0"
-              )}
-            >
-              <Avatar
-                name={activeTenant?.name || "All"}
-                seed={activeTenant?.phone_number_id || "all"}
-                size="sm"
-              />
-              {!collapsed && (
-                <>
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                    {activeTenant?.name || "All tenants"}
-                  </span>
-                  <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                </>
-              )}
-            </button>
-          </Dropdown.Trigger>
-          <Dropdown.Portal>
-            <Dropdown.Content
-              side="right"
-              align="start"
-              sideOffset={8}
-              className="z-50 min-w-[220px] overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-elevated"
-            >
-              <Dropdown.Item
-                className="cursor-pointer rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent"
-                onSelect={() => selectTenant("all")}
+      {/* Tenant switcher — admin only */}
+      {isAdmin && (
+        <div className="px-2 pb-3">
+          <Dropdown.Root>
+            <Dropdown.Trigger asChild>
+              <button
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent/40 px-2 py-2 text-left transition hover:bg-sidebar-accent focus-ring",
+                  collapsed && "justify-center px-0"
+                )}
               >
-                All tenants
-              </Dropdown.Item>
-              {tenants.map((t) => (
+                <Avatar
+                  name={activeTenant?.name || "All"}
+                  seed={activeTenant?.phone_number_id || "all"}
+                  size="sm"
+                />
+                {!collapsed && (
+                  <>
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                      {activeTenant?.name || "All tenants"}
+                    </span>
+                    <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </>
+                )}
+              </button>
+            </Dropdown.Trigger>
+            <Dropdown.Portal>
+              <Dropdown.Content
+                side="right"
+                align="start"
+                sideOffset={8}
+                className="z-50 min-w-[220px] overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-elevated"
+              >
                 <Dropdown.Item
-                  key={t.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent"
-                  onSelect={() => selectTenant(t.phone_number_id)}
+                  className="cursor-pointer rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent"
+                  onSelect={() => selectTenant("all")}
                 >
-                  <Avatar name={t.name} seed={t.phone_number_id} size="sm" />
-                  <span className="truncate">{t.name}</span>
+                  All tenants
                 </Dropdown.Item>
-              ))}
-            </Dropdown.Content>
-          </Dropdown.Portal>
-        </Dropdown.Root>
-      </div>
+                {tenants.map((tn) => (
+                  <Dropdown.Item
+                    key={tn.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent"
+                    onSelect={() => selectTenant(tn.phone_number_id)}
+                  >
+                    <Avatar name={tn.name} seed={tn.phone_number_id} size="sm" />
+                    <span className="truncate">{tn.name}</span>
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Content>
+            </Dropdown.Portal>
+          </Dropdown.Root>
+        </div>
+      )}
+
+      {/* Owner: fixed tenant chip (no switcher) */}
+      {ownerShell && !collapsed && (
+        <div className="px-3 pb-3">
+          <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/30 px-3 py-2">
+            <p className="truncate text-xs font-medium">{activeTenant?.name || "…"}</p>
+            <p className="text-[10px] text-muted-foreground">Your business</p>
+          </div>
+        </div>
+      )}
 
       <nav className="flex-1 space-y-0.5 px-2">
         {nav.map((item) => (
@@ -186,7 +261,7 @@ export default function Layout() {
             key={item.to}
             to={item.to}
             end={item.end}
-            title={item.label}
+            title={t(item.labelKey)}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
@@ -198,12 +273,36 @@ export default function Layout() {
             }
           >
             <item.icon className="h-4.5 w-4.5 h-[18px] w-[18px] shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
+            {!collapsed && <span>{t(item.labelKey)}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="space-y-1 border-t border-sidebar-border p-2">
+        {!collapsed && (
+          <div className="mb-1 flex gap-1 rounded-lg border border-sidebar-border p-0.5">
+            <button
+              type="button"
+              className={cn(
+                "flex-1 rounded-md px-2 py-1 text-[10px] font-semibold",
+                lang === "en" ? "bg-sidebar-accent text-primary" : "text-muted-foreground"
+              )}
+              onClick={() => setLang("en")}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex-1 rounded-md px-2 py-1 text-[10px] font-semibold",
+                lang === "ur" ? "bg-sidebar-accent text-primary" : "text-muted-foreground"
+              )}
+              onClick={() => setLang("ur")}
+            >
+              UR
+            </button>
+          </div>
+        )}
         <Button
           variant="ghost"
           size={collapsed ? "icon" : "sm"}
@@ -221,7 +320,7 @@ export default function Layout() {
           onClick={logout}
         >
           <LogOut className="h-4 w-4" />
-          {!collapsed && <span>Log out</span>}
+          {!collapsed && <span>{t("logout")}</span>}
         </Button>
       </div>
     </>
@@ -229,7 +328,6 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-sidebar-border glass transition-[width] duration-200 md:flex",
@@ -239,7 +337,6 @@ export default function Layout() {
         {sidebarInner}
       </aside>
 
-      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -273,7 +370,18 @@ export default function Layout() {
           collapsed ? "md:pl-16" : "md:pl-60"
         )}
       >
-        {/* Topbar */}
+        {readonly && (
+          <div className="flex items-center justify-between gap-3 bg-amber-500/15 px-4 py-2 text-sm text-amber-200">
+            <span>
+              {t("readonlyBanner")}
+              {impersonator ? ` · ${impersonator}` : ""}
+            </span>
+            <Button size="sm" variant="outline" onClick={onExitViewAs}>
+              {t("exitViewAs")}
+            </Button>
+          </div>
+        )}
+
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-xl">
           <Button
             variant="ghost"
@@ -353,7 +461,6 @@ export default function Layout() {
           </div>
         </main>
 
-        {/* Mobile bottom nav */}
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/90 backdrop-blur-xl md:hidden">
           {nav.slice(0, 5).map((item) => (
             <NavLink
@@ -368,7 +475,7 @@ export default function Layout() {
               }
             >
               <item.icon className="h-5 w-5" />
-              {item.label.split(" ")[0]}
+              {t(item.labelKey).split(" ")[0]}
             </NavLink>
           ))}
         </nav>

@@ -1,0 +1,21 @@
+{
+  "id": "pos-lead",
+  "name": "POS Lead Qualification",
+  "description": "Bahi-style lead bot for POS / software sales — greeting, business type, locations, demo booking.",
+  "vertical": "pos",
+  "flow_mode": "lead",
+  "config": {
+    "campaign_phrase": "Bahi POS",
+    "demo_slots": ["Kal 11am", "Kal 4pm"],
+    "facts_features": "Inventory, billing, multi-branch reports, WhatsApp order sync.",
+    "facts_pricing_note": "Packages start from a monthly subscription — exact quote after a short demo.",
+    "facts_claims_note": "Used by retailers, pharmacies, and restaurants across Pakistan.",
+    "greeting_text": "Assalam o Alaikum! Bahi POS se baat ho rahi hai.",
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Bahi POS se baat ho rahi hai.",
+        "value_line": "Hum aapke business ke liye POS + WhatsApp setup karte hain."
+      }
+    }
+  }
+}

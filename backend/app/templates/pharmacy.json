@@ -1,0 +1,202 @@
+{
+  "id": "pharmacy",
+  "name": "Pharmacy",
+  "vertical": "pharmacy",
+  "flow_mode": "order",
+  "blurb": "OTC, personal care, baby care, supplements. Rx via nuskha.",
+  "icon": "pill",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Pharmacy",
+    "greeting_text": "Assalam o Alaikum! [Business] — OTC items menu se order karein. Prescription medicines ke liye nuskha bhejein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "OTC only via menu. Rx: send prescription photo for pharmacist confirmation.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Prescription items require pharmacist confirmation — never auto-confirm Rx.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business]! Order OTC below. For prescription medicines, please send your nuskha."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_otc",
+          "name": "OTC Medicines",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_pc",
+          "name": "Personal Care",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_baby",
+          "name": "Baby Care",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_supp",
+          "name": "Supplements",
+          "sort": 3,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_panadol",
+          "category_id": "c_otc",
+          "name": "Panadol Tab",
+          "description": "Strip",
+          "price": 35,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_disprin",
+          "category_id": "c_otc",
+          "name": "Disprin",
+          "description": "",
+          "price": 40,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_ors",
+          "category_id": "c_otc",
+          "name": "ORS Sachet",
+          "description": "",
+          "price": 50,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_cough",
+          "category_id": "c_otc",
+          "name": "Cough Syrup",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_shamp",
+          "category_id": "c_pc",
+          "name": "Shampoo 200ml",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_tooth",
+          "category_id": "c_pc",
+          "name": "Toothpaste",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_san",
+          "category_id": "c_pc",
+          "name": "Hand Sanitizer",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_diaper",
+          "category_id": "c_baby",
+          "name": "Diapers M (pack)",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_wipes",
+          "category_id": "c_baby",
+          "name": "Baby Wipes",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_feed",
+          "category_id": "c_baby",
+          "name": "Feeding Bottle",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_vitc",
+          "category_id": "c_supp",
+          "name": "Vitamin C",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_multi",
+          "category_id": "c_supp",
+          "name": "Multivitamin",
+          "description": "",
+          "price": 850,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_omega",
+          "category_id": "c_supp",
+          "name": "Omega-3",
+          "description": "",
+          "price": 1100,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] — OTC menu. Prescription medicines ke liye nuskha bhejein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 2000,
+          "area_note": "Same-day local delivery"
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

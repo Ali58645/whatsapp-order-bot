@@ -1,0 +1,115 @@
+{
+  "id": "salon_booking",
+  "name": "Salon Booking",
+  "vertical": "salon",
+  "flow_mode": "lead",
+  "blurb": "Appointment bot — services list then scheduling slots.",
+  "icon": "scissors",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Book Appointment",
+    "greeting_text": "Assalam o Alaikum! Appointment book karne mein madad karte hain. Service choose karein.",
+    "demo_slots": [
+      "Aaj 4pm",
+      "Kal 11am"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Assalam o Alaikum! Let's book your appointment — pick a service."
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Appointment book karne mein madad karte hain.",
+        "value_line": "Preferred time batayein — hum confirm kar denge.",
+        "q_business_name": "Aapka naam kya hai?",
+        "q_business_type": "Kaunsi service chahiye?",
+        "q_locations": "Kaunsa branch / area?",
+        "q_current_system": "Pehle kab aaye the?",
+        "q_scheduling": "Preferred slot choose karein:"
+      },
+      "interactive": {
+        "business_types": [
+          {
+            "id": "svc_cut",
+            "title": "Haircut",
+            "description": "Cut & style",
+            "value": "Haircut"
+          },
+          {
+            "id": "svc_fac",
+            "title": "Facial",
+            "description": "Skin care",
+            "value": "Facial"
+          },
+          {
+            "id": "svc_bri",
+            "title": "Bridal",
+            "description": "Bridal package",
+            "value": "Bridal"
+          },
+          {
+            "id": "svc_man",
+            "title": "Manicure",
+            "description": "Nails",
+            "value": "Manicure"
+          },
+          {
+            "id": "svc_col",
+            "title": "Hair Color",
+            "description": "Coloring",
+            "value": "Color"
+          },
+          {
+            "id": "svc_oth",
+            "title": "Other",
+            "description": "Something else",
+            "value": "Other"
+          }
+        ],
+        "locations": [
+          {
+            "id": "loc_main",
+            "title": "Main branch",
+            "value": "Main"
+          },
+          {
+            "id": "loc_mall",
+            "title": "Mall outlet",
+            "value": "Mall"
+          },
+          {
+            "id": "loc_home",
+            "title": "Home service",
+            "value": "Home"
+          }
+        ],
+        "current_system": [
+          {
+            "id": "vis_new",
+            "title": "Pehli baar",
+            "sheet_value": "New"
+          },
+          {
+            "id": "vis_ret",
+            "title": "Wapas aa rahe",
+            "sheet_value": "Returning"
+          },
+          {
+            "id": "vis_ref",
+            "title": "Referral",
+            "sheet_value": "Referral"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "id": "dairy_milk",
+  "name": "Dairy / Milk",
+  "vertical": "dairy",
+  "flow_mode": "order",
+  "blurb": "Fresh milk & dairy — morning delivery + subscription note.",
+  "icon": "milk",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Dairy / Milk",
+    "greeting_text": "Assalam o Alaikum! [Business] dairy — fresh milk order karein. Subah delivery / regular subscription available.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Like water_supplier: customers can request regular morning delivery.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Fresh dairy from [Business]. Morning delivery & regular subscription available."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_dairy",
+          "name": "Dairy",
+          "sort": 0,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_milk1",
+          "category_id": "c_dairy",
+          "name": "Fresh Milk 1L",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_milk2",
+          "category_id": "c_dairy",
+          "name": "Fresh Milk 2L",
+          "description": "",
+          "price": 420,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_yog",
+          "category_id": "c_dairy",
+          "name": "Yogurt 1kg",
+          "description": "",
+          "price": 300,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_but",
+          "category_id": "c_dairy",
+          "name": "Butter 200g",
+          "description": "",
+          "price": 380,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_ghee",
+          "category_id": "c_dairy",
+          "name": "Desi Ghee 1kg",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 4,
+          "modifiers": []
+        },
+        {
+          "id": "i_cream",
+          "category_id": "c_dairy",
+          "name": "Fresh Cream",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 5,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! Fresh dairy — subah delivery / regular subscription available.",
+        "menu_button_label": "Dairy menu",
+        "delivery": {
+          "enabled": true,
+          "charge": 50,
+          "free_above": 1000,
+          "area_note": "Morning delivery window 7–10am"
+        },
+        "order_confirm_note": "Confirm? Regular delivery chahiye to likhein.",
+        "currency": "PKR"
+      }
+    }
+  }
+}

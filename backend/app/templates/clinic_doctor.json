@@ -1,0 +1,117 @@
+{
+  "id": "clinic_doctor",
+  "name": "Clinic / Doctor",
+  "vertical": "clinic",
+  "flow_mode": "lead",
+  "blurb": "Appointment only — no medical advice from the bot.",
+  "icon": "stethoscope",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Book Appointment",
+    "greeting_text": "Assalam o Alaikum! Appointment book karne ke liye neeche se specialty choose karein. (Sirf booking — medical advice nahi)",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 3pm"
+    ],
+    "facts_features": "Booking only. No diagnosis or medical advice via WhatsApp bot.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "CRITICAL: bot never answers health questions — only schedules.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Book an appointment — select a specialty. Booking only; no medical advice."
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Appointment book karne ke liye madad karte hain.",
+        "value_line": "Sirf scheduling — medical sawalon ka jawab yahan nahi. Doctor se mil kar discuss karein.",
+        "q_business_name": "Patient ka naam?",
+        "q_business_type": "Kaunsi specialty / service?",
+        "q_locations": "Clinic location?",
+        "q_current_system": "Pehle visit kiya tha?",
+        "q_scheduling": "Appointment slot choose karein:",
+        "info_text": "Yeh bot sirf appointment book karta hai. Koi medical advice ya diagnosis yahan available nahi.",
+        "pricing_text": "Consultation fee clinic policy ke mutabiq — reception confirm karegi."
+      },
+      "interactive": {
+        "business_types": [
+          {
+            "id": "s_gp",
+            "title": "General",
+            "description": "GP",
+            "value": "General"
+          },
+          {
+            "id": "s_den",
+            "title": "Dental",
+            "description": "Teeth",
+            "value": "Dental"
+          },
+          {
+            "id": "s_skin",
+            "title": "Skin",
+            "description": "Dermatology",
+            "value": "Skin"
+          },
+          {
+            "id": "s_child",
+            "title": "Child",
+            "description": "Pediatrics",
+            "value": "Child"
+          },
+          {
+            "id": "s_gyn",
+            "title": "Gyne",
+            "description": "Women health",
+            "value": "Gyne"
+          },
+          {
+            "id": "s_oth",
+            "title": "Other",
+            "description": "Other",
+            "value": "Other"
+          }
+        ],
+        "locations": [
+          {
+            "id": "loc_1",
+            "title": "1",
+            "value": "1"
+          },
+          {
+            "id": "loc_2_3",
+            "title": "2-3",
+            "value": "2-3"
+          },
+          {
+            "id": "loc_4p",
+            "title": "4+",
+            "value": "4+"
+          }
+        ],
+        "current_system": [
+          {
+            "id": "sys_a",
+            "title": "Manual",
+            "sheet_value": "Manual"
+          },
+          {
+            "id": "sys_b",
+            "title": "Software",
+            "sheet_value": "Software"
+          },
+          {
+            "id": "sys_c",
+            "title": "Kuch nahi",
+            "sheet_value": "None"
+          }
+        ]
+      }
+    }
+  }
+}

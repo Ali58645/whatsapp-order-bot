@@ -1,0 +1,36 @@
+{
+  "id": "generic_lead",
+  "name": "Generic Lead",
+  "vertical": "generic",
+  "flow_mode": "lead",
+  "blurb": "Minimal lead skeleton — customize questions in Settings.",
+  "icon": "message-circle",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Hello",
+    "greeting_text": "Assalam o Alaikum! Kaise madad kar sakte hain?",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Assalam o Alaikum! How can we help you today?"
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Kaise madad kar sakte hain?",
+        "value_line": "Thori si info dein — hum guide kar denge."
+      }
+    }
+  }
+}

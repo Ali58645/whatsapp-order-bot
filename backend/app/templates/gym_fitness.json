@@ -1,0 +1,110 @@
+{
+  "id": "gym_fitness",
+  "name": "Gym / Fitness",
+  "vertical": "gym",
+  "flow_mode": "lead",
+  "blurb": "Membership plans → trial/tour scheduling.",
+  "icon": "dumbbell",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Gym Trial",
+    "greeting_text": "Assalam o Alaikum! [Business] — membership ya trial book karein. Plan choose karein.",
+    "demo_slots": [
+      "Aaj 6pm",
+      "Kal 10am"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Join [Business]! Pick a plan or book a trial tour."
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Membership ya trial book karein.",
+        "value_line": "Plan choose karein — hum tour/trial schedule kar denge.",
+        "q_business_name": "Aapka naam?",
+        "q_business_type": "Kaunsa plan / interest?",
+        "q_locations": "Preferred branch?",
+        "q_current_system": "Pehle gym join kiya tha?",
+        "q_scheduling": "Trial/tour ke liye slot choose karein:",
+        "pricing_text": "Fees plan aur duration pe depend karti hai — tour ke dauran clear quote milegi."
+      },
+      "interactive": {
+        "business_types": [
+          {
+            "id": "p_m",
+            "title": "Monthly",
+            "description": "1 month",
+            "value": "Monthly"
+          },
+          {
+            "id": "p_q",
+            "title": "Quarterly",
+            "description": "3 months",
+            "value": "Quarterly"
+          },
+          {
+            "id": "p_a",
+            "title": "Annual",
+            "description": "12 months",
+            "value": "Annual"
+          },
+          {
+            "id": "p_pt",
+            "title": "Personal Train",
+            "description": "PT sessions",
+            "value": "PT"
+          },
+          {
+            "id": "p_tr",
+            "title": "Free Trial",
+            "description": "Tour + trial",
+            "value": "Trial"
+          }
+        ],
+        "locations": [
+          {
+            "id": "b1",
+            "title": "Main gym",
+            "value": "Main"
+          },
+          {
+            "id": "b2",
+            "title": "Ladies",
+            "value": "Ladies"
+          },
+          {
+            "id": "b3",
+            "title": "Branch 2",
+            "value": "Branch2"
+          }
+        ],
+        "current_system": [
+          {
+            "id": "sys_a",
+            "title": "Manual",
+            "sheet_value": "Manual"
+          },
+          {
+            "id": "sys_b",
+            "title": "Software",
+            "sheet_value": "Software"
+          },
+          {
+            "id": "sys_c",
+            "title": "Kuch nahi",
+            "sheet_value": "None"
+          }
+        ]
+      }
+    }
+  }
+}

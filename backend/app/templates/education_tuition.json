@@ -1,0 +1,117 @@
+{
+  "id": "education_tuition",
+  "name": "Education / Tuition",
+  "vertical": "education",
+  "flow_mode": "lead",
+  "blurb": "Courses list → inquiry + demo class; fee deflection like POS.",
+  "icon": "graduation-cap",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Education / Tuition",
+    "greeting_text": "Assalam o Alaikum! [Business] — course / demo class ke liye interest batayein. Fees/timings pooch sakte hain.",
+    "demo_slots": [
+      "Kal 5pm",
+      "Hafta 11am"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Explore courses at [Business]. Ask about fees/timings or book a demo class."
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Course ya demo class book karein.",
+        "value_line": "Subject choose karein — timings/fees guide karenge.",
+        "q_business_name": "Student ka naam?",
+        "q_business_type": "Kaunsa course / class?",
+        "q_locations": "Online ya campus?",
+        "q_current_system": "Class / grade?",
+        "q_scheduling": "Demo class ka slot choose karein:",
+        "pricing_text": "Fees course aur duration pe depend karti hai — sahi quote demo / counseling mein milti hai.",
+        "price_deflect_mid": "Fees short counseling ke baad clear hoti hai. {{current_question}}"
+      },
+      "interactive": {
+        "business_types": [
+          {
+            "id": "c_math",
+            "title": "Math",
+            "description": "Mathematics",
+            "value": "Math"
+          },
+          {
+            "id": "c_eng",
+            "title": "English",
+            "description": "Language",
+            "value": "English"
+          },
+          {
+            "id": "c_sci",
+            "title": "Science",
+            "description": "Physics/Chem",
+            "value": "Science"
+          },
+          {
+            "id": "c_comp",
+            "title": "Computer",
+            "description": "IT / coding",
+            "value": "Computer"
+          },
+          {
+            "id": "c_entry",
+            "title": "Entry test",
+            "description": "ECAT/MDCAT",
+            "value": "Entry"
+          },
+          {
+            "id": "c_oth",
+            "title": "Other",
+            "description": "Other",
+            "value": "Other"
+          }
+        ],
+        "locations": [
+          {
+            "id": "m_on",
+            "title": "Online",
+            "value": "Online"
+          },
+          {
+            "id": "m_camp",
+            "title": "Campus",
+            "value": "Campus"
+          },
+          {
+            "id": "m_home",
+            "title": "Home tutor",
+            "value": "Home"
+          }
+        ],
+        "current_system": [
+          {
+            "id": "sys_a",
+            "title": "Manual",
+            "sheet_value": "Manual"
+          },
+          {
+            "id": "sys_b",
+            "title": "Software",
+            "sheet_value": "Software"
+          },
+          {
+            "id": "sys_c",
+            "title": "Kuch nahi",
+            "sheet_value": "None"
+          }
+        ]
+      }
+    }
+  }
+}

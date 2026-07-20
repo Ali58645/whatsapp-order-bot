@@ -112,6 +112,7 @@ async def create_tenant(
     greeting_language: str = "roman_urdu",
     status: str = "draft",
     config: dict | None = None,
+    template_id: str | None = None,
 ) -> Any:
     """Create a new tenant row (admin). Returns DBTenant."""
     m = _m()
@@ -126,21 +127,36 @@ async def create_tenant(
     cfg.setdefault("business_wa_id", business_wa_id)
     cfg.setdefault("owner_whatsapp", owner_whatsapp)
     cfg.setdefault("greeting_language", greeting_language)
-    cfg = seed_messages_into_config(cfg, flow_mode=flow_mode, greeting_language=greeting_language)
-    if flow_mode == "order":
-        if not cfg.get("menu_v2"):
-            from app.menu_v2 import empty_menu_v2 as _empty
-            menu = _empty()
-            cfg["menu_v2"] = menu
-            cfg["menu_v2_draft"] = menu
-        # Minimal legacy menu for pydantic compat if needed later
-        if not cfg.get("menu"):
-            cfg["menu"] = {
-                "shop_name": name,
-                "delivery_fee": 100,
-                "delivery_area": "",
-                "categories": [{"name": "Items", "items": [{"name": "Sample", "price": 100}]}],
-            }
+
+    if template_id:
+        from app.onboarding import apply_template_to_config
+        cfg = apply_template_to_config(
+            cfg,
+            template_id=template_id,
+            flow_mode=flow_mode,
+            greeting_language=greeting_language,
+            business_name=name,
+        )
+    else:
+        cfg = seed_messages_into_config(
+            cfg, flow_mode=flow_mode, greeting_language=greeting_language
+        )
+        if flow_mode == "order":
+            if not cfg.get("menu_v2"):
+                from app.menu_v2 import empty_menu_v2 as _empty
+                menu = _empty()
+                cfg["menu_v2"] = menu
+                cfg["menu_v2_draft"] = menu
+            if not cfg.get("menu"):
+                cfg["menu"] = {
+                    "shop_name": name,
+                    "delivery_fee": 100,
+                    "delivery_area": "",
+                    "categories": [
+                        {"name": "Items", "items": [{"name": "Sample", "price": 100}]}
+                    ],
+                }
+
     row = m.DBTenant(
         phone_number_id=phone_number_id,
         name=name,
@@ -242,6 +258,14 @@ async def create_user(
     session.add(user)
     await session.flush()
     return user
+
+
+async def list_users(session: AsyncSession) -> list:
+    m = _m()
+    result = await session.execute(
+        select(m.DBUser).order_by(m.DBUser.created_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 async def get_db_tenant_id(session: AsyncSession, phone_number_id: str) -> Optional[int]:

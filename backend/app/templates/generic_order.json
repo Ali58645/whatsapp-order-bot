@@ -1,0 +1,84 @@
+{
+  "id": "generic_order",
+  "name": "Generic Order",
+  "vertical": "generic",
+  "flow_mode": "order",
+  "blurb": "Minimal order skeleton — add your own categories in Settings.",
+  "icon": "shopping-cart",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Generic Order",
+    "greeting_text": "Assalam o Alaikum! Order ke liye neeche menu dekhein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Assalam o Alaikum! Tap below to view the menu."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_items",
+          "name": "Items",
+          "sort": 0,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_a",
+          "category_id": "c_items",
+          "name": "Item A",
+          "description": "Edit in Settings",
+          "price": 100,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_b",
+          "category_id": "c_items",
+          "name": "Item B",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_c",
+          "category_id": "c_items",
+          "name": "Item C",
+          "description": "",
+          "price": 300,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! Order ke liye neeche menu dekhein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 0,
+          "area_note": ""
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

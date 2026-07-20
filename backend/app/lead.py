@@ -690,74 +690,34 @@ def get_phase_interactive(
     Return the interactive payload dict for *phase*, or None if this phase
     uses free-text (handled deterministically).
 
-    The returned dict is the full message payload (ready for the Graph API).
-    Import build_buttons / build_list here to avoid a circular import at
-    module level (interactive imports nothing from lead).
-
-    meta: optional lead meta dict; used to read per-tenant _slot_1/_slot_2.
+    Resolves via tenant.config.flow when present; Bahi POS default is byte-identical
+    to the classic phase builders.
     """
-    from app.interactive import build_buttons, build_list  # local import — no circular dep
+    from app.flow import build_step_interactive, find_step, get_tenant_flow
 
-    maps = _interactive_maps(tenant, lang)
-
-    if phase == "BUSINESS_TYPE":
-        return build_list(
-            sender,
-            lead_text("q_business_type", lang, tenant),
-            str(maps["select_label"])[:20],
-            maps["btype_rows"],
-        )
-
-    if phase == "LOCATIONS":
-        return build_buttons(
-            sender,
-            lead_text("q_locations", lang, tenant),
-            maps["loc_buttons"],
-        )
-
-    if phase == "CURRENT_SYSTEM":
-        return build_buttons(
-            sender,
-            lead_text("q_current_system", lang, tenant),
-            maps["sys_buttons"],
-        )
-
-    if phase == "SCHEDULING":
-        # Use per-tenant slots from meta if available, else fall back to globals
-        if meta:
-            slot_1 = meta.get("_slot_1") or DEMO_SLOT_1
-            slot_2 = meta.get("_slot_2") or DEMO_SLOT_2
-            buttons = [
-                ("slot_1",     slot_1[:20]),
-                ("slot_2",     slot_2[:20]),
-                ("slot_other", str(maps["slot_other"])[:20]),
-            ]
-        else:
-            buttons = [
-                ("slot_1",     DEMO_SLOT_1[:20]),
-                ("slot_2",     DEMO_SLOT_2[:20]),
-                ("slot_other", str(maps["slot_other"])[:20]),
-            ]
-        return build_buttons(
-            sender,
-            lead_text("q_scheduling", lang, tenant),
-            buttons,
-        )
-
-    return None  # GREETING, BUSINESS_NAME, CONFIRMED, STALLED → deterministic text
+    step = find_step(get_tenant_flow(tenant), phase)
+    if step is not None:
+        return build_step_interactive(step, sender, lang, meta=meta, tenant=tenant)
+    return None
 
 
 def build_reprompt(phase: str, lang: str = "ur", tenant=None) -> str:
     """Return a re-prompt string repeating the current phase's question."""
-    phase_q_map = {
-        "BUSINESS_TYPE":  "q_business_type",
-        "LOCATIONS":      "q_locations",
-        "CURRENT_SYSTEM": "q_current_system",
-        "SCHEDULING":     "q_scheduling",
-        "BUSINESS_NAME":  "q_business_name",
-    }
-    q_key = phase_q_map.get(phase, "q_business_name")
-    current_q = lead_text(q_key, lang, tenant)
+    from app.flow import find_step, get_tenant_flow, step_question_text
+
+    step = find_step(get_tenant_flow(tenant), phase)
+    if step is not None:
+        current_q = step_question_text(step, lang, tenant)
+    else:
+        phase_q_map = {
+            "BUSINESS_TYPE": "q_business_type",
+            "LOCATIONS": "q_locations",
+            "CURRENT_SYSTEM": "q_current_system",
+            "SCHEDULING": "q_scheduling",
+            "BUSINESS_NAME": "q_business_name",
+        }
+        q_key = phase_q_map.get(phase, "q_business_name")
+        current_q = lead_text(q_key, lang, tenant)
     return lead_text("reprompt", lang, tenant, current_question=current_q)
 
 
@@ -797,7 +757,8 @@ def handle_business_name(
 
     # Accept verbatim — no keyword filtering, no LLM judgment
     meta["business_name"] = stripped
-    meta["phase"] = "BUSINESS_TYPE"
+    from app.flow import next_phase_key
+    meta["phase"] = next_phase_key(tenant, "BUSINESS_NAME")
     reset_reprompts(meta)
     log.info(f"lead: business name captured: {stripped!r}")
     return lead_text("ack_business_name", lang, tenant, name=stripped), True
@@ -812,66 +773,23 @@ def apply_interactive_answer(
     """
     Process a button/list tap deterministically — no LLM call needed.
 
-    Returns (handled: bool, follow_up_text: Optional[str]).
-      handled=True  → caller must NOT call Claude; advance is done here.
-      follow_up_text → if not None, send this plain-text message to the user.
-
-    slot_other is a special case: we mark the meta and return a follow-up
-    question; the *next* free-text message will be captured as demo_slot.
+    Delegates to the tenant flow walker (default Bahi POS sequence is
+    byte-identical to the classic hard-coded advances).
     """
-    phase = meta.get("phase", "GREETING")
-    lang = meta.get("lang", "ur")
-    maps = _interactive_maps(tenant, lang)
+    from app.flow import apply_flow_interactive_answer
 
-    # ── menu_demo: starts the qualification flow from any welcome menu ────────
-    if reply_id == "menu_demo":
-        # Treat as a GENERIC_INFO entry: advance to BUSINESS_NAME
-        meta["phase"] = "BUSINESS_NAME"
-        meta.setdefault("entry_intent", "DEMO_FIRST")
-        log.info("lead: menu_demo tapped — starting qualification flow")
-        return True, _greeting_text(lang, tenant)
-
-    if phase == "BUSINESS_TYPE" and reply_id in maps["btype_labels"]:
-        meta["business_type"] = maps["btype_labels"][reply_id]
-        meta["phase"] = "LOCATIONS"
-        log.info(f"lead: interactive BUSINESS_TYPE → {meta['business_type']}")
-        return True, None
-
-    if phase == "LOCATIONS" and reply_id in maps["loc_labels"]:
-        meta["locations"] = maps["loc_labels"][reply_id]
-        meta["phase"] = "CURRENT_SYSTEM"
-        log.info(f"lead: interactive LOCATIONS → {meta['locations']}")
-        return True, None
-
-    if phase == "CURRENT_SYSTEM" and reply_id in maps["sys_labels"]:
-        meta["current_system"] = maps["sys_labels"][reply_id]
-        meta["phase"] = "SCHEDULING"
-        log.info(f"lead: interactive CURRENT_SYSTEM → {meta['current_system']}")
-        return True, None
-
-    if phase == "SCHEDULING":
-        # Prefer per-tenant slots stored in meta; fall back to module globals
-        _slot_1 = meta.get("_slot_1") or DEMO_SLOT_1
-        _slot_2 = meta.get("_slot_2") or DEMO_SLOT_2
-        if reply_id == "slot_1":
-            meta["demo_slot"] = _slot_1
-            meta["phase"] = "CONFIRMED"
-            log.info(f"lead: interactive SCHEDULING → {_slot_1}")
-            return True, None
-        if reply_id == "slot_2":
-            meta["demo_slot"] = _slot_2
-            meta["phase"] = "CONFIRMED"
-            log.info(f"lead: interactive SCHEDULING → {_slot_2}")
-            return True, None
-        if reply_id == "slot_other":
-            # Mark that next free-text = custom slot; don't advance phase yet
-            meta["awaiting_custom_slot"] = True
-            log.info("lead: interactive SCHEDULING → slot_other, awaiting free text")
-            return True, lead_text("q_custom_slot", lang, tenant)
-
-    # Unknown id for this phase — fall through to LLM
-    log.warning(f"lead: interactive reply_id={reply_id!r} unhandled at phase={phase}")
-    return False, None
+    handled, follow_up = apply_flow_interactive_answer(
+        meta, reply_id, reply_title, tenant=tenant
+    )
+    if handled:
+        phase = meta.get("phase")
+        log.info(f"lead: interactive reply_id={reply_id!r} → phase={phase}")
+    else:
+        log.warning(
+            f"lead: interactive reply_id={reply_id!r} unhandled at "
+            f"phase={meta.get('phase')}"
+        )
+    return handled, follow_up
 
 
 def extract_detour_done(reply: str) -> tuple[bool, str]:

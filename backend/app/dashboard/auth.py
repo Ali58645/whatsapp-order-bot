@@ -26,6 +26,8 @@ class AuthUser:
     username: str
     role: str  # admin | owner
     tenant_id: Optional[int] = None  # DB tenant PK for owners
+    impersonated_by: Optional[str] = None  # admin username when view-as
+    readonly: bool = False  # view-as tokens are read-only
 
 
 def is_dashboard_enabled() -> bool:
@@ -51,6 +53,10 @@ def create_access_token(user: AuthUser) -> str:
         "iat": now,
         "exp": now + timedelta(hours=TOKEN_TTL_H),
     }
+    if user.impersonated_by:
+        payload["impersonated_by"] = user.impersonated_by
+    if user.readonly:
+        payload["readonly"] = True
     return jwt.encode(payload, secret, algorithm=ALGORITHM)
 
 
@@ -68,6 +74,8 @@ def decode_token(token: str) -> AuthUser:
         username=str(sub),
         role=str(payload.get("role", "owner")),
         tenant_id=payload.get("tenant_id"),
+        impersonated_by=payload.get("impersonated_by"),
+        readonly=bool(payload.get("readonly")),
     )
 
 
@@ -115,11 +123,50 @@ async def require_auth(
 def require_admin(user: AuthUser = Depends(require_auth)) -> AuthUser:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
+    if user.readonly:
+        raise HTTPException(status_code=403, detail="Read-only session")
     return user
 
 
+def assert_writable(user: AuthUser) -> None:
+    """Block mutations during admin view-as (read-only) sessions."""
+    if user.readonly:
+        raise HTTPException(
+            status_code=403,
+            detail="Read-only view — exit View as owner to make changes",
+        )
+
+
+# Config keys owners must never change (wiring / credentials)
+OWNER_FORBIDDEN_CONFIG_KEYS = frozenset({
+    "business_wa_id",
+    "owner_whatsapp",
+    "sheet",
+    "phone_number_id",
+    "flow_mode",
+})
+
+
+def assert_owner_config_patch(user: AuthUser, patch: dict) -> None:
+    """Owners cannot edit wiring fields; admins can."""
+    if user.role == "admin" and not user.readonly:
+        return
+    assert_writable(user)
+    bad = sorted(k for k in patch.keys() if k in OWNER_FORBIDDEN_CONFIG_KEYS)
+    # Nested onboarding.waba_id / connection fields
+    if "onboarding" in patch and isinstance(patch["onboarding"], dict):
+        wiring_ob = {"waba_id", "connection_verified", "subscribed_apps", "verified_name"}
+        if wiring_ob & set(patch["onboarding"].keys()):
+            bad.append("onboarding.wiring")
+    if bad:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Owners cannot edit wiring fields: {', '.join(bad)} (managed by AccellionX)",
+        )
+
+
 async def assert_tenant_access(user: AuthUser, tenant_db_id: int) -> None:
-    """Owners may only access their tenant."""
+    """Owners (and view-as sessions) may only access their tenant."""
     if user.role == "admin":
         return
     if user.tenant_id != tenant_db_id:

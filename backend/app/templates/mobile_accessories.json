@@ -1,0 +1,208 @@
+{
+  "id": "mobile_accessories",
+  "name": "Mobile Accessories",
+  "vertical": "mobile",
+  "flow_mode": "order",
+  "blurb": "Chargers, covers, earbuds, power banks + repair inquiry.",
+  "icon": "smartphone",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Mobile Accessories",
+    "greeting_text": "Assalam o Alaikum! [Business] — accessories order karein. Model bata kar availability pooch sakte hain.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business]! Order accessories or ask about your phone model."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_chg",
+          "name": "Chargers/Cables",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_cov",
+          "name": "Covers/Protectors",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_aud",
+          "name": "Earbuds/Audio",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_pb",
+          "name": "Power Banks",
+          "sort": 3,
+          "visible": true
+        },
+        {
+          "id": "c_rep",
+          "name": "Repairs",
+          "sort": 4,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_c20",
+          "category_id": "c_chg",
+          "name": "20W Fast Charger",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_ctype",
+          "category_id": "c_chg",
+          "name": "Type-C Cable",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_light",
+          "category_id": "c_chg",
+          "name": "Lightning Cable",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_cover",
+          "category_id": "c_cov",
+          "name": "Silicon Cover",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_glass",
+          "category_id": "c_cov",
+          "name": "Tempered Glass",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_wallet",
+          "category_id": "c_cov",
+          "name": "Wallet Case",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_buds",
+          "category_id": "c_aud",
+          "name": "Wireless Earbuds",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_bt",
+          "category_id": "c_aud",
+          "name": "BT Speaker Mini",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_pb10",
+          "category_id": "c_pb",
+          "name": "Power Bank 10k",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_pb20",
+          "category_id": "c_pb",
+          "name": "Power Bank 20k",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_scr",
+          "category_id": "c_rep",
+          "name": "Screen Repair",
+          "description": "Quote after model",
+          "price": 1,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_bat",
+          "category_id": "c_rep",
+          "name": "Battery Replace",
+          "description": "Quote after model",
+          "price": 1,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_diag",
+          "category_id": "c_rep",
+          "name": "Diagnosis",
+          "description": "",
+          "price": 500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] — accessories. Model-specific sawal pooch sakte hain.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 3000,
+          "area_note": ""
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

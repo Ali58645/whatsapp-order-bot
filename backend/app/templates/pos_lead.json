@@ -1,0 +1,36 @@
+{
+  "id": "pos_lead",
+  "name": "POS / B2B Software Lead",
+  "vertical": "pos",
+  "flow_mode": "lead",
+  "blurb": "Bahi POS–style lead qualification for any B2B software reseller.",
+  "icon": "monitor",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Bahi POS",
+    "greeting_text": "Assalam o Alaikum 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "Inventory, billing, multi-branch reports, WhatsApp order sync.",
+    "facts_pricing_note": "Packages start from a monthly subscription — quote after demo.",
+    "facts_claims_note": "Used by retailers, pharmacies, and restaurants across Pakistan.",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Assalam o Alaikum! Thanks for your interest in our POS software."
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
+        "value_line": "Bahi POS aap ke business ki sales, stock, khata aur invoicing ko ek jagah manage karta hai."
+      }
+    }
+  }
+}

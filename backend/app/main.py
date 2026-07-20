@@ -160,7 +160,15 @@ def _sheet_upsert(sender: str, fields: dict, tenant: Tenant) -> None:
 
 
 def _sheet_field_update(sender: str, meta: dict, tenant: Tenant) -> None:
-    fields = {k: meta[k] for k in ("business_name", "business_type", "current_system") if meta.get(k)}
+    from app.flow import sheet_fields_from_meta
+    fields = sheet_fields_from_meta(meta)
+    # Keep classic fields if helper returns empty for partial meta
+    if not fields:
+        fields = {
+            k: meta[k]
+            for k in ("business_name", "business_type", "current_system")
+            if meta.get(k)
+        }
     if fields:
         _sheet_upsert(sender, fields, tenant)
 
@@ -523,10 +531,24 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
         phase = meta.get("phase", "")
         lang = meta.get("lang", "ur")
 
+        from app.flow import find_step, get_tenant_flow
+
+        step = find_step(get_tenant_flow(tenant), phase)
+        if step and step.get("type") == "text_question" and step.get("capture_field") == "business_name":
+            result = await _handle_business_name_phase(sender, meta, user_text, lang, tenant)
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
+            return result
         if phase == "BUSINESS_NAME":
             result = await _handle_business_name_phase(sender, meta, user_text, lang, tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
+
+        if step and step.get("type") in ("button_options", "list_options") and phase != "SCHEDULING":
+            result = await _handle_text_at_flow_step(sender, meta, user_text, lang, step, tenant)
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
+            return result
+
+        # Legacy hard-coded matchers (same as default flow keys)
         if phase == "BUSINESS_TYPE":
             result = await _handle_text_at_interactive_phase(
                 sender, meta, user_text, lang, _match_business_type, "LOCATIONS", "business_type", tenant)
@@ -540,6 +562,11 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
         if phase == "CURRENT_SYSTEM":
             result = await _handle_text_at_interactive_phase(
                 sender, meta, user_text, lang, _match_current_system, "SCHEDULING", "current_system", tenant)
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
+            return result
+
+        if step and step.get("type") == "free_text_capture":
+            result = await _handle_free_text_capture_step(sender, meta, user_text, lang, step, tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
@@ -647,13 +674,118 @@ async def _handle_business_name_phase(
     ack_text, accepted = handle_business_name(meta, user_text, lang, tenant=tenant)
     if accepted:
         _sheet_field_update(sender, meta, tenant)
-        payload = get_phase_interactive("BUSINESS_TYPE", sender, lang, meta=meta, tenant=tenant)
+        next_phase = meta.get("phase", "BUSINESS_TYPE")
+        payload = get_phase_interactive(next_phase, sender, lang, meta=meta, tenant=tenant)
         if payload:
             await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
         else:
             await send_whatsapp_message(sender, ack_text, tenant=tenant)
     else:
         await send_whatsapp_message(sender, ack_text, tenant=tenant)
+    return {"status": "ok"}
+
+
+async def _handle_text_at_flow_step(
+    sender: str, meta: dict, user_text: str, lang: str, step: dict, tenant: Tenant
+) -> dict:
+    """Free-text answer while on a button/list step — match option or re-prompt."""
+    from app.flow import match_text_to_step_option, next_phase_key, step_question_text
+    from app.lead import (
+        build_handoff,
+        increment_reprompt,
+        reset_reprompts,
+        MAX_REPROMPTS,
+        extract_detour_done,
+        _is_detour_question,
+        build_reprompt,
+    )
+
+    tid = tenant.phone_number_id
+    phase = step.get("key") or meta.get("phase", "")
+    field = step.get("capture_field") or ""
+
+    # Prefer legacy fuzzy matchers for classic steps (byte-identical)
+    display_val = None
+    sheet_val = None
+    if phase == "BUSINESS_TYPE":
+        display_val, sheet_val = _match_business_type(user_text)
+    elif phase == "LOCATIONS":
+        display_val, sheet_val = _match_locations(user_text)
+    elif phase == "CURRENT_SYSTEM":
+        display_val, sheet_val = _match_current_system(user_text)
+    else:
+        matched = match_text_to_step_option(step, user_text, tenant, lang)
+        if matched is not None:
+            display_val = sheet_val = matched
+
+    if display_val is not None:
+        if field:
+            meta[field] = sheet_val
+        meta["phase"] = next_phase_key(tenant, phase)
+        reset_reprompts(meta)
+        _sheet_field_update(sender, meta, tenant)
+        advance_to = meta["phase"]
+        payload = get_phase_interactive(advance_to, sender, lang, meta=meta, tenant=tenant)
+        if payload:
+            await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
+        else:
+            from app.lead import lead_text
+            await send_whatsapp_message(
+                sender, lead_text("q_business_name", lang, tenant), tenant=tenant
+            )
+        return {"status": "ok"}
+
+    if _is_detour_question(user_text):
+        detour_reply = await _generate_lead_reply(sender, user_text, tenant)
+        _, clean_detour = extract_detour_done(detour_reply)
+        re_ask = step_question_text(step, lang, tenant)
+        combined = f"{clean_detour}\n\n{re_ask}" if clean_detour else re_ask
+        await send_whatsapp_message(sender, combined, tenant=tenant)
+        return {"status": "ok"}
+
+    count = increment_reprompt(meta)
+    if count > MAX_REPROMPTS:
+        meta["phase"] = "STALLED"
+        await send_whatsapp_message(sender, build_handoff(lang, tenant), tenant=tenant)
+        await forward_lead_card(
+            sender, meta, tenant.owner_whatsapp,
+            lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+            tenant=tenant,
+        )
+        clear_session(sender, tenant_id=tid)
+        clear_lead_meta(sender, tenant_id=tid)
+    else:
+        await send_whatsapp_message(
+            sender, build_reprompt(phase, lang, tenant), tenant=tenant
+        )
+    return {"status": "ok"}
+
+
+async def _handle_free_text_capture_step(
+    sender: str, meta: dict, user_text: str, lang: str, step: dict, tenant: Tenant
+) -> dict:
+    from app.flow import next_phase_key, step_question_text
+    from app.lead import reset_reprompts, lead_text
+
+    stripped = user_text.strip()
+    if not stripped:
+        await send_whatsapp_message(
+            sender, step_question_text(step, lang, tenant), tenant=tenant
+        )
+        return {"status": "ok"}
+    field = step.get("capture_field")
+    if field:
+        meta[field] = stripped
+    meta["phase"] = next_phase_key(tenant, step.get("key", ""))
+    reset_reprompts(meta)
+    _sheet_field_update(sender, meta, tenant)
+    payload = get_phase_interactive(meta["phase"], sender, lang, meta=meta, tenant=tenant)
+    if payload:
+        await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
+    else:
+        await send_whatsapp_message(
+            sender, lead_text("ack_business_name", lang, tenant, name=stripped), tenant=tenant
+        )
     return {"status": "ok"}
 
 

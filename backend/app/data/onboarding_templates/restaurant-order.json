@@ -1,0 +1,70 @@
+{
+  "id": "restaurant-order",
+  "name": "Restaurant Order Taking",
+  "description": "WhatsApp menu + cart for restaurants / cafes. Sample categories and delivery settings included.",
+  "vertical": "restaurant",
+  "flow_mode": "order",
+  "config": {
+    "campaign_phrase": "Order Now",
+    "demo_slots": ["Tonight 8pm", "Tomorrow 1pm"],
+    "facts_features": "Browse menu, add items, confirm delivery.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "greeting_text": "Assalam o Alaikum! Order ke liye menu dekhein.",
+    "menu_v2": {
+      "categories": [
+        {"id": "cat_mains", "name": "Mains", "sort": 0, "visible": true},
+        {"id": "cat_drinks", "name": "Drinks", "sort": 1, "visible": true}
+      ],
+      "items": [
+        {
+          "id": "item_biryani",
+          "category_id": "cat_mains",
+          "name": "Chicken Biryani",
+          "description": "Full plate",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "item_karahi",
+          "category_id": "cat_mains",
+          "name": "Chicken Karahi",
+          "description": "Half / full",
+          "price": 900,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "item_chai",
+          "category_id": "cat_drinks",
+          "name": "Chai",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! Order ke liye menu dekhein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 1500,
+          "area_note": "City limits"
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    },
+    "messages_overlay": {
+      "order": {
+        "greeting": "Assalam o Alaikum! Order ke liye menu dekhein."
+      }
+    }
+  }
+}

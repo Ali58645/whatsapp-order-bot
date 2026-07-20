@@ -26,6 +26,13 @@ const PAGES_BASE = [
 
 const PAGE_ADMIN = { to: "/businesses", label: "Businesses", icon: Building2 };
 
+const OWNER_PAGES = [
+  { to: "/", label: "Home", icon: LayoutDashboard },
+  { to: "/customers", label: "Customers", icon: Users },
+  { to: "/my-bot", label: "My Bot", icon: Settings },
+  { to: "/billing", label: "Billing", icon: Package },
+];
+
 export function CommandPalette({
   open,
   onOpenChange,
@@ -40,10 +47,10 @@ export function CommandPalette({
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [leads, setLeads] = useState<Lead[]>([]);
-  const pages =
-    isAdmin ?? getRole() === "admin"
-      ? [...PAGES_BASE.slice(0, -1), PAGE_ADMIN, PAGES_BASE[PAGES_BASE.length - 1]]
-      : PAGES_BASE;
+  const admin = isAdmin ?? getRole() === "admin";
+  const pages = admin
+    ? [...PAGES_BASE.slice(0, -1), PAGE_ADMIN, PAGES_BASE[PAGES_BASE.length - 1]]
+    : OWNER_PAGES;
 
   useEffect(() => {
     if (!open) return;
@@ -120,7 +127,7 @@ export function CommandPalette({
               </Command.Group>
             )}
 
-            {tenants.length > 0 && (
+            {admin && tenants.length > 0 && (
               <Command.Group heading="Switch tenant" className="text-xs text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
                 <Command.Item
                   value="All tenants"

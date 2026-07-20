@@ -1,0 +1,100 @@
+{
+  "id": "water_supplier",
+  "name": "Water Supplier",
+  "vertical": "water",
+  "flow_mode": "order",
+  "blurb": "Bottled water + refill — tuned for repeat / regular delivery.",
+  "icon": "droplets",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Water Supplier",
+    "greeting_text": "Assalam o Alaikum! Paani order karne ke liye neeche se muntakhib karein 💧",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "19L bottles, refill, packs. Regular delivery available on request.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Regular delivery: customer can mention weekly schedule in chat.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Assalam o Alaikum! Choose your water order below 💧"
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_water",
+          "name": "Water Orders",
+          "sort": 0,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_19new",
+          "category_id": "c_water",
+          "name": "19L Bottle (new)",
+          "description": "With bottle",
+          "price": 350,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_19ref",
+          "category_id": "c_water",
+          "name": "19L Refill",
+          "description": "Empty exchange",
+          "price": 150,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_pack6",
+          "category_id": "c_water",
+          "name": "6-Bottle Pack",
+          "description": "Small bottles",
+          "price": 800,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_disp",
+          "category_id": "c_water",
+          "name": "Dispenser",
+          "description": "Purchase",
+          "price": 4500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! Paani order karne ke liye neeche se muntakhib karein 💧",
+        "menu_button_label": "Order karein",
+        "delivery": {
+          "enabled": true,
+          "charge": 0,
+          "free_above": 0,
+          "area_note": "Service area — confirm before first delivery"
+        },
+        "order_confirm_note": "Order confirm? (Regular delivery note bata sakte hain)",
+        "currency": "PKR"
+      }
+    },
+    "messages_overlay": {
+      "order": {
+        "greeting": "Assalam o Alaikum! Paani order karne ke liye neeche se muntakhib karein 💧",
+        "confirm_note": "Confirm karein? Agar regular delivery chahiye to address ke sath likhein."
+      }
+    }
+  }
+}

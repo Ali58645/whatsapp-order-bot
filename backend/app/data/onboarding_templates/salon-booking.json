@@ -1,0 +1,44 @@
+{
+  "id": "salon-booking",
+  "name": "Salon / Clinic Booking",
+  "description": "Lead-style booking bot for salons and clinics — service type, location, preferred slot.",
+  "vertical": "salon",
+  "flow_mode": "lead",
+  "config": {
+    "campaign_phrase": "Book Appointment",
+    "demo_slots": ["Aaj 4pm", "Kal 11am"],
+    "facts_features": "Appointments, reminders, WhatsApp booking.",
+    "facts_pricing_note": "Services priced after consultation.",
+    "facts_claims_note": "",
+    "greeting_text": "Assalam o Alaikum! Appointment book karne mein madad karte hain.",
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Appointment book karne mein madad karte hain.",
+        "value_line": "Apna preferred time batayein — hum confirm kar denge.",
+        "q_business_name": "Aapka naam kya hai?",
+        "q_business_type": "Kaunsi service chahiye?",
+        "q_locations": "Kaunsa branch / area?",
+        "q_current_system": "Pehle kab aaye the?",
+        "q_scheduling": "Preferred slot choose karein:"
+      },
+      "interactive": {
+        "business_types": [
+          {"id": "svc_hair", "title": "Hair", "description": "Cut / color / styling", "value": "Hair"},
+          {"id": "svc_skin", "title": "Skin / facial", "description": "Facials & treatments", "value": "Skin"},
+          {"id": "svc_nails", "title": "Nails", "description": "Manicure / pedicure", "value": "Nails"},
+          {"id": "svc_other", "title": "Other", "description": "Something else", "value": "Other"}
+        ],
+        "locations": [
+          {"id": "loc_main", "title": "Main branch", "value": "Main"},
+          {"id": "loc_mall", "title": "Mall outlet", "value": "Mall"},
+          {"id": "loc_home", "title": "Home service", "value": "Home"}
+        ],
+        "current_system": [
+          {"id": "vis_new", "title": "Pehli baar", "sheet_value": "New"},
+          {"id": "vis_return", "title": "Wapas aa rahe", "sheet_value": "Returning"},
+          {"id": "vis_referral", "title": "Referral", "sheet_value": "Referral"}
+        ]
+      }
+    }
+  }
+}

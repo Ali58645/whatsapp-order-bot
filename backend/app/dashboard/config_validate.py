@@ -168,4 +168,42 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
     if "name" in patch:
         out["name"] = sanitize_text(patch["name"], max_len=256)
 
+    if "sheet" in patch:
+        sheet = patch["sheet"]
+        if sheet is None:
+            out["sheet"] = None
+        elif isinstance(sheet, dict):
+            from app.onboarding import parse_sheet_id
+            gid = parse_sheet_id(str(sheet.get("gsheet_id") or sheet.get("url") or ""))
+            if not gid and (sheet.get("gsheet_id") or sheet.get("url")):
+                _err("sheet.gsheet_id / url invalid")
+            out["sheet"] = {
+                "gsheet_id": gid,
+                "tab": sanitize_text(str(sheet.get("tab") or ""), max_len=128),
+            }
+        else:
+            _err("sheet must be an object or null")
+
+    if "onboarding" in patch and isinstance(patch["onboarding"], dict):
+        # Allow storing wizard progress markers (booleans / short strings only)
+        ob_in = patch["onboarding"]
+        ob_out: dict[str, Any] = {}
+        for k, v in ob_in.items():
+            if isinstance(v, bool) or v is None:
+                ob_out[k] = v
+            elif isinstance(v, (int, float)):
+                ob_out[k] = v
+            elif isinstance(v, str):
+                ob_out[k] = sanitize_text(v, max_len=256)
+        out["onboarding"] = ob_out
+
+    if "flow" in patch:
+        if flow_mode != "lead":
+            _err("flow only valid for lead flow_mode")
+        from app.flow import FlowError, validate_flow
+        try:
+            out["flow"] = validate_flow(patch["flow"])
+        except FlowError as exc:
+            _err(str(exc))
+
     return out

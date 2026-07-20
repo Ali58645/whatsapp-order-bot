@@ -148,6 +148,9 @@ class Tenant(BaseModel):
             flow_mode=row.flow_mode,
             greeting_language=cfg.get("greeting_language", "roman_urdu"),
         )
+        from app.flow import seed_flow_into_config
+        if row.flow_mode == "lead":
+            cfg = seed_flow_into_config(cfg)
         data = {
             "phone_number_id": row.phone_number_id,
             "name": row.name,

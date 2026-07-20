@@ -1,0 +1,248 @@
+{
+  "id": "grocery_kiryana",
+  "name": "Grocery / Kiryana",
+  "vertical": "grocery",
+  "flow_mode": "order",
+  "blurb": "Neighborhood kiryana staples — aata, oil, dairy, household.",
+  "icon": "shopping-basket",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Grocery / Kiryana",
+    "greeting_text": "Assalam o Alaikum! [Business] — ghar ki zarooriyat yahan se order karein. Menu neeche hai.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Assalam o Alaikum! Order groceries from [Business] — tap menu below."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_grain",
+          "name": "Aata/Rice/Daal",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_oil",
+          "name": "Cooking Oil/Ghee",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_dairy",
+          "name": "Dairy/Eggs",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_bev",
+          "name": "Beverages",
+          "sort": 3,
+          "visible": true
+        },
+        {
+          "id": "c_house",
+          "name": "Household",
+          "sort": 4,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_aata",
+          "category_id": "c_grain",
+          "name": "Aata 10kg",
+          "description": "",
+          "price": 1450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_rice",
+          "category_id": "c_grain",
+          "name": "Basmati Rice 5kg",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_daal",
+          "category_id": "c_grain",
+          "name": "Daal Masoor 1kg",
+          "description": "",
+          "price": 320,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_chann",
+          "category_id": "c_grain",
+          "name": "Chana Daal 1kg",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_oil",
+          "category_id": "c_oil",
+          "name": "Cooking Oil 5L",
+          "description": "",
+          "price": 2100,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_ghee",
+          "category_id": "c_oil",
+          "name": "Banaspati 1kg",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_olive",
+          "category_id": "c_oil",
+          "name": "Olive Oil 500ml",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_milk",
+          "category_id": "c_dairy",
+          "name": "Milk Pack 1L",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_eggs",
+          "category_id": "c_dairy",
+          "name": "Eggs (Dozen)",
+          "description": "",
+          "price": 420,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_yogurt",
+          "category_id": "c_dairy",
+          "name": "Yogurt 1kg",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_butter",
+          "category_id": "c_dairy",
+          "name": "Butter 200g",
+          "description": "",
+          "price": 380,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_tea",
+          "category_id": "c_bev",
+          "name": "Tea Whitener",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_juice",
+          "category_id": "c_bev",
+          "name": "Juice 1L",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_cola",
+          "category_id": "c_bev",
+          "name": "Soft Drink 1.5L",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_det",
+          "category_id": "c_house",
+          "name": "Detergent 1kg",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_soap",
+          "category_id": "c_house",
+          "name": "Bath Soap",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_tissue",
+          "category_id": "c_house",
+          "name": "Tissue Pack",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] — ghar ki zarooriyat yahan se order karein. Menu neeche hai.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 50,
+          "free_above": 2000,
+          "area_note": "Local delivery only"
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

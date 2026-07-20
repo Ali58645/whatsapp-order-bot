@@ -1,0 +1,236 @@
+{
+  "id": "beauty_cosmetics",
+  "name": "Beauty / Cosmetics",
+  "vertical": "beauty",
+  "flow_mode": "order",
+  "blurb": "Skincare, makeup, haircare, fragrances — shade modifiers.",
+  "icon": "sparkles",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Beauty / Cosmetics",
+    "greeting_text": "Assalam o Alaikum! [Business] beauty — products order karein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Shop beauty at [Business] — skincare, makeup, and more."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_skin",
+          "name": "Skincare",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_make",
+          "name": "Makeup",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_hair",
+          "name": "Haircare",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_frag",
+          "name": "Fragrances",
+          "sort": 3,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_clean",
+          "category_id": "c_skin",
+          "name": "Face Cleanser",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_moist",
+          "category_id": "c_skin",
+          "name": "Moisturizer",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_sun",
+          "category_id": "c_skin",
+          "name": "Sunscreen SPF50",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_found",
+          "category_id": "c_make",
+          "name": "Foundation",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_shade",
+              "name": "Shade",
+              "options": [
+                {
+                  "id": "sh_f",
+                  "label": "Fair",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_m",
+                  "label": "Medium",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_d",
+                  "label": "Deep",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_lip",
+          "category_id": "c_make",
+          "name": "Lipstick",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_shade",
+              "name": "Shade",
+              "options": [
+                {
+                  "id": "sh_f",
+                  "label": "Fair",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_m",
+                  "label": "Medium",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_d",
+                  "label": "Deep",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_mascara",
+          "category_id": "c_make",
+          "name": "Mascara",
+          "description": "",
+          "price": 1100,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_shamp",
+          "category_id": "c_hair",
+          "name": "Shampoo",
+          "description": "",
+          "price": 850,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_cond",
+          "category_id": "c_hair",
+          "name": "Conditioner",
+          "description": "",
+          "price": 850,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_serum",
+          "category_id": "c_hair",
+          "name": "Hair Serum",
+          "description": "",
+          "price": 1400,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_attar",
+          "category_id": "c_frag",
+          "name": "Attar 12ml",
+          "description": "",
+          "price": 800,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_edt",
+          "category_id": "c_frag",
+          "name": "Body Mist",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_perfume",
+          "category_id": "c_frag",
+          "name": "Perfume 50ml",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] beauty — products order karein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 3000,
+          "area_note": ""
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

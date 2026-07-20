@@ -1,0 +1,109 @@
+{
+  "id": "auto_workshop",
+  "name": "Auto Workshop",
+  "vertical": "auto",
+  "flow_mode": "lead",
+  "blurb": "Service booking — capture vehicle make/model then schedule.",
+  "icon": "car",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Auto Workshop",
+    "greeting_text": "Assalam o Alaikum! [Business] workshop — service book karein. Gaari ka make/model zaroor batayein.",
+    "demo_slots": [
+      "Kal 10am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Vehicle make/model captured via business_name / free-text step.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Book a service at [Business]. Please share your vehicle make/model."
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Workshop service book karein.",
+        "value_line": "Service choose karein — make/model batayein.",
+        "q_business_name": "Gaari ka make/model? (e.g. Honda City 2018)",
+        "q_business_type": "Kaunsi service chahiye?",
+        "q_locations": "Workshop branch?",
+        "q_current_system": "Pehli baar aa rahe hain?",
+        "q_scheduling": "Drop-off / visit slot choose karein:"
+      },
+      "interactive": {
+        "business_types": [
+          {
+            "id": "s_oil",
+            "title": "Oil change",
+            "description": "Oil + filter",
+            "value": "Oil"
+          },
+          {
+            "id": "s_dent",
+            "title": "Denting/Paint",
+            "description": "Body work",
+            "value": "Dent"
+          },
+          {
+            "id": "s_ac",
+            "title": "AC service",
+            "description": "Cooling",
+            "value": "AC"
+          },
+          {
+            "id": "s_gen",
+            "title": "General check",
+            "description": "Inspection",
+            "value": "Check"
+          },
+          {
+            "id": "s_oth",
+            "title": "Other",
+            "description": "Other job",
+            "value": "Other"
+          }
+        ],
+        "locations": [
+          {
+            "id": "loc_1",
+            "title": "1",
+            "value": "1"
+          },
+          {
+            "id": "loc_2_3",
+            "title": "2-3",
+            "value": "2-3"
+          },
+          {
+            "id": "loc_4p",
+            "title": "4+",
+            "value": "4+"
+          }
+        ],
+        "current_system": [
+          {
+            "id": "sys_a",
+            "title": "Manual",
+            "sheet_value": "Manual"
+          },
+          {
+            "id": "sys_b",
+            "title": "Software",
+            "sheet_value": "Software"
+          },
+          {
+            "id": "sys_c",
+            "title": "Kuch nahi",
+            "sheet_value": "None"
+          }
+        ]
+      }
+    }
+  }
+}

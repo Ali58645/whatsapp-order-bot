@@ -1,0 +1,212 @@
+{
+  "id": "bakery",
+  "name": "Bakery",
+  "vertical": "bakery",
+  "flow_mode": "order",
+  "blurb": "Cakes, pastries, bread, savory — birthday deals + custom-cake note.",
+  "icon": "cake",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Bakery",
+    "greeting_text": "Assalam o Alaikum! [Business] bakery — fresh items order karein. Custom cake ke liye details likhein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Custom-cake: customer describes size/flavor in chat after selecting Custom Cake.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business]! Order fresh bakes below. Custom cakes: describe in chat."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_cakes",
+          "name": "Cakes",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_past",
+          "name": "Pastries",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_bread",
+          "name": "Bread/Rusk",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_sav",
+          "name": "Savory",
+          "sort": 3,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_choc",
+          "category_id": "c_cakes",
+          "name": "Chocolate Cake",
+          "description": "1 pound",
+          "price": 2500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_pine",
+          "category_id": "c_cakes",
+          "name": "Pineapple Cake",
+          "description": "1 pound",
+          "price": 2200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_bday",
+          "category_id": "c_cakes",
+          "name": "Birthday Deal",
+          "description": "Cake + 6 pastries",
+          "price": 3500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_custom",
+          "category_id": "c_cakes",
+          "name": "Custom Cake",
+          "description": "Details in chat",
+          "price": 3000,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_croissant",
+          "category_id": "c_past",
+          "name": "Croissant",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_danish",
+          "category_id": "c_past",
+          "name": "Danish Pastry",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_cup",
+          "category_id": "c_past",
+          "name": "Cupcake (2pc)",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_eclair",
+          "category_id": "c_past",
+          "name": "Chocolate Eclair",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_bread",
+          "category_id": "c_bread",
+          "name": "Sandwich Bread",
+          "description": "",
+          "price": 160,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_rusk",
+          "category_id": "c_bread",
+          "name": "Rusk Pack",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_bun",
+          "category_id": "c_bread",
+          "name": "Burger Buns (4)",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_patties",
+          "category_id": "c_sav",
+          "name": "Chicken Patty",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_roll",
+          "category_id": "c_sav",
+          "name": "Chicken Roll",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_samosa_b",
+          "category_id": "c_sav",
+          "name": "Aloo Samosa",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] bakery — fresh order. Custom cake ke liye details likhein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 2500,
+          "area_note": ""
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

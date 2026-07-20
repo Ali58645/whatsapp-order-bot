@@ -18,6 +18,9 @@ from app.tenants import Tenant
 def tenant_config_response(row) -> dict:
     t = Tenant.from_db_row(row)
     cfg = dict(row.config or {})
+    from app.flow import default_bahi_pos_flow, seed_flow_into_config
+    cfg = seed_flow_into_config(cfg)
+    ob = cfg.get("onboarding") or {}
     return {
         "id": row.id,
         "phone_number_id": row.phone_number_id,
@@ -25,6 +28,13 @@ def tenant_config_response(row) -> dict:
         "flow_mode": row.flow_mode,
         "status": getattr(row, "status", None) or t.status or "live",
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "wiring": {
+            "phone_number_id": row.phone_number_id,
+            "waba_id": ob.get("waba_id") or "",
+            "flow_mode": row.flow_mode,
+            "managed_by": "AccellionX",
+            "read_only": True,
+        },
         "config": {
             **cfg,
             "greeting_text": t.greeting_text,
@@ -42,6 +52,7 @@ def tenant_config_response(row) -> dict:
             "messages_draft": cfg.get("messages_draft") or cfg.get("messages") or t.messages,
             "business_wa_id": t.business_wa_id,
             "owner_whatsapp": t.owner_whatsapp,
+            "flow": cfg.get("flow") or default_bahi_pos_flow(),
         },
     }
 

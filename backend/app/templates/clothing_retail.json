@@ -1,0 +1,336 @@
+{
+  "id": "clothing_retail",
+  "name": "Clothing Retail",
+  "vertical": "clothing",
+  "flow_mode": "order",
+  "blurb": "Men/Women/Kids/Fabric with Size modifier — ask for availability.",
+  "icon": "shirt",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Clothing Retail",
+    "greeting_text": "Assalam o Alaikum! [Business] — collection dekhein. Size/availability poochne ke liye message karein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "Sizes vary — confirm availability before payment.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business]! Browse below. Ask in chat for size or stock."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_men",
+          "name": "Men",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_wom",
+          "name": "Women",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_kid",
+          "name": "Kids",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_fab",
+          "name": "Fabric",
+          "sort": 3,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_kurta",
+          "category_id": "c_men",
+          "name": "Cotton Kurta",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_shalwar",
+          "category_id": "c_men",
+          "name": "Shalwar Kameez",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_jeans",
+          "category_id": "c_men",
+          "name": "Denim Jeans",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_lawn",
+          "category_id": "c_wom",
+          "name": "Lawn Suit",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_abaya",
+          "category_id": "c_wom",
+          "name": "Abaya",
+          "description": "",
+          "price": 3200,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_dupatta",
+          "category_id": "c_wom",
+          "name": "Dupatta",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_kidset",
+          "category_id": "c_kid",
+          "name": "Kids Suit",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kidt",
+          "category_id": "c_kid",
+          "name": "Kids T-Shirt",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_cotton",
+          "category_id": "c_fab",
+          "name": "Cotton (meter)",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_lawnf",
+          "category_id": "c_fab",
+          "name": "Lawn (meter)",
+          "description": "",
+          "price": 380,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_silk",
+          "category_id": "c_fab",
+          "name": "Silk (meter)",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] — collection dekhein. Size/availability pooch sakte hain.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 150,
+          "free_above": 5000,
+          "area_note": "City delivery"
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

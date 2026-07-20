@@ -1,0 +1,288 @@
+{
+  "id": "flower_gifts",
+  "name": "Flowers & Gifts",
+  "vertical": "gifts",
+  "flow_mode": "order",
+  "blurb": "Bouquets & baskets with occasion modifier + message card note.",
+  "icon": "flower",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Flowers & Gifts",
+    "greeting_text": "Assalam o Alaikum! [Business] — flowers/gifts order karein. Delivery date/time aur card message batayein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Capture delivery date/time + message-card text in chat after order.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Order flowers & gifts from [Business]. Share delivery time and card message."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_bouq",
+          "name": "Bouquets",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_bask",
+          "name": "Gift Baskets",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_cake",
+          "name": "Cakes add-on",
+          "sort": 2,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_rose",
+          "category_id": "c_bouq",
+          "name": "Rose Bouquet",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_mix",
+          "category_id": "c_bouq",
+          "name": "Mixed Bouquet",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_orch",
+          "category_id": "c_bouq",
+          "name": "Orchid Special",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_choc",
+          "category_id": "c_bask",
+          "name": "Chocolate Basket",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_fruit",
+          "category_id": "c_bask",
+          "name": "Fruit Basket",
+          "description": "",
+          "price": 3000,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_combo",
+          "category_id": "c_bask",
+          "name": "Gift Combo",
+          "description": "",
+          "price": 5000,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_half",
+          "category_id": "c_cake",
+          "name": "Half kg Cake",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_one",
+          "category_id": "c_cake",
+          "name": "1 Pound Cake",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_cupg",
+          "category_id": "c_cake",
+          "name": "Cupcakes (6)",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! Flowers/gifts. Delivery date/time + card message batayein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 200,
+          "free_above": 5000,
+          "area_note": "Same-day if ordered before 2pm"
+        },
+        "order_confirm_note": "Confirm? Delivery time + card message likhein.",
+        "currency": "PKR"
+      }
+    }
+  }
+}

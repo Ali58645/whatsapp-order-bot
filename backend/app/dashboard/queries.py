@@ -95,6 +95,8 @@ async def list_tenants(db: AsyncSession) -> list[dict]:
             ).scalar_one()
         )
         cfg = t.config or {}
+        from app.onboarding import build_checklist
+        checklist = build_checklist(t)
         out.append({
             "id": t.id,
             "phone_number_id": t.phone_number_id,
@@ -106,6 +108,8 @@ async def list_tenants(db: AsyncSession) -> list[dict]:
             "leads_today": leads_today,
             "orders_today": orders_today,
             "stat_today": leads_today if t.flow_mode == "lead" else orders_today,
+            "checklist": checklist,
+            "template_id": (cfg.get("onboarding") or {}).get("template_id"),
         })
     return out
 

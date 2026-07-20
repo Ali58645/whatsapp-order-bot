@@ -1,0 +1,283 @@
+{
+  "id": "restaurant",
+  "name": "Restaurant / Cafe",
+  "vertical": "restaurant",
+  "flow_mode": "order",
+  "blurb": "Pakistani restaurant menu — starters, mains, BBQ, deals, drinks.",
+  "icon": "utensils",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Order Now",
+    "greeting_text": "Assalam o Alaikum! [Business] mein khush aamdeed 🍽️ Order karne ke liye neeche menu dekhein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "Dine-in quality, home delivery available.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Replace [Business] is auto-filled with tenant name on apply.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business]! Tap below to browse the menu and order."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_start",
+          "name": "Starters",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_main",
+          "name": "Main Course",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_bbq",
+          "name": "BBQ",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_deals",
+          "name": "Deals",
+          "sort": 3,
+          "visible": true
+        },
+        {
+          "id": "c_drink",
+          "name": "Drinks",
+          "sort": 4,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_soup",
+          "category_id": "c_start",
+          "name": "Chicken Corn Soup",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_fries",
+          "category_id": "c_start",
+          "name": "Masala Fries",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_wings",
+          "category_id": "c_start",
+          "name": "Hot Wings (6pc)",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_samosa",
+          "category_id": "c_start",
+          "name": "Chicken Samosa",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_biryani",
+          "category_id": "c_main",
+          "name": "Chicken Biryani",
+          "description": "Full plate",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_karahi",
+          "category_id": "c_main",
+          "name": "Chicken Karahi",
+          "description": "Half",
+          "price": 1200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_karahi_f",
+          "category_id": "c_main",
+          "name": "Chicken Karahi Full",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_daal",
+          "category_id": "c_main",
+          "name": "Daal Mash Fry",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_pulao",
+          "category_id": "c_main",
+          "name": "Beef Pulao",
+          "description": "",
+          "price": 500,
+          "available": true,
+          "sort": 4,
+          "modifiers": []
+        },
+        {
+          "id": "i_boti",
+          "category_id": "c_bbq",
+          "name": "Chicken Boti",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_seekh",
+          "category_id": "c_bbq",
+          "name": "Seekh Kabab (4)",
+          "description": "",
+          "price": 480,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_malai",
+          "category_id": "c_bbq",
+          "name": "Malai Boti",
+          "description": "",
+          "price": 720,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_tikka",
+          "category_id": "c_bbq",
+          "name": "Chicken Tikka",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_deal2",
+          "category_id": "c_deals",
+          "name": "Deal for 2",
+          "description": "2 mains + drinks",
+          "price": 1499,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_deal4",
+          "category_id": "c_deals",
+          "name": "Family Deal",
+          "description": "4 people",
+          "price": 2999,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_student",
+          "category_id": "c_deals",
+          "name": "Student Deal",
+          "description": "",
+          "price": 499,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_chai",
+          "category_id": "c_drink",
+          "name": "Doodh Patti",
+          "description": "",
+          "price": 100,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_soft",
+          "category_id": "c_drink",
+          "name": "Soft Drink",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_lassi",
+          "category_id": "c_drink",
+          "name": "Sweet Lassi",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_water",
+          "category_id": "c_drink",
+          "name": "Mineral Water",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] mein khush aamdeed 🍽️ Order karne ke liye neeche menu dekhein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 1500,
+          "area_note": "City limits"
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    },
+    "messages_overlay": {
+      "order": {
+        "greeting": "Assalam o Alaikum! [Business] mein khush aamdeed 🍽️ Order karne ke liye neeche menu dekhein."
+      }
+    }
+  }
+}

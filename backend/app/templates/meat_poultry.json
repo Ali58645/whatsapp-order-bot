@@ -1,0 +1,178 @@
+{
+  "id": "meat_poultry",
+  "name": "Meat & Poultry",
+  "vertical": "meat",
+  "flow_mode": "order",
+  "blurb": "Per-kg chicken/mutton/beef/fish — same-day delivery cutoff.",
+  "icon": "beef",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Meat & Poultry",
+    "greeting_text": "Assalam o Alaikum! [Business] — fresh meat order karein (per kg). Kitne kg chahiye batayein. Same-day delivery (cutoff note Settings mein).",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Weight-based: after item pick, ask kitne kg. Cutoff-time in area_note.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Order fresh meat from [Business] (per kg). Tell us how many kg. Same-day delivery."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_ch",
+          "name": "Chicken",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_mut",
+          "name": "Mutton",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_beef",
+          "name": "Beef",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_fish",
+          "name": "Fish",
+          "sort": 3,
+          "visible": true
+        },
+        {
+          "id": "c_cut",
+          "name": "Ready Cuts",
+          "sort": 4,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_chkg",
+          "category_id": "c_ch",
+          "name": "Chicken (per kg)",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_chbon",
+          "category_id": "c_ch",
+          "name": "Boneless (kg)",
+          "description": "",
+          "price": 850,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_mutkg",
+          "category_id": "c_mut",
+          "name": "Mutton (per kg)",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_mutk",
+          "category_id": "c_mut",
+          "name": "Mutton Karahi Cut",
+          "description": "",
+          "price": 2300,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_beefkg",
+          "category_id": "c_beef",
+          "name": "Beef (per kg)",
+          "description": "",
+          "price": 1600,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_keema",
+          "category_id": "c_beef",
+          "name": "Beef Keema (kg)",
+          "description": "",
+          "price": 1700,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_fishkg",
+          "category_id": "c_fish",
+          "name": "Rohu (per kg)",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_prawn",
+          "category_id": "c_fish",
+          "name": "Prawns (kg)",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_qorma",
+          "category_id": "c_cut",
+          "name": "Qorma Cut (kg)",
+          "description": "",
+          "price": 600,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_boticut",
+          "category_id": "c_cut",
+          "name": "Boti Cut (kg)",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! Fresh meat (per kg). Kitne kg chahiye batayein. Same-day delivery.",
+        "menu_button_label": "Meat menu",
+        "delivery": {
+          "enabled": true,
+          "charge": 100,
+          "free_above": 3000,
+          "area_note": "Same-day: order before 4pm"
+        },
+        "order_confirm_note": "Confirm? Kg quantity chat mein likhein.",
+        "currency": "PKR"
+      }
+    }
+  }
+}

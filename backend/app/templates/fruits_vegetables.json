@@ -1,0 +1,186 @@
+{
+  "id": "fruits_vegetables",
+  "name": "Fruits & Vegetables",
+  "vertical": "produce",
+  "flow_mode": "order",
+  "blurb": "Sabzi mandi style — rates aaj ke hisaab se, weight-based.",
+  "icon": "carrot",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Fruits & Vegetables",
+    "greeting_text": "Assalam o Alaikum! [Business] sabzi — rates aaj ke hisaab se. Neeche se order karein (per kg).",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "Rates aaj ke hisaab se — daily update recommended.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Prices change daily — update in Settings each morning.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Assalam o Alaikum! Today's rates at [Business]. Order produce below (per kg)."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_veg",
+          "name": "Vegetables",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_fru",
+          "name": "Fruits",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_herb",
+          "name": "Herbs",
+          "sort": 2,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_tam",
+          "category_id": "c_veg",
+          "name": "Tamatar (kg)",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_alu",
+          "category_id": "c_veg",
+          "name": "Aalu (kg)",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_pyaz",
+          "category_id": "c_veg",
+          "name": "Pyaz (kg)",
+          "description": "",
+          "price": 100,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_bhindi",
+          "category_id": "c_veg",
+          "name": "Bhindi (kg)",
+          "description": "",
+          "price": 160,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_matar",
+          "category_id": "c_veg",
+          "name": "Matar (kg)",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 4,
+          "modifiers": []
+        },
+        {
+          "id": "i_kela",
+          "category_id": "c_fru",
+          "name": "Kela (dozen)",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_saib",
+          "category_id": "c_fru",
+          "name": "Saib (kg)",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_ambo",
+          "category_id": "c_fru",
+          "name": "Aam (kg)",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_angur",
+          "category_id": "c_fru",
+          "name": "Angoor (kg)",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_dhani",
+          "category_id": "c_herb",
+          "name": "Dhania bunch",
+          "description": "",
+          "price": 40,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_podi",
+          "category_id": "c_herb",
+          "name": "Podina bunch",
+          "description": "",
+          "price": 40,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_adrak",
+          "category_id": "c_herb",
+          "name": "Adrak (kg)",
+          "description": "",
+          "price": 500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! Rates aaj ke hisaab se. Sabzi/fruit (per kg) order karein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 80,
+          "free_above": 1500,
+          "area_note": "Morning delivery preferred"
+        },
+        "order_confirm_note": "Confirm? Kg batayein. Rates aaj ke hisaab se.",
+        "currency": "PKR"
+      }
+    }
+  }
+}

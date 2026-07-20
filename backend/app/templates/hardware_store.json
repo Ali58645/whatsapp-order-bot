@@ -1,0 +1,238 @@
+{
+  "id": "hardware_store",
+  "name": "Hardware Store",
+  "vertical": "hardware",
+  "flow_mode": "order",
+  "blurb": "Tools, paint, plumbing, electrical, fasteners.",
+  "icon": "wrench",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Hardware Store",
+    "greeting_text": "Assalam o Alaikum! [Business] hardware — zarooriyat order karein.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business] hardware — order tools and supplies below."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_tools",
+          "name": "Tools",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_paint",
+          "name": "Paint/Chemicals",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_plumb",
+          "name": "Plumbing",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_elec",
+          "name": "Electrical",
+          "sort": 3,
+          "visible": true
+        },
+        {
+          "id": "c_fast",
+          "name": "Fasteners",
+          "sort": 4,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_ham",
+          "category_id": "c_tools",
+          "name": "Hammer",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_screw",
+          "category_id": "c_tools",
+          "name": "Screwdriver Set",
+          "description": "",
+          "price": 850,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_plier",
+          "category_id": "c_tools",
+          "name": "Pliers",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_tape",
+          "category_id": "c_tools",
+          "name": "Measuring Tape",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_paint1",
+          "category_id": "c_paint",
+          "name": "Emulsion 1L",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_paint4",
+          "category_id": "c_paint",
+          "name": "Emulsion 4L",
+          "description": "",
+          "price": 4200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_thinner",
+          "category_id": "c_paint",
+          "name": "Thinner 1L",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_pipe",
+          "category_id": "c_plumb",
+          "name": "PVC Pipe 1in",
+          "description": "Per length",
+          "price": 180,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_tap",
+          "category_id": "c_plumb",
+          "name": "Basin Mixer",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_elbow",
+          "category_id": "c_plumb",
+          "name": "Elbow Joint",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_switch",
+          "category_id": "c_elec",
+          "name": "Switch Board",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_wire",
+          "category_id": "c_elec",
+          "name": "Wire 1.5mm (coil)",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_bulb",
+          "category_id": "c_elec",
+          "name": "LED Bulb 12W",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_screw2",
+          "category_id": "c_fast",
+          "name": "Screw Pack",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_nail",
+          "category_id": "c_fast",
+          "name": "Nail Pack",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_nut",
+          "category_id": "c_fast",
+          "name": "Nut Bolt Assort",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] hardware — zarooriyat order karein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": false,
+          "charge": 0,
+          "free_above": 0,
+          "area_note": "Delivery optional — ask in chat"
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

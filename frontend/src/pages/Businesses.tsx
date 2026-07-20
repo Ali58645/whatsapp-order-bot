@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Archive,
   Building2,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import {
   api,
   getRole,
+  OnboardingChecklist,
   setTenantFilter,
   Tenant,
 } from "../api";
@@ -25,23 +27,36 @@ import { Button } from "../components/ui/button";
 import { Dialog, DialogContent } from "../components/ui/dialog";
 import { Input, Label } from "../components/ui/input";
 import { Skeleton } from "../components/ui/avatar";
+import { TemplatePicker } from "../components/TemplatePicker";
 import { cn } from "../lib/utils";
 
-type WizardStep = 1 | 2 | 3 | 4;
+type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 type VerifyResult = {
   ok: boolean;
   verified_name?: string;
   display_phone_number?: string;
+  subscribed_apps?: boolean | null;
+  subscribed_apps_fixed?: boolean;
 };
 
-type CreateResult = {
+type DraftResult = {
   id: number;
   phone_number_id: string;
   name: string;
   flow_mode: string;
   status: string;
+  template_id?: string;
+  checklist?: OnboardingChecklist;
 };
+
+const STEPS: { id: WizardStep; label: string }[] = [
+  { id: 1, label: "Basics" },
+  { id: 2, label: "WhatsApp" },
+  { id: 3, label: "Content" },
+  { id: 4, label: "Sheet" },
+  { id: 5, label: "Go live" },
+];
 
 const STATUS_BADGE: Record<string, string> = {
   draft: "bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/25",
@@ -64,6 +79,31 @@ function flowLabel(mode: string) {
   return mode === "order" ? "Order Taking" : "Lead Qualification";
 }
 
+function ChecklistView({ checklist }: { checklist?: OnboardingChecklist | null }) {
+  if (!checklist?.items?.length) return null;
+  return (
+    <ul className="mt-3 space-y-1.5">
+      {checklist.items.map((item) => (
+        <li key={item.id} className="flex items-center gap-2 text-xs">
+          <span
+            className={cn(
+              "flex h-4 w-4 items-center justify-center rounded-full",
+              item.done
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "bg-muted text-muted-foreground"
+            )}
+          >
+            {item.done ? <Check className="h-2.5 w-2.5" /> : null}
+          </span>
+          <span className={item.done ? "text-foreground" : "text-muted-foreground"}>
+            {item.label}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function BusinessesPage() {
   const navigate = useNavigate();
   const isAdmin = getRole() === "admin";
@@ -74,18 +114,35 @@ export default function BusinessesPage() {
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>(1);
+
+  // Step 1
   const [name, setName] = useState("");
   const [flowMode, setFlowMode] = useState<"lead" | "order">("lead");
-  const [phoneNumberId, setPhoneNumberId] = useState("");
-  const [businessWaId, setBusinessWaId] = useState("");
-  const [ownerWhatsapp, setOwnerWhatsapp] = useState("");
   const [language, setLanguage] = useState("roman_urdu");
+  const [ownerWhatsapp, setOwnerWhatsapp] = useState("");
+
+  // Step 2
+  const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [wabaId, setWabaId] = useState("");
+  const [businessWaId, setBusinessWaId] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [verifyError, setVerifyError] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [created, setCreated] = useState<CreateResult | null>(null);
-  const [publishing, setPublishing] = useState(false);
+
+  // Step 3
+  const [templateId, setTemplateId] = useState("pos_lead");
+
+  // Step 4
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetTesting, setSheetTesting] = useState(false);
+  const [sheetOk, setSheetOk] = useState(false);
+  const [sheetMsg, setSheetMsg] = useState("");
+
+  // Draft / activate
+  const [draftId, setDraftId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [created, setCreated] = useState<DraftResult | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -103,12 +160,18 @@ export default function BusinessesPage() {
     setStep(1);
     setName("");
     setFlowMode("lead");
-    setPhoneNumberId("");
-    setBusinessWaId("");
-    setOwnerWhatsapp("");
     setLanguage("roman_urdu");
+    setOwnerWhatsapp("");
+    setPhoneNumberId("");
+    setWabaId("");
+    setBusinessWaId("");
     setVerifyResult(null);
     setVerifyError("");
+    setTemplateId("pos_lead");
+    setSheetUrl("");
+    setSheetOk(false);
+    setSheetMsg("");
+    setDraftId(null);
     setCreated(null);
   }
 
@@ -119,7 +182,7 @@ export default function BusinessesPage() {
 
   function closeWizard() {
     setWizardOpen(false);
-    if (created) load();
+    if (created || draftId) load();
   }
 
   async function setStatus(id: number, status: string) {
@@ -156,11 +219,20 @@ export default function BusinessesPage() {
     try {
       const res = await api<VerifyResult>("/api/dashboard/whatsapp/verify", {
         method: "POST",
-        body: JSON.stringify({ phone_number_id: phoneNumberId.trim() }),
+        body: JSON.stringify({
+          phone_number_id: phoneNumberId.trim(),
+          waba_id: wabaId.trim() || undefined,
+        }),
         tenant: false,
       });
       setVerifyResult(res);
-      toast.success("Connection verified");
+      if (!businessWaId.trim() && res.display_phone_number) {
+        setBusinessWaId(res.display_phone_number.replace(/\D/g, ""));
+      }
+      const bits = [res.verified_name || "Connected"];
+      if (res.subscribed_apps_fixed) bits.push("subscribed_apps fixed");
+      else if (res.subscribed_apps) bits.push("webhooks subscribed");
+      toast.success(bits.join(" · "));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Verification failed";
       setVerifyError(msg);
@@ -170,54 +242,147 @@ export default function BusinessesPage() {
     }
   }
 
-  async function createBusiness() {
-    setCreating(true);
+  async function testSheet() {
+    if (!sheetUrl.trim()) {
+      toast.error("Paste a Google Sheet URL first");
+      return;
+    }
+    setSheetTesting(true);
+    setSheetOk(false);
+    setSheetMsg("");
     try {
-      const res = await api<CreateResult>("/api/dashboard/tenants", {
-        method: "POST",
-        body: JSON.stringify({
-          name: name.trim(),
-          flow_mode: flowMode,
-          phone_number_id: phoneNumberId.trim(),
-          business_wa_id: businessWaId.trim(),
-          owner_whatsapp: ownerWhatsapp.trim(),
-          greeting_language: language,
-          publish: false,
-        }),
-        tenant: false,
-      });
-      setCreated(res);
-      toast.success("Business created as draft");
+      const res = await api<{ ok: boolean; title?: string; write_access?: boolean }>(
+        "/api/dashboard/sheet/test",
+        {
+          method: "POST",
+          body: JSON.stringify({ sheet_url: sheetUrl.trim() }),
+          tenant: false,
+        }
+      );
+      setSheetOk(true);
+      setSheetMsg(
+        res.title
+          ? `Write OK — “${res.title}”`
+          : "Write access confirmed"
+      );
+      toast.success("Sheet access OK");
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Create failed");
+      const msg = e instanceof Error ? e.message : "Sheet test failed";
+      setSheetOk(false);
+      setSheetMsg(msg);
+      toast.error(msg);
     } finally {
-      setCreating(false);
+      setSheetTesting(false);
     }
   }
 
-  async function publishCreated() {
-    if (!created) return;
-    setPublishing(true);
+  function draftPayload() {
+    return {
+      tenant_id: draftId || undefined,
+      name: name.trim(),
+      flow_mode: flowMode,
+      phone_number_id: phoneNumberId.trim(),
+      business_wa_id: businessWaId.trim(),
+      owner_whatsapp: ownerWhatsapp.trim(),
+      greeting_language: language,
+      template_id: templateId,
+      waba_id: wabaId.trim(),
+      sheet_url: sheetUrl.trim(),
+      connection_verified: Boolean(verifyResult?.ok),
+      subscribed_apps: verifyResult?.subscribed_apps ?? null,
+      sheet_tested: sheetOk,
+      verified_name: verifyResult?.verified_name || "",
+    };
+  }
+
+  async function saveDraft(silent = false): Promise<DraftResult | null> {
+    setSaving(true);
     try {
-      await api(`/api/dashboard/tenants/${created.id}/publish`, {
+      const res = await api<DraftResult>("/api/dashboard/onboarding/draft", {
         method: "POST",
+        body: JSON.stringify(draftPayload()),
         tenant: false,
       });
-      toast.success("Business published — now live");
-      setCreated({ ...created, status: "live" });
+      setDraftId(res.id);
+      setCreated(res);
+      if (!silent) toast.success("Draft saved");
+      return res;
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function activate() {
+    setActivating(true);
+    try {
+      let id = draftId;
+      if (!id) {
+        const draft = await saveDraft(true);
+        if (!draft) return;
+        id = draft.id;
+      } else {
+        const draft = await saveDraft(true);
+        if (!draft) return;
+        id = draft.id;
+      }
+      const res = await api<{
+        status: string;
+        test_message_sent: boolean;
+        test_error?: string | null;
+        checklist?: OnboardingChecklist;
+      }>(`/api/dashboard/onboarding/${id}/activate`, {
+        method: "POST",
+        body: JSON.stringify({ send_test: true }),
+        tenant: false,
+      });
+      setCreated((prev) =>
+        prev
+          ? { ...prev, status: "live", checklist: res.checklist }
+          : prev
+      );
+      if (res.test_message_sent) {
+        toast.success("Live — test message sent to owner");
+      } else if (res.test_error) {
+        toast.success("Live — but test message failed");
+        toast.error(res.test_error);
+      } else {
+        toast.success("Business is live");
+      }
       load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Publish failed");
+      toast.error(e instanceof Error ? e.message : "Activate failed");
     } finally {
-      setPublishing(false);
+      setActivating(false);
     }
   }
 
   function canAdvance(): boolean {
-    if (step === 1) return name.trim().length > 0;
-    if (step === 2) return !!flowMode;
-    if (step === 3) return phoneNumberId.trim().length > 0;
+    if (step === 1) {
+      return name.trim().length > 0 && ownerWhatsapp.trim().length >= 8;
+    }
+    if (step === 2) {
+      return (
+        phoneNumberId.trim().length > 0 &&
+        ownerWhatsapp.trim().length >= 8 &&
+        Boolean(verifyResult?.ok)
+      );
+    }
+    if (step === 3) return Boolean(templateId);
+    if (step === 4) return true; // sheet optional
     return true;
+  }
+
+  async function goNext() {
+    if (!canAdvance()) {
+      if (step === 2 && !verifyResult?.ok) {
+        toast.error("Test connection before continuing");
+      }
+      return;
+    }
+    if (step < 5) setStep((step + 1) as WizardStep);
   }
 
   if (!isAdmin) {
@@ -238,7 +403,7 @@ export default function BusinessesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Businesses</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage WhatsApp tenants — create, pause, and configure
+            Onboard a new business from zero to live bot
           </p>
         </div>
         <Button onClick={openWizard}>
@@ -250,7 +415,7 @@ export default function BusinessesPage() {
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-44 w-full rounded-2xl" />
+            <Skeleton key={i} className="h-52 w-full rounded-2xl" />
           ))}
         </div>
       ) : tenants.length === 0 ? (
@@ -277,6 +442,7 @@ export default function BusinessesPage() {
                     <h2 className="truncate font-semibold">{t.name}</h2>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {flowLabel(t.flow_mode)}
+                      {t.template_id ? ` · ${t.template_id}` : ""}
                     </p>
                   </div>
                   <Badge className={STATUS_BADGE[st] || STATUS_BADGE.live}>
@@ -290,6 +456,16 @@ export default function BusinessesPage() {
                     <span className="text-foreground">{t.stat_today ?? 0}</span>{" "}
                     {statLabel.toLowerCase()}
                   </p>
+                </div>
+
+                <div className="mt-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Onboarding
+                    {t.checklist
+                      ? ` · ${t.checklist.done_count}/${t.checklist.total_count}`
+                      : ""}
+                  </p>
+                  <ChecklistView checklist={t.checklist} />
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">
@@ -346,204 +522,380 @@ export default function BusinessesPage() {
       )}
 
       <Dialog open={wizardOpen} onOpenChange={(o) => !o && closeWizard()}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto p-0 sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-lg">
           <div className="border-b border-border px-5 py-4">
-            <h2 className="text-lg font-semibold">
-              {created ? "Business created" : "New Business"}
-            </h2>
-            {!created && (
-              <p className="mt-0.5 text-xs text-muted-foreground">Step {step} of 4</p>
-            )}
+            <h2 className="text-lg font-semibold">Onboard business</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Zero to live bot — step {step} of {STEPS.length}
+            </p>
+            <div className="mt-4 flex gap-1">
+              {STEPS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => s.id < step && setStep(s.id)}
+                  className={cn(
+                    "flex-1 rounded-full px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
+                    s.id === step
+                      ? "bg-primary text-primary-foreground"
+                      : s.id < step
+                        ? "bg-primary/20 text-primary"
+                        : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-4 px-5 py-4">
-            {created ? (
-              <div className="space-y-4 text-center">
-                <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-400" />
-                <div>
-                  <p className="font-medium">{created.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Created as draft — publish when ready to go live
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {created.status !== "live" && (
-                    <Button disabled={publishing} onClick={publishCreated}>
-                      {publishing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Publish"
-                      )}
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      openSettings(created as unknown as Tenant);
-                      closeWizard();
-                    }}
-                  >
-                    Open Settings
-                  </Button>
-                  <Button variant="ghost" onClick={closeWizard}>
-                    Done
-                  </Button>
-                </div>
-              </div>
-            ) : (
+            {step === 1 && (
               <>
-                {step === 1 && (
-                  <div>
-                    <Label>Business name</Label>
-                    <Input
-                      className="mt-1.5"
-                      placeholder="e.g. Bahi POS Demo"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-                )}
-
-                {step === 2 && (
-                  <div className="space-y-2">
-                    <Label>Flow type</Label>
-                    {(
-                      [
-                        { id: "lead" as const, label: "Lead Qualification" },
-                        { id: "order" as const, label: "Order Taking" },
-                      ] as const
-                    ).map((opt) => (
+                <div>
+                  <Label htmlFor="biz-name">Business name</Label>
+                  <Input
+                    id="biz-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Ali Grocery"
+                    className="mt-1.5"
+                  />
+                </div>
+                <div>
+                  <Label>Flow type</Label>
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    {(["lead", "order"] as const).map((m) => (
                       <button
-                        key={opt.id}
+                        key={m}
                         type="button"
-                        onClick={() => setFlowMode(opt.id)}
+                        onClick={() => {
+                          setFlowMode(m);
+                          setTemplateId(m === "order" ? "restaurant" : "pos_lead");
+                        }}
                         className={cn(
-                          "flex w-full items-center rounded-xl border px-4 py-3 text-left text-sm transition",
-                          flowMode === opt.id
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border hover:bg-muted/50"
+                          "rounded-xl border px-3 py-3 text-left text-sm transition-colors",
+                          flowMode === m
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:bg-muted/40"
                         )}
                       >
-                        {opt.label}
+                        <p className="font-semibold">
+                          {m === "lead" ? "Lead" : "Order"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {m === "lead"
+                            ? "Qualify & book demos"
+                            : "Menu + cart on WhatsApp"}
+                        </p>
                       </button>
                     ))}
                   </div>
-                )}
+                </div>
+                <div>
+                  <Label htmlFor="lang">Language</Label>
+                  <select
+                    id="lang"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="mt-1.5 flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="roman_urdu">Roman Urdu</option>
+                    <option value="english">English</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="owner-wa">Owner WhatsApp</Label>
+                  <Input
+                    id="owner-wa"
+                    value={ownerWhatsapp}
+                    onChange={(e) => setOwnerWhatsapp(e.target.value)}
+                    placeholder="92300…"
+                    className="mt-1.5"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Receives lead cards / order slips and the go-live test message
+                  </p>
+                </div>
+              </>
+            )}
 
-                {step === 3 && (
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Phone number ID</Label>
-                      <Input
-                        className="mt-1.5 font-mono text-xs"
-                        placeholder="Meta phone_number_id"
-                        value={phoneNumberId}
-                        onChange={(e) => {
-                          setPhoneNumberId(e.target.value);
-                          setVerifyResult(null);
-                          setVerifyError("");
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <Label>Business WA ID</Label>
-                      <Input
-                        className="mt-1.5 font-mono text-xs"
-                        value={businessWaId}
-                        onChange={(e) => setBusinessWaId(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label>Owner WhatsApp</Label>
-                      <Input
-                        className="mt-1.5 font-mono text-xs"
-                        placeholder="923001234567"
-                        value={ownerWhatsapp}
-                        onChange={(e) => setOwnerWhatsapp(e.target.value)}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      disabled={verifying || !phoneNumberId.trim()}
-                      onClick={verifyConnection}
-                    >
-                      {verifying ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Verify connection"
-                      )}
-                    </Button>
-                    {verifyResult && (
-                      <div className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
-                        {verifyResult.verified_name && (
-                          <p>{verifyResult.verified_name}</p>
-                        )}
-                        {verifyResult.display_phone_number && (
-                          <p className="text-xs opacity-80">
-                            {verifyResult.display_phone_number}
-                          </p>
-                        )}
-                      </div>
+            {step === 2 && (
+              <>
+                <div>
+                  <Label htmlFor="phone-id">Phone number ID</Label>
+                  <Input
+                    id="phone-id"
+                    value={phoneNumberId}
+                    onChange={(e) => {
+                      setPhoneNumberId(e.target.value);
+                      setVerifyResult(null);
+                    }}
+                    placeholder="Meta phone_number_id"
+                    className="mt-1.5 font-mono text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="waba">WABA ID</Label>
+                  <Input
+                    id="waba"
+                    value={wabaId}
+                    onChange={(e) => {
+                      setWabaId(e.target.value);
+                      setVerifyResult(null);
+                    }}
+                    placeholder="WhatsApp Business Account ID"
+                    className="mt-1.5 font-mono text-sm"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Used to auto-check and fix subscribed_apps
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="biz-wa">Business WA ID (digits)</Label>
+                  <Input
+                    id="biz-wa"
+                    value={businessWaId}
+                    onChange={(e) => setBusinessWaId(e.target.value)}
+                    placeholder="Auto-filled after verify when possible"
+                    className="mt-1.5 font-mono text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="owner-wa-2">Owner WhatsApp</Label>
+                  <Input
+                    id="owner-wa-2"
+                    value={ownerWhatsapp}
+                    onChange={(e) => setOwnerWhatsapp(e.target.value)}
+                    className="mt-1.5"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={verifying || !phoneNumberId.trim()}
+                  onClick={() => void verifyConnection()}
+                >
+                  {verifying ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Test connection
+                </Button>
+                {verifyResult?.ok && (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm">
+                    <p className="font-medium text-emerald-400">
+                      {verifyResult.verified_name || "Verified"}
+                    </p>
+                    {verifyResult.display_phone_number && (
+                      <p className="text-xs text-muted-foreground">
+                        {verifyResult.display_phone_number}
+                      </p>
                     )}
-                    {verifyError && (
-                      <p className="text-sm text-destructive">{verifyError}</p>
-                    )}
-                  </div>
-                )}
-
-                {step === 4 && (
-                  <div>
-                    <Label>Default language</Label>
-                    <select
-                      className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus-ring"
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                    >
-                      <option value="roman_urdu">Roman Urdu</option>
-                      <option value="english">English</option>
-                    </select>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Business will be created as a draft. You can publish after reviewing
-                      settings.
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Webhooks:{" "}
+                      {verifyResult.subscribed_apps
+                        ? verifyResult.subscribed_apps_fixed
+                          ? "subscribed (auto-fixed)"
+                          : "subscribed ✓"
+                        : wabaId
+                          ? "unknown / failed"
+                          : "skipped (add WABA ID)"}
                     </p>
                   </div>
+                )}
+                {verifyError && (
+                  <p className="text-sm text-destructive">{verifyError}</p>
+                )}
+              </>
+            )}
+
+            {step === 3 && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Pick a starter template. You can edit copy, options, and menu later in
+                  Settings.
+                </p>
+                <TemplatePicker
+                  selectedId={templateId}
+                  flowMode={flowMode}
+                  onSelect={(id, tmpl) => {
+                    setTemplateId(id);
+                    if (tmpl?.flow_mode === "lead" || tmpl?.flow_mode === "order") {
+                      setFlowMode(tmpl.flow_mode);
+                    }
+                  }}
+                />
+              </>
+            )}
+
+            {step === 4 && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Optional — paste a Google Sheet URL shared with the service account.
+                </p>
+                <div>
+                  <Label htmlFor="sheet">Google Sheet URL</Label>
+                  <Input
+                    id="sheet"
+                    value={sheetUrl}
+                    onChange={(e) => {
+                      setSheetUrl(e.target.value);
+                      setSheetOk(false);
+                      setSheetMsg("");
+                    }}
+                    placeholder="https://docs.google.com/spreadsheets/d/…"
+                    className="mt-1.5"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={sheetTesting || !sheetUrl.trim()}
+                  onClick={() => void testSheet()}
+                >
+                  {sheetTesting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Test write access
+                </Button>
+                {sheetMsg && (
+                  <p
+                    className={cn(
+                      "text-sm",
+                      sheetOk ? "text-emerald-400" : "text-destructive"
+                    )}
+                  >
+                    {sheetMsg}
+                  </p>
+                )}
+                <p className="text-[11px] text-muted-foreground">
+                  Skip this step if the client has no sheet yet.
+                </p>
+              </>
+            )}
+
+            {step === 5 && (
+              <>
+                {created?.status === "live" ? (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+                    <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
+                    <p className="mt-2 font-semibold">You’re live</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {created.name} is routable now — no redeploy needed.
+                    </p>
+                    {created.checklist && (
+                      <div className="mt-3 text-left">
+                        <ChecklistView checklist={created.checklist} />
+                      </div>
+                    )}
+                    <Button
+                      className="mt-4"
+                      onClick={() => {
+                        closeWizard();
+                        if (created) {
+                          openSettings({
+                            id: created.id,
+                            phone_number_id: created.phone_number_id,
+                            name: created.name,
+                            flow_mode: created.flow_mode,
+                          });
+                        }
+                      }}
+                    >
+                      Open Settings
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-4 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Name · </span>
+                        {name || "—"}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Flow · </span>
+                        {flowLabel(flowMode)}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Template · </span>
+                        {templateId}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Phone ID · </span>
+                        <span className="font-mono text-xs">{phoneNumberId || "—"}</span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Owner · </span>
+                        {ownerWhatsapp || "—"}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Connection · </span>
+                        {verifyResult?.ok
+                          ? verifyResult.verified_name || "Verified"
+                          : "Not verified"}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Sheet · </span>
+                        {sheetUrl
+                          ? sheetOk
+                            ? "Tested ✓"
+                            : "Provided (not tested)"
+                          : "Skipped"}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Activate creates the tenant as Live, seeds the template, and sends a
+                      test WhatsApp to the owner.
+                    </p>
+                  </>
                 )}
               </>
             )}
           </div>
 
-          {!created && (
-            <div className="flex items-center justify-between border-t border-border px-5 py-4">
+          {!(step === 5 && created?.status === "live") && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3">
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={step === 1}
-                onClick={() => setStep((s) => (s > 1 ? ((s - 1) as WizardStep) : s))}
+                disabled={step === 1 || saving || activating}
+                onClick={() => setStep((step - 1) as WizardStep)}
               >
                 <ChevronLeft className="h-4 w-4" />
                 Back
               </Button>
-              {step < 4 ? (
+              <div className="flex gap-2">
                 <Button
+                  variant="outline"
                   size="sm"
-                  disabled={!canAdvance()}
-                  onClick={() => setStep((s) => (s < 4 ? ((s + 1) as WizardStep) : s))}
+                  disabled={saving || activating || !name.trim() || !phoneNumberId.trim()}
+                  onClick={() => void saveDraft()}
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Save draft
                 </Button>
-              ) : (
-                <Button size="sm" disabled={creating} onClick={createBusiness}>
-                  {creating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Create"
-                  )}
-                </Button>
-              )}
+                {step < 5 ? (
+                  <Button size="sm" disabled={!canAdvance()} onClick={() => void goNext()}>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={activating || !canAdvance() || !verifyResult?.ok}
+                    onClick={() => void activate()}
+                  >
+                    {activating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Activate
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

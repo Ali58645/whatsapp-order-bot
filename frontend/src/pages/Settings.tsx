@@ -1,17 +1,29 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
-import { api, getTenantFilter, setTenantFilter, Tenant, TenantConfigResponse } from "../api";
+import {
+  api,
+  getTenantFilter,
+  isReadonlySession,
+  setTenantFilter,
+  Tenant,
+  TenantConfigResponse,
+} from "../api";
+import { useI18n } from "../i18n";
 import { Button } from "../components/ui/button";
 import { Input, Label, Textarea } from "../components/ui/input";
 import { Skeleton } from "../components/ui/avatar";
+import { Dialog, DialogContent } from "../components/ui/dialog";
 import { MenuBuilder } from "../components/MenuBuilder";
 import { MessagesEditor } from "../components/MessagesEditor";
 import { LeadOptionsEditor } from "../components/LeadOptionsEditor";
 import { OptionListEditor, OptionListItem, stripEmptyOptionRows } from "../components/OptionListEditor";
+import { TemplatePicker } from "../components/TemplatePicker";
+import { FlowBuilder } from "../components/FlowBuilder";
 import { cn } from "../lib/utils";
+import type { FlowStep } from "../api";
 
-type Tab = "general" | "lead" | "menu" | "faq" | "messages";
+type Tab = "general" | "lead" | "menu" | "faq" | "messages" | "flow";
 
 type MessagesDraft = {
   lead?: Record<string, string>;
@@ -21,7 +33,15 @@ type MessagesDraft = {
   [key: string]: unknown;
 };
 
-export default function SettingsPage() {
+type Props = {
+  /** Owner "My Bot" — content only; wiring read-only */
+  ownerMode?: boolean;
+  /** Owner Menu page — jump straight to menu builder */
+  menuOnly?: boolean;
+};
+
+export default function SettingsPage({ ownerMode = false, menuOnly = false }: Props) {
+  const { t } = useI18n();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedDbId, setSelectedDbId] = useState<number | null>(null);
   const [cfg, setCfg] = useState<TenantConfigResponse | null>(null);
@@ -30,8 +50,13 @@ export default function SettingsPage() {
   const [messagesBusy, setMessagesBusy] = useState(false);
   const [messagesPublishing, setMessagesPublishing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("general");
+  const [tab, setTab] = useState<Tab>(menuOnly ? "menu" : "general");
   const [faqRows, setFaqRows] = useState<OptionListItem[]>([]);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [pickTemplateId, setPickTemplateId] = useState("pos_lead");
+  const [templateConfirm, setTemplateConfirm] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const readonly = isReadonlySession();
 
   const loadTenants = useCallback(() => {
     api<Tenant[]>("/api/dashboard/tenants", { tenant: false })
@@ -163,12 +188,18 @@ export default function SettingsPage() {
         facts_pricing_note: cfg.config.facts_pricing_note,
         facts_claims_note: cfg.config.facts_claims_note,
         faq: faqClean,
-        business_wa_id: cfg.config.business_wa_id,
-        owner_whatsapp: cfg.config.owner_whatsapp,
         messages_draft: draft,
       };
+      // Owners must never send wiring fields (server also rejects)
+      if (!ownerMode) {
+        body.business_wa_id = cfg.config.business_wa_id;
+        body.owner_whatsapp = cfg.config.owner_whatsapp;
+      }
       if (cfg.flow_mode === "order" && cfg.config.menu) {
         body.menu = cfg.config.menu;
+      }
+      if (cfg.flow_mode === "lead" && cfg.config.flow) {
+        body.flow = cfg.config.flow;
       }
       const updated = await api<TenantConfigResponse>(
         `/api/dashboard/tenants/${selectedDbId}/config`,
@@ -269,6 +300,47 @@ export default function SettingsPage() {
     setFaqRows(items);
   }
 
+  async function applyStarterTemplate() {
+    if (!selectedDbId || !pickTemplateId) return;
+    if (!templateConfirm) {
+      toast.error("Confirm that you want to overwrite draft config");
+      return;
+    }
+    setTemplateBusy(true);
+    try {
+      await api(`/api/dashboard/tenants/${selectedDbId}/apply-template`, {
+        method: "POST",
+        body: JSON.stringify({
+          template_id: pickTemplateId,
+          confirm: true,
+          greeting_language: cfg?.config.greeting_language || "roman_urdu",
+        }),
+        tenant: false,
+      });
+      toast.success("Starter template loaded into draft — review & publish");
+      setTemplateOpen(false);
+      setTemplateConfirm(false);
+      // Reload config
+      const data = await api<TenantConfigResponse>(
+        `/api/dashboard/tenants/${selectedDbId}/config`,
+        { tenant: false }
+      );
+      setCfg(data);
+      setFaqRows(
+        (data.config.faq || []).map((f, i) => ({
+          id: `faq_${Date.now()}_${i}`,
+          label: f.question,
+          answer: f.answer,
+        }))
+      );
+      loadTenants();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to apply template");
+    } finally {
+      setTemplateBusy(false);
+    }
+  }
+
   if (loading || !cfg) {
     return (
       <div className="space-y-4">
@@ -287,36 +359,111 @@ export default function SettingsPage() {
   const leadMsgs = (draft.lead || {}) as Record<string, string>;
   const interactive = (draft.interactive || {}) as Record<string, unknown>;
 
-  const tabs: { id: Tab; label: string; show?: boolean }[] = [
-    { id: "general", label: "General" },
-    { id: "lead", label: "Lead options", show: cfg.flow_mode === "lead" },
-    { id: "messages", label: "Messages" },
-    { id: "menu", label: "Menu", show: cfg.flow_mode === "order" },
-    { id: "faq", label: "FAQ" },
-  ];
+  const tabs: { id: Tab; label: string; show?: boolean }[] = menuOnly
+    ? [{ id: "menu", label: t("menu"), show: cfg.flow_mode === "order" }]
+    : [
+        { id: "general", label: "General" },
+        { id: "lead", label: "Lead options", show: cfg.flow_mode === "lead" },
+        {
+          id: "flow",
+          label: "Flow",
+          show: cfg.flow_mode === "lead" && !ownerMode,
+        },
+        { id: "messages", label: "Messages" },
+        {
+          id: "menu",
+          label: t("menu"),
+          show: cfg.flow_mode === "order" && !ownerMode,
+        },
+        { id: "faq", label: "FAQ" },
+      ];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {ownerMode ? (menuOnly ? t("menu") : t("myBot")) : "Settings"}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Changes go live within ~60 seconds
           </p>
         </div>
-        {tab !== "menu" && tab !== "messages" && (
-          <Button type="button" disabled={busy} onClick={() => onSave()}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {!ownerMode && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setPickTemplateId(
+                  cfg.flow_mode === "order" ? "restaurant" : "pos_lead"
+                );
+                setTemplateConfirm(false);
+                setTemplateOpen(true);
+              }}
+            >
+              <LayoutTemplate className="h-4 w-4" />
+              Load starter template
+            </Button>
+          )}
+          {tab !== "menu" && tab !== "messages" && (
+            <Button type="button" disabled={busy || readonly} onClick={() => onSave()}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {t("save")}
+            </Button>
+          )}
+        </div>
       </div>
+
+      <Dialog open={templateOpen} onOpenChange={(o) => !o && setTemplateOpen(false)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-2xl">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-lg font-semibold">Load starter template</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Applies to draft config only. Published messages/menu stay until you publish.
+            </p>
+          </div>
+          <div className="space-y-4 px-5 py-4">
+            <TemplatePicker
+              selectedId={pickTemplateId}
+              onSelect={(id) => {
+                setPickTemplateId(id);
+                setTemplateConfirm(false);
+              }}
+            />
+            <label className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={templateConfirm}
+                onChange={(e) => setTemplateConfirm(e.target.checked)}
+              />
+              <span>
+                I understand this will overwrite the current <strong>draft</strong>{" "}
+                messages / menu for this business.
+              </span>
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+            <Button variant="ghost" onClick={() => setTemplateOpen(false)} disabled={templateBusy}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!templateConfirm || templateBusy || !pickTemplateId}
+              onClick={() => void applyStarterTemplate()}
+            >
+              {templateBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Apply to draft
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {error && (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
       )}
 
-      {tenants.length > 1 && (
+      {!ownerMode && tenants.length > 1 && (
         <div className="rounded-2xl border border-border bg-card p-5">
           <Label>Tenant</Label>
           <select
@@ -325,41 +472,43 @@ export default function SettingsPage() {
             onChange={(e) => {
               const id = Number(e.target.value);
               setSelectedDbId(id);
-              const t = tenants.find((x) => x.id === id);
-              if (t) {
-                setTenantFilter(t.phone_number_id);
+              const tn = tenants.find((x) => x.id === id);
+              if (tn) {
+                setTenantFilter(tn.phone_number_id);
                 window.dispatchEvent(new Event("tenant-change"));
               }
             }}
           >
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.flow_mode})
+            {tenants.map((tn) => (
+              <option key={tn.id} value={tn.id}>
+                {tn.name} ({tn.flow_mode})
               </option>
             ))}
           </select>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/30 p-1">
-        {tabs
-          .filter((t) => t.show !== false)
-          .map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition min-w-[5.5rem]",
-                tab === t.id
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-      </div>
+      {!menuOnly && (
+        <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/30 p-1">
+          {tabs
+            .filter((tabItem) => tabItem.show !== false)
+            .map((tabItem) => (
+              <button
+                key={tabItem.id}
+                type="button"
+                onClick={() => setTab(tabItem.id)}
+                className={cn(
+                  "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition min-w-[5.5rem]",
+                  tab === tabItem.id
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tabItem.label}
+              </button>
+            ))}
+        </div>
+      )}
 
       {tab === "menu" && cfg.flow_mode === "order" && selectedDbId != null && (
         <MenuBuilder
@@ -414,6 +563,21 @@ export default function SettingsPage() {
         />
       )}
 
+      {tab === "flow" && cfg.flow_mode === "lead" && selectedDbId != null && (
+        <FlowBuilder
+          tenantDbId={selectedDbId}
+          initial={(cfg.config.flow || []) as FlowStep[]}
+          demoSlots={slots}
+          readonly={readonly}
+          onChange={(flow) =>
+            setCfg({
+              ...cfg,
+              config: { ...cfg.config, flow },
+            })
+          }
+        />
+      )}
+
       {tab === "general" && (
         <form onSubmit={onSave} className="space-y-6">
           <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
@@ -463,34 +627,72 @@ export default function SettingsPage() {
                 <option value="en">English</option>
               </select>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label>Business WA ID</Label>
-                <Input
-                  className="mt-1.5"
-                  value={cfg.config.business_wa_id}
-                  onChange={(e) =>
-                    setCfg({
-                      ...cfg,
-                      config: { ...cfg.config, business_wa_id: e.target.value },
-                    })
-                  }
-                />
+            {ownerMode ? (
+              <section className="rounded-xl border border-dashed border-border bg-muted/20 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Connection
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("wiringNote")}</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <Label className="text-muted-foreground">Phone number ID</Label>
+                    <Input
+                      className="mt-1.5 opacity-60"
+                      value={cfg.wiring?.phone_number_id || cfg.phone_number_id}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">WABA ID</Label>
+                    <Input
+                      className="mt-1.5 opacity-60"
+                      value={cfg.wiring?.waba_id || ""}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Flow mode</Label>
+                    <Input
+                      className="mt-1.5 opacity-60"
+                      value={cfg.wiring?.flow_mode || cfg.flow_mode}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label>Business WA ID</Label>
+                  <Input
+                    className="mt-1.5"
+                    value={cfg.config.business_wa_id}
+                    onChange={(e) =>
+                      setCfg({
+                        ...cfg,
+                        config: { ...cfg.config, business_wa_id: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Owner WhatsApp</Label>
+                  <Input
+                    className="mt-1.5"
+                    value={cfg.config.owner_whatsapp}
+                    onChange={(e) =>
+                      setCfg({
+                        ...cfg,
+                        config: { ...cfg.config, owner_whatsapp: e.target.value },
+                      })
+                    }
+                  />
+                </div>
               </div>
-              <div>
-                <Label>Owner WhatsApp</Label>
-                <Input
-                  className="mt-1.5"
-                  value={cfg.config.owner_whatsapp}
-                  onChange={(e) =>
-                    setCfg({
-                      ...cfg,
-                      config: { ...cfg.config, owner_whatsapp: e.target.value },
-                    })
-                  }
-                />
-              </div>
-            </div>
+            )}
           </section>
 
           {cfg.flow_mode === "lead" && (

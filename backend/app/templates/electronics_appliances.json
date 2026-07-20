@@ -1,0 +1,192 @@
+{
+  "id": "electronics_appliances",
+  "name": "Electronics & Appliances",
+  "vertical": "electronics",
+  "flow_mode": "order",
+  "blurb": "Home/kitchen appliances — installation & warranty notes.",
+  "icon": "tv",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Electronics & Appliances",
+    "greeting_text": "Assalam o Alaikum! [Business] — appliances dekhein. Warranty included; installation alag se confirm.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Installation note: confirm separately. Warranty mentioned in greeting.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business]! Browse appliances. Warranty included; ask about install."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_home",
+          "name": "Home Appliances",
+          "sort": 0,
+          "visible": true
+        },
+        {
+          "id": "c_kit",
+          "name": "Kitchen",
+          "sort": 1,
+          "visible": true
+        },
+        {
+          "id": "c_fan",
+          "name": "Fans/Cooling",
+          "sort": 2,
+          "visible": true
+        },
+        {
+          "id": "c_sm",
+          "name": "Small Electronics",
+          "sort": 3,
+          "visible": true
+        }
+      ],
+      "items": [
+        {
+          "id": "i_wash",
+          "category_id": "c_home",
+          "name": "Washing Machine",
+          "description": "Auto 7kg",
+          "price": 45000,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_fridge",
+          "category_id": "c_home",
+          "name": "Refrigerator",
+          "description": "Inverter",
+          "price": 85000,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_iron",
+          "category_id": "c_home",
+          "name": "Dry Iron",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_micro",
+          "category_id": "c_kit",
+          "name": "Microwave",
+          "description": "",
+          "price": 22000,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_blend",
+          "category_id": "c_kit",
+          "name": "Blender",
+          "description": "",
+          "price": 6500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_kettle",
+          "category_id": "c_kit",
+          "name": "Electric Kettle",
+          "description": "",
+          "price": 4200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_fan",
+          "category_id": "c_fan",
+          "name": "Pedestal Fan",
+          "description": "",
+          "price": 8500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_ac",
+          "category_id": "c_fan",
+          "name": "AC 1.5 Ton",
+          "description": "Inverter",
+          "price": 145000,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_cooler",
+          "category_id": "c_fan",
+          "name": "Room Cooler",
+          "description": "",
+          "price": 18000,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_trim",
+          "category_id": "c_sm",
+          "name": "Trimmer",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_scale",
+          "category_id": "c_sm",
+          "name": "Kitchen Scale",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_ext",
+          "category_id": "c_sm",
+          "name": "Extension Board",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] — appliances. Warranty included; installation confirm karein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 300,
+          "free_above": 50000,
+          "area_note": "Installation on request"
+        },
+        "order_confirm_note": "Confirm? Installation/warranty chat mein pooch sakte hain.",
+        "currency": "PKR"
+      }
+    }
+  }
+}

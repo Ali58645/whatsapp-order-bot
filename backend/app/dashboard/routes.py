@@ -44,6 +44,8 @@ class TokenOut(BaseModel):
     expires_in_hours: int = dash_auth.TOKEN_TTL_H
     role: str = "admin"
     tenant_id: Optional[int] = None
+    readonly: bool = False
+    impersonated_by: Optional[str] = None
 
 
 @router.post("/api/auth/login", response_model=TokenOut)
@@ -57,6 +59,8 @@ async def login(body: LoginBody):
         access_token=token,
         role=user.role,
         tenant_id=user.tenant_id,
+        readonly=user.readonly,
+        impersonated_by=user.impersonated_by,
     )
 
 
@@ -130,6 +134,8 @@ async def save_tenant_config(
 ):
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
+    dash_auth.assert_writable(user)
+    dash_auth.assert_owner_config_patch(user, body if isinstance(body, dict) else {})
     async with _get_db() as db:
         result = await apply_config_save(db, tenant_db_id, body, changed_by=user.username)
     if result is None:
@@ -145,6 +151,7 @@ async def publish_menu(
     """Promote menu_v2_draft → published menu_v2 (history snapshot on save)."""
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
+    dash_auth.assert_writable(user)
     from app.dashboard.config_api import publish_menu_v2
     from app.menu_v2 import MenuV2Error
 
@@ -187,6 +194,47 @@ async def preview_menu(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.post("/api/dashboard/tenants/{tenant_db_id}/flow/preview")
+async def preview_lead_flow(
+    tenant_db_id: int,
+    body: dict | None = None,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """
+    End-to-end WhatsApp preview of the lead conversation flow.
+    Optional body.flow overrides stored config (unsaved editor state).
+    """
+    _require_db()
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    from app.db.repo import get_tenant_row
+    from app.flow import FlowError, default_bahi_pos_flow, preview_flow_messages, validate_flow
+    from app.tenants import Tenant
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    if row.flow_mode != "lead":
+        raise HTTPException(status_code=400, detail="flow preview only for lead tenants")
+
+    tenant = Tenant.from_db_row(row)
+    cfg = dict(row.config or {})
+    flow = (body or {}).get("flow")
+    if flow is None:
+        flow = cfg.get("flow") or default_bahi_pos_flow()
+    try:
+        cleaned = validate_flow(flow)
+        steps = preview_flow_messages(
+            cleaned,
+            lang=tenant.lang_code(),
+            tenant=tenant,
+            demo_slots=tenant.demo_slots,
+        )
+    except FlowError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"flow": cleaned, "steps": steps}
+
+
 @router.post("/api/dashboard/tenants/{tenant_db_id}/menu/test-send")
 async def test_send_menu(
     tenant_db_id: int,
@@ -195,6 +243,7 @@ async def test_send_menu(
     """Send current draft menu entry messages to owner_whatsapp (does not publish)."""
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
+    dash_auth.assert_writable(user)
     from app.db.repo import get_tenant_row
     from app.dashboard.config_api import send_menu_test
     from app.menu_v2 import MenuV2Error
@@ -218,6 +267,7 @@ async def publish_messages(
     """Promote messages_draft → published messages."""
     _require_db()
     await dash_auth.assert_tenant_access(user, tenant_db_id)
+    dash_auth.assert_writable(user)
     from app.dashboard.config_api import publish_messages as _publish
     from app.messages import MessagesError
 
@@ -239,6 +289,13 @@ class CreateTenantBody(BaseModel):
     owner_whatsapp: str = ""
     greeting_language: str = "roman_urdu"
     publish: bool = False  # if True, create as live; else draft
+    template_id: Optional[str] = None
+    waba_id: str = ""
+    sheet_url: str = ""
+    connection_verified: bool = False
+    subscribed_apps: Optional[bool] = None
+    sheet_tested: bool = False
+    verified_name: str = ""
 
 
 class TenantStatusBody(BaseModel):
@@ -247,6 +304,33 @@ class TenantStatusBody(BaseModel):
 
 class VerifyWhatsAppBody(BaseModel):
     phone_number_id: str = Field(..., min_length=1, max_length=64)
+    waba_id: str = ""
+
+
+class SheetTestBody(BaseModel):
+    sheet_url: str = Field(..., min_length=1, max_length=512)
+
+
+class OnboardingDraftBody(BaseModel):
+    """Create or update a draft tenant from the onboarding wizard."""
+    tenant_id: Optional[int] = None  # update existing draft when set
+    name: str = Field(..., min_length=1, max_length=256)
+    flow_mode: str = Field(..., pattern="^(lead|order)$")
+    phone_number_id: str = Field(..., min_length=1, max_length=64)
+    business_wa_id: str = ""
+    owner_whatsapp: str = ""
+    greeting_language: str = "roman_urdu"
+    template_id: str = Field(..., min_length=1, max_length=64)
+    waba_id: str = ""
+    sheet_url: str = ""
+    connection_verified: bool = False
+    subscribed_apps: Optional[bool] = None
+    sheet_tested: bool = False
+    verified_name: str = ""
+
+
+class OnboardingActivateBody(BaseModel):
+    send_test: bool = True
 
 
 @router.post("/api/dashboard/tenants")
@@ -257,6 +341,7 @@ async def create_tenant_route(
     """Admin: create a new business tenant (draft by default)."""
     _require_db()
     from app.db.repo import create_tenant
+    from app.onboarding import parse_sheet_id, patch_onboarding
     from app.prompt_data import sanitize_text
     from app.tenant_resolver import invalidate_tenant
 
@@ -264,6 +349,23 @@ async def create_tenant_route(
     lang = body.greeting_language.strip().lower()
     if lang not in ("roman_urdu", "en", "ur", "english"):
         raise HTTPException(status_code=400, detail="Invalid greeting_language")
+    lang_norm = "en" if lang in ("en", "english") else "roman_urdu"
+
+    extra: dict = {}
+    if body.waba_id or body.connection_verified or body.template_id:
+        extra = patch_onboarding(
+            extra,
+            waba_id=sanitize_text(body.waba_id, max_len=64) if body.waba_id else None,
+            connection_verified=body.connection_verified or None,
+            subscribed_apps=body.subscribed_apps,
+            sheet_tested=body.sheet_tested or None,
+            verified_name=sanitize_text(body.verified_name, max_len=256) if body.verified_name else None,
+            template_id=body.template_id,
+        )
+    sheet_id = parse_sheet_id(body.sheet_url) if body.sheet_url else ""
+    if sheet_id:
+        extra["sheet"] = {"gsheet_id": sheet_id, "tab": ""}
+
     try:
         async with _get_db() as db:
             row = await create_tenant(
@@ -273,11 +375,14 @@ async def create_tenant_route(
                 phone_number_id=sanitize_text(body.phone_number_id, max_len=64),
                 business_wa_id=sanitize_text(body.business_wa_id or "", max_len=32),
                 owner_whatsapp=sanitize_text(body.owner_whatsapp or "", max_len=32),
-                greeting_language="en" if lang in ("en", "english") else "roman_urdu",
+                greeting_language=lang_norm,
                 status=status,
+                config=extra or None,
+                template_id=body.template_id,
             )
             phone = row.phone_number_id
             tid = row.id
+            st = row.status
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     invalidate_tenant(phone)
@@ -286,7 +391,8 @@ async def create_tenant_route(
         "phone_number_id": phone,
         "name": body.name,
         "flow_mode": body.flow_mode,
-        "status": status,
+        "status": st,
+        "template_id": body.template_id,
     }
 
 
@@ -344,38 +450,384 @@ async def verify_whatsapp_connection(
     _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
 ):
     """
-    Call Meta Graph API to confirm phone_number_id resolves.
-    Returns display name / verified_name when available.
+    Confirm phone_number_id via Graph API, show display name, and
+    auto-check / subscribe WABA subscribed_apps when waba_id is provided.
     """
-    _require_db()
-    import httpx
-    import os
+    from app.onboarding import verify_and_subscribe
 
-    token = os.environ.get("WHATSAPP_TOKEN") or os.environ.get("META_WHATSAPP_TOKEN") or ""
-    if not token:
-        raise HTTPException(status_code=503, detail="WHATSAPP_TOKEN not configured")
-    url = f"https://graph.facebook.com/v21.0/{body.phone_number_id}"
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(
-                url,
-                params={"fields": "display_phone_number,verified_name,quality_rating"},
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        return await verify_and_subscribe(
+            phone_number_id=body.phone_number_id.strip(),
+            waba_id=(body.waba_id or "").strip(),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Graph API error: {exc}") from exc
-    data = resp.json() if resp.content else {}
-    if resp.status_code >= 400:
-        err = (data.get("error") or {}).get("message") or resp.text
-        raise HTTPException(status_code=400, detail=f"Verification failed: {err}")
+
+
+@router.get("/api/dashboard/onboarding/templates")
+async def list_onboarding_templates(
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    from app.onboarding import list_templates
+    return {"items": list_templates()}
+
+
+@router.get("/api/dashboard/templates")
+async def list_starter_templates(
+    flow_mode: Optional[str] = Query(None),
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """List vertical starter templates (admin + owners for Settings picker)."""
+    from app.templates import list_templates
+    if flow_mode and flow_mode not in ("lead", "order"):
+        raise HTTPException(status_code=400, detail="flow_mode must be lead or order")
+    return {"items": list_templates(flow_mode=flow_mode)}
+
+
+class ApplyTemplateBody(BaseModel):
+    template_id: str = Field(..., min_length=1, max_length=64)
+    confirm: bool = False
+    greeting_language: Optional[str] = None
+
+
+@router.post("/api/dashboard/tenants/{tenant_db_id}/apply-template")
+async def apply_starter_template(
+    tenant_db_id: int,
+    body: ApplyTemplateBody,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """
+    Apply a starter template to the tenant's DRAFT config only.
+    Requires confirm=true. Does not touch published messages/menu_v2.
+    """
+    _require_db()
+    if not body.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="confirm=true required — applying a template overwrites draft config",
+        )
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    dash_auth.assert_writable(user)
+    from app.dashboard.config_validate import validate_config_patch
+    from app.db.repo import get_tenant_row, save_tenant_config
+    from app.templates import build_draft_patch, get_template
+    from app.tenant_resolver import invalidate_tenant
+
+    tmpl = get_template(body.template_id)
+    if tmpl is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        cfg = dict(row.config or {})
+        lang = (body.greeting_language or cfg.get("greeting_language") or "roman_urdu").strip()
+        tmpl_flow = tmpl.get("flow_mode") or row.flow_mode
+        try:
+            patch = build_draft_patch(
+                body.template_id,
+                flow_mode=tmpl_flow,
+                greeting_language=lang,
+                business_name=row.name or "",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        cleaned = validate_config_patch(tmpl_flow, patch)
+        # Merge: draft keys from template; preserve published messages/menu_v2
+        new_cfg = dict(cfg)
+        for key, val in cleaned.items():
+            if key in ("messages", "menu_v2"):
+                continue  # never overwrite published via apply-template
+            new_cfg[key] = val
+        if "messages_draft" in patch:
+            new_cfg["messages_draft"] = patch["messages_draft"]
+        if "menu_v2_draft" in patch:
+            new_cfg["menu_v2_draft"] = patch["menu_v2_draft"]
+        if "onboarding" in patch:
+            ob = dict(new_cfg.get("onboarding") or {})
+            ob.update(patch["onboarding"])
+            new_cfg["onboarding"] = ob
+
+        if tmpl_flow in ("lead", "order") and row.flow_mode != tmpl_flow:
+            row.flow_mode = tmpl_flow
+
+        await save_tenant_config(
+            db,
+            tenant_db_id,
+            name=None,
+            config=new_cfg,
+            changed_by=user.username,
+        )
+        phone = row.phone_number_id
+        flow = row.flow_mode
+
+    invalidate_tenant(phone)
     return {
         "ok": True,
-        "phone_number_id": body.phone_number_id,
-        "display_phone_number": data.get("display_phone_number"),
-        "verified_name": data.get("verified_name") or data.get("name"),
-        "quality_rating": data.get("quality_rating"),
-        "raw": data,
+        "tenant_id": tenant_db_id,
+        "template_id": tmpl.get("id"),
+        "flow_mode": flow,
+        "draft_only": True,
+        "message": "Draft updated — publish from Settings to go live",
     }
+
+
+@router.post("/api/dashboard/sheet/test")
+async def test_sheet_connection(
+    body: SheetTestBody,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    from app.onboarding import test_sheet_access
+
+    try:
+        result = await test_sheet_access(body.sheet_url)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Sheet test failed: {exc}") from exc
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("detail") or "Sheet write failed")
+    return result
+
+
+@router.post("/api/dashboard/onboarding/draft")
+async def save_onboarding_draft(
+    body: OnboardingDraftBody,
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """Save wizard progress as a draft tenant (create or update)."""
+    _require_db()
+    from app.db.repo import (
+        create_tenant,
+        get_tenant_row,
+        get_tenant_row_by_phone,
+        save_tenant_config,
+    )
+    from app.onboarding import (
+        apply_template_to_config,
+        build_checklist,
+        parse_sheet_id,
+        patch_onboarding,
+    )
+    from app.prompt_data import sanitize_text
+    from app.tenant_resolver import invalidate_tenant
+
+    lang = body.greeting_language.strip().lower()
+    if lang not in ("roman_urdu", "en", "ur", "english"):
+        raise HTTPException(status_code=400, detail="Invalid greeting_language")
+    lang_norm = "en" if lang in ("en", "english") else "roman_urdu"
+    phone = sanitize_text(body.phone_number_id, max_len=64)
+    name = sanitize_text(body.name, max_len=256)
+
+    sheet_id = parse_sheet_id(body.sheet_url) if body.sheet_url else ""
+    base_cfg: dict = {
+        "business_wa_id": sanitize_text(body.business_wa_id or "", max_len=32),
+        "owner_whatsapp": sanitize_text(body.owner_whatsapp or "", max_len=32),
+        "greeting_language": lang_norm,
+    }
+    if sheet_id:
+        base_cfg["sheet"] = {"gsheet_id": sheet_id, "tab": ""}
+
+    try:
+        base_cfg = apply_template_to_config(
+            base_cfg,
+            template_id=body.template_id,
+            flow_mode=body.flow_mode,
+            greeting_language=lang_norm,
+            business_name=name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    base_cfg = patch_onboarding(
+        base_cfg,
+        waba_id=sanitize_text(body.waba_id, max_len=64) if body.waba_id else "",
+        connection_verified=body.connection_verified,
+        subscribed_apps=body.subscribed_apps,
+        sheet_tested=body.sheet_tested,
+        verified_name=sanitize_text(body.verified_name, max_len=256) if body.verified_name else "",
+        template_id=body.template_id,
+        content_set=True,
+    )
+
+    async with _get_db() as db:
+        row = None
+        if body.tenant_id:
+            row = await get_tenant_row(db, body.tenant_id)
+            if row is None:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+            if (row.status or "") not in ("draft", "paused"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only draft/paused tenants can be updated via onboarding draft",
+                )
+        else:
+            existing = await get_tenant_row_by_phone(db, phone)
+            if existing is not None and (not body.tenant_id or existing.id != body.tenant_id):
+                # Allow continuing the same draft phone
+                if (existing.status or "") == "draft":
+                    row = existing
+                else:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"phone_number_id already exists: {phone}",
+                    )
+
+        if row is None:
+            try:
+                row = await create_tenant(
+                    db,
+                    name=name,
+                    flow_mode=body.flow_mode,
+                    phone_number_id=phone,
+                    business_wa_id=base_cfg.get("business_wa_id", ""),
+                    owner_whatsapp=base_cfg.get("owner_whatsapp", ""),
+                    greeting_language=lang_norm,
+                    status="draft",
+                    config=base_cfg,
+                    template_id=None,  # already applied into base_cfg
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+        else:
+            row.name = name
+            row.flow_mode = body.flow_mode
+            # phone change only if free
+            if row.phone_number_id != phone:
+                clash = await get_tenant_row_by_phone(db, phone)
+                if clash is not None and clash.id != row.id:
+                    raise HTTPException(status_code=409, detail="phone_number_id already exists")
+                row.phone_number_id = phone
+            await save_tenant_config(
+                db,
+                row.id,
+                name=name,
+                config=base_cfg,
+                changed_by=_admin.username,
+            )
+            # Re-fetch for checklist
+            row = await get_tenant_row(db, row.id)
+
+        checklist = build_checklist(row)
+        tid = row.id
+        st = row.status
+        out_phone = row.phone_number_id
+
+    invalidate_tenant(out_phone)
+    return {
+        "id": tid,
+        "phone_number_id": out_phone,
+        "name": name,
+        "flow_mode": body.flow_mode,
+        "status": st,
+        "template_id": body.template_id,
+        "checklist": checklist,
+    }
+
+
+@router.post("/api/dashboard/onboarding/{tenant_db_id}/activate")
+async def activate_onboarding(
+    tenant_db_id: int,
+    body: OnboardingActivateBody = OnboardingActivateBody(),
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """Promote draft → live, invalidate resolver cache, optionally SMS owner."""
+    _require_db()
+    from app.db.repo import get_tenant_row, set_tenant_status
+    from app.onboarding import build_checklist, patch_onboarding
+    from app.tenant_resolver import invalidate_tenant
+    from app.tenants import Tenant
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        cfg = dict(row.config or {})
+        owner = (cfg.get("owner_whatsapp") or "").strip()
+        if not owner:
+            raise HTTPException(
+                status_code=400,
+                detail="owner_whatsapp required before activate",
+            )
+        if not (cfg.get("onboarding") or {}).get("connection_verified"):
+            raise HTTPException(
+                status_code=400,
+                detail="Verify WhatsApp connection before activate",
+            )
+
+        row = await set_tenant_status(db, tenant_db_id, "live")
+        phone = row.phone_number_id
+        tenant = Tenant.from_db_row(row)
+
+    invalidate_tenant(phone)
+
+    test_sent = False
+    test_error = None
+    if body.send_test:
+        from app.main import send_whatsapp_message
+
+        text = (
+            f"BahiDesk: {tenant.name} is now LIVE on WhatsApp. "
+            f"Reply to this number to confirm the bot is working."
+        )
+        try:
+            ok = await send_whatsapp_message(owner, text, tenant=tenant)
+            test_sent = bool(ok)
+            if not ok:
+                test_error = "WhatsApp send failed"
+        except Exception as exc:
+            test_error = str(exc)
+
+        async with _get_db() as db:
+            row = await get_tenant_row(db, tenant_db_id)
+            cfg = patch_onboarding(
+                dict(row.config or {}),
+                test_message_sent=test_sent,
+                test_message_error=test_error or "",
+            )
+            row.config = cfg
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(row, "config")
+            checklist = build_checklist(row)
+    else:
+        async with _get_db() as db:
+            row = await get_tenant_row(db, tenant_db_id)
+            checklist = build_checklist(row)
+
+    invalidate_tenant(phone)
+    return {
+        "id": tenant_db_id,
+        "phone_number_id": phone,
+        "status": "live",
+        "test_message_sent": test_sent,
+        "test_error": test_error,
+        "checklist": checklist,
+    }
+
+
+@router.get("/api/dashboard/tenants/{tenant_db_id}/checklist")
+async def get_tenant_checklist(
+    tenant_db_id: int,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    _require_db()
+    from app.db.repo import get_tenant_row
+    from app.onboarding import build_checklist
+
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        return build_checklist(row)
 
 
 class CreateOwnerBody(BaseModel):
@@ -403,7 +855,142 @@ async def create_owner(
             role="owner",
             tenant_id=body.tenant_id,
         )
-    return {"ok": True, "username": body.username}
+    return {"ok": True, "username": body.username, "tenant_id": body.tenant_id, "role": "owner"}
+
+
+@router.get("/api/dashboard/users")
+async def list_dashboard_users(
+    _admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    _require_db()
+    from app.db.repo import list_users, get_tenant_row
+
+    async with _get_db() as db:
+        rows = await list_users(db)
+        items = []
+        for u in rows:
+            tenant_name = None
+            if u.tenant_id:
+                t = await get_tenant_row(db, u.tenant_id)
+                tenant_name = t.name if t else None
+            items.append({
+                "id": u.id,
+                "username": u.username,
+                "role": u.role,
+                "tenant_id": u.tenant_id,
+                "tenant_name": tenant_name,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+            })
+    return {"items": items}
+
+
+@router.get("/api/dashboard/me")
+async def get_me(user: dash_auth.AuthUser = Depends(dash_auth.require_auth)):
+    """Current user + tenant summary (owner shell bootstrap)."""
+    _require_db()
+    from app.db.repo import get_tenant_row
+    from app.onboarding import build_checklist
+
+    tenant = None
+    if user.tenant_id is not None:
+        async with _get_db() as db:
+            row = await get_tenant_row(db, user.tenant_id)
+            if row is not None:
+                cfg = row.config or {}
+                tenant = {
+                    "id": row.id,
+                    "name": row.name,
+                    "phone_number_id": row.phone_number_id,
+                    "flow_mode": row.flow_mode,
+                    "status": getattr(row, "status", None) or "live",
+                    "waba_id": (cfg.get("onboarding") or {}).get("waba_id") or "",
+                    "checklist": build_checklist(row),
+                }
+    return {
+        "username": user.username,
+        "role": user.role,
+        "tenant_id": user.tenant_id,
+        "readonly": user.readonly,
+        "impersonated_by": user.impersonated_by,
+        "tenant": tenant,
+    }
+
+
+@router.get("/api/dashboard/billing")
+async def get_billing(user: dash_auth.AuthUser = Depends(dash_auth.require_auth)):
+    """
+    Read-only billing placeholder for owners.
+    Structured for a future metering backend.
+    """
+    _require_db()
+    from datetime import datetime, timezone
+    from app.db.repo import get_tenant_row
+
+    if user.role == "owner" and user.tenant_id is None:
+        raise HTTPException(status_code=403, detail="Owner missing tenant")
+
+    tenant_id = user.tenant_id
+    tenant_name = None
+    if tenant_id is not None:
+        async with _get_db() as db:
+            row = await get_tenant_row(db, tenant_id)
+            if row is None and user.role == "owner":
+                raise HTTPException(status_code=404, detail="Tenant not found")
+            if row:
+                tenant_name = row.name
+
+    now = datetime.now(timezone.utc)
+    return {
+        "plan_name": "Starter",
+        "status": "active",
+        "period": now.strftime("%Y-%m"),
+        "tenant_id": tenant_id,
+        "tenant_name": tenant_name,
+        "usage": {
+            "messages_sent": 0,
+            "templates_sent": 0,
+            "note": "Usage metering coming soon — placeholder counts",
+        },
+        "placeholder": True,
+    }
+
+
+@router.post("/api/dashboard/admin/view-as/{tenant_db_id}")
+async def view_as_owner(
+    tenant_db_id: int,
+    admin: dash_auth.AuthUser = Depends(dash_auth.require_admin),
+):
+    """
+    Issue a short-lived read-only owner token for support.
+    Client stores previous token separately to exit view-as.
+    """
+    _require_db()
+    from app.db.repo import get_tenant_row
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        name = row.name
+
+    view_user = dash_auth.AuthUser(
+        username=f"viewas:{admin.username}",
+        role="owner",
+        tenant_id=tenant_db_id,
+        impersonated_by=admin.username,
+        readonly=True,
+    )
+    token = dash_auth.create_access_token(view_user)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": "owner",
+        "tenant_id": tenant_db_id,
+        "tenant_name": name,
+        "readonly": True,
+        "impersonated_by": admin.username,
+        "expires_in_hours": dash_auth.TOKEN_TTL_H,
+    }
 
 
 @router.get("/api/dashboard/overview")
@@ -508,6 +1095,7 @@ async def send_conversation_message(
     _require_db()
     from app.prompt_data import sanitize_text
 
+    dash_auth.assert_writable(user)
     text = sanitize_text(body.text.strip(), max_len=4096)
     if not text:
         raise HTTPException(status_code=400, detail="Message text is required")
@@ -586,6 +1174,7 @@ async def post_mute(
     from app.tenants import get_tenant
     from app.db.store import MuteStore, EventStore
 
+    dash_auth.assert_writable(user)
     if user.role == "owner":
         scoped = await _scoped_tenant_phone(user, body.tenant_id)
         if scoped != body.tenant_id:

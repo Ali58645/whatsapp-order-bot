@@ -1,3 +1,30 @@
+export type ChecklistItem = {
+  id: string;
+  label: string;
+  done: boolean;
+};
+
+export type OnboardingChecklist = {
+  tenant_id: number;
+  status: string;
+  template_id?: string | null;
+  items: ChecklistItem[];
+  done_count: number;
+  total_count: number;
+  complete: boolean;
+};
+
+export type OnboardingTemplate = {
+  id: string;
+  name: string;
+  description?: string;
+  blurb?: string;
+  vertical: string;
+  flow_mode: "lead" | "order" | string;
+  icon?: string;
+  languages?: string[];
+};
+
 export type Tenant = {
   id: number;
   phone_number_id: string;
@@ -9,6 +36,31 @@ export type Tenant = {
   leads_today?: number;
   orders_today?: number;
   stat_today?: number;
+  checklist?: OnboardingChecklist;
+  template_id?: string | null;
+};
+
+export type FlowStepOption = {
+  id: string;
+  title: string;
+  description?: string;
+  value?: string;
+  sheet_value?: string;
+};
+
+export type FlowStep = {
+  id: string;
+  key: string;
+  type: "text_question" | "button_options" | "list_options" | "free_text_capture" | string;
+  question_text?: string;
+  question_key?: string | null;
+  options_key?: string | null;
+  options?: FlowStepOption[];
+  capture_field?: string | null;
+  required?: boolean;
+  skip_if_declined?: boolean;
+  reserved?: boolean;
+  system?: boolean;
 };
 
 export type TenantConfig = {
@@ -32,6 +84,7 @@ export type TenantConfig = {
   messages_draft?: Record<string, unknown> | null;
   business_wa_id: string;
   owner_whatsapp: string;
+  flow?: FlowStep[];
 };
 
 export type MenuV2Option = { id: string; label: string; price_delta: number };
@@ -76,11 +129,22 @@ export type TenantConfigResponse = {
   flow_mode: string;
   status?: string;
   updated_at: string | null;
+  wiring?: {
+    phone_number_id: string;
+    waba_id: string;
+    flow_mode: string;
+    managed_by: string;
+    read_only: boolean;
+  };
   config: TenantConfig;
 };
 
 const ROLE_KEY = "dash_role";
 const USER_TENANT_KEY = "dash_user_tenant_id";
+const READONLY_KEY = "dash_readonly";
+const IMPERSONATOR_KEY = "dash_impersonated_by";
+const ADMIN_TOKEN_BACKUP = "dash_admin_token_backup";
+const UI_LANG_KEY = "dash_ui_lang";
 
 export function getRole(): string | null {
   return localStorage.getItem(ROLE_KEY);
@@ -90,6 +154,54 @@ export function getUserTenantId(): number | null {
   const v = localStorage.getItem(USER_TENANT_KEY);
   return v ? Number(v) : null;
 }
+
+export function isOwner(): boolean {
+  return getRole() === "owner";
+}
+
+export function isAdmin(): boolean {
+  return getRole() === "admin";
+}
+
+export function isReadonlySession(): boolean {
+  return localStorage.getItem(READONLY_KEY) === "1";
+}
+
+export function getImpersonatedBy(): string | null {
+  return localStorage.getItem(IMPERSONATOR_KEY);
+}
+
+export function getUiLang(): "en" | "ur" {
+  return localStorage.getItem(UI_LANG_KEY) === "ur" ? "ur" : "en";
+}
+
+export function setUiLang(lang: "en" | "ur") {
+  localStorage.setItem(UI_LANG_KEY, lang);
+  window.dispatchEvent(new Event("ui-lang-change"));
+}
+
+export type MeResponse = {
+  username: string;
+  role: string;
+  tenant_id: number | null;
+  readonly: boolean;
+  impersonated_by: string | null;
+  tenant: Tenant | null;
+};
+
+export type BillingInfo = {
+  plan_name: string;
+  status: string;
+  period: string;
+  tenant_id: number | null;
+  tenant_name: string | null;
+  usage: {
+    messages_sent: number;
+    templates_sent: number;
+    note: string;
+  };
+  placeholder: boolean;
+};
 
 export type Overview = {
   leads_today: number;
@@ -173,6 +285,81 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(USER_TENANT_KEY);
+  localStorage.removeItem(READONLY_KEY);
+  localStorage.removeItem(IMPERSONATOR_KEY);
+  localStorage.removeItem(TENANT_KEY);
+}
+
+function applySession(data: {
+  access_token: string;
+  role?: string;
+  tenant_id?: number | null;
+  readonly?: boolean;
+  impersonated_by?: string | null;
+}) {
+  setToken(data.access_token);
+  if (data.role) localStorage.setItem(ROLE_KEY, data.role);
+  if (data.tenant_id != null) localStorage.setItem(USER_TENANT_KEY, String(data.tenant_id));
+  else localStorage.removeItem(USER_TENANT_KEY);
+  if (data.readonly) localStorage.setItem(READONLY_KEY, "1");
+  else localStorage.removeItem(READONLY_KEY);
+  if (data.impersonated_by) localStorage.setItem(IMPERSONATOR_KEY, data.impersonated_by);
+  else localStorage.removeItem(IMPERSONATOR_KEY);
+}
+
+export async function login(username: string, password: string) {
+  const data = await api<{
+    access_token: string;
+    role?: string;
+    tenant_id?: number | null;
+    readonly?: boolean;
+    impersonated_by?: string | null;
+  }>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+    tenant: false,
+  });
+  applySession(data);
+  return data;
+}
+
+export async function enterViewAs(tenantDbId: number) {
+  const current = getToken();
+  if (current && getRole() === "admin") {
+    localStorage.setItem(ADMIN_TOKEN_BACKUP, current);
+  }
+  const data = await api<{
+    access_token: string;
+    role: string;
+    tenant_id: number;
+    readonly: boolean;
+    impersonated_by: string;
+    tenant_name?: string;
+  }>(`/api/dashboard/admin/view-as/${tenantDbId}`, {
+    method: "POST",
+    tenant: false,
+  });
+  applySession(data);
+  // Lock filter; phone set after /me load by Layout
+  return data;
+}
+
+export function exitViewAs(): boolean {
+  const backup = localStorage.getItem(ADMIN_TOKEN_BACKUP);
+  if (!backup) return false;
+  localStorage.removeItem(ADMIN_TOKEN_BACKUP);
+  localStorage.removeItem(READONLY_KEY);
+  localStorage.removeItem(IMPERSONATOR_KEY);
+  setToken(backup);
+  localStorage.setItem(ROLE_KEY, "admin");
+  localStorage.removeItem(USER_TENANT_KEY);
+  return true;
+}
+
 export function getTenantFilter(): string {
   return localStorage.getItem(TENANT_KEY) || "all";
 }
@@ -208,7 +395,7 @@ export async function api<T>(
   const { tenant: _t, ...rest } = opts;
   const res = await fetch(url, { ...rest, headers });
   if (res.status === 401) {
-    setToken(null);
+    clearSession();
     throw new ApiError(401, "Unauthorized");
   }
   if (!res.ok) {
@@ -223,16 +410,4 @@ export async function api<T>(
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
-}
-
-export async function login(username: string, password: string) {
-  const data = await api<{ access_token: string; role?: string; tenant_id?: number | null }>(
-    "/api/auth/login",
-    { method: "POST", body: JSON.stringify({ username, password }), tenant: false },
-  );
-  setToken(data.access_token);
-  if (data.role) localStorage.setItem(ROLE_KEY, data.role);
-  if (data.tenant_id != null) localStorage.setItem(USER_TENANT_KEY, String(data.tenant_id));
-  else localStorage.removeItem(USER_TENANT_KEY);
-  return data;
 }

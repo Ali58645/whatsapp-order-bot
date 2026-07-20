@@ -1,0 +1,110 @@
+{
+  "id": "real_estate",
+  "name": "Real Estate",
+  "vertical": "real_estate",
+  "flow_mode": "lead",
+  "blurb": "Buy/Rent interest → area → budget → agent callback.",
+  "icon": "home",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Property Inquiry",
+    "greeting_text": "Assalam o Alaikum! Property interest share karein — hum agent callback schedule kar denge.",
+    "demo_slots": [
+      "Aaj 5pm",
+      "Kal 12pm"
+    ],
+    "facts_features": "Lead capture: type, area, budget, then agent callback.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Share your property interest — we'll schedule an agent callback."
+      }
+    },
+    "messages_overlay": {
+      "lead": {
+        "greeting_line": "Assalam o Alaikum! Property interest note karte hain.",
+        "value_line": "Type choose karein — area/budget ke baad agent call.",
+        "q_business_name": "Aapka naam?",
+        "q_business_type": "Buy/Rent aur property type?",
+        "q_locations": "Kaunsa area / city?",
+        "q_current_system": "Budget range (approx)?",
+        "q_scheduling": "Agent callback ke liye slot choose karein:",
+        "q_custom_slot": "Preferred callback time likhein."
+      },
+      "interactive": {
+        "business_types": [
+          {
+            "id": "t_bh",
+            "title": "Buy House",
+            "description": "Purchase home",
+            "value": "Buy House"
+          },
+          {
+            "id": "t_bp",
+            "title": "Buy Plot",
+            "description": "Plot",
+            "value": "Buy Plot"
+          },
+          {
+            "id": "t_bc",
+            "title": "Buy Shop",
+            "description": "Commercial",
+            "value": "Buy Commercial"
+          },
+          {
+            "id": "t_rh",
+            "title": "Rent House",
+            "description": "Rental home",
+            "value": "Rent House"
+          },
+          {
+            "id": "t_rc",
+            "title": "Rent Shop",
+            "description": "Commercial rent",
+            "value": "Rent Commercial"
+          }
+        ],
+        "locations": [
+          {
+            "id": "a1",
+            "title": "DHA / Bahria",
+            "value": "DHA/Bahria"
+          },
+          {
+            "id": "a2",
+            "title": "City center",
+            "value": "Center"
+          },
+          {
+            "id": "a3",
+            "title": "Other area",
+            "value": "Other"
+          }
+        ],
+        "current_system": [
+          {
+            "id": "b1",
+            "title": "Under 1 Cr",
+            "sheet_value": "<1Cr"
+          },
+          {
+            "id": "b2",
+            "title": "1-3 Cr",
+            "sheet_value": "1-3Cr"
+          },
+          {
+            "id": "b3",
+            "title": "3 Cr+",
+            "sheet_value": "3Cr+"
+          }
+        ]
+      }
+    }
+  }
+}
