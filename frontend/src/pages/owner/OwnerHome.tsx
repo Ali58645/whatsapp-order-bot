@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { RefreshCw, Sparkles, AlertTriangle } from "lucide-react";
 import {
@@ -9,9 +9,8 @@ import {
 } from "../../api";
 import { useI18n } from "../../i18n";
 import { StatCard } from "../../components/ui/stat-card";
-import { Skeleton } from "../../components/ui/avatar";
 import { Button } from "../../components/ui/button";
-import { cn, relativeTime, eventIconType } from "../../lib/utils";
+import { cn, relativeTime, eventIconType, eventsByDay } from "../../lib/utils";
 
 export default function OwnerHome() {
   const { t } = useI18n();
@@ -61,6 +60,11 @@ export default function OwnerHome() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const series = useMemo(
+    () => eventsByDay(data?.recent_events || [], 7),
+    [data?.recent_events]
+  );
 
   const live = (me?.tenant?.status || "live") === "live";
   const isOrder = me?.tenant?.flow_mode === "order";
@@ -114,29 +118,44 @@ export default function OwnerHome() {
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
       )}
 
-      {loading || !data ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-28 rounded-2xl" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label={isOrder ? t("ordersToday") : t("newCustomers")}
+          value={isOrder ? data?.orders_today ?? 0 : data?.leads_today ?? 0}
+          series={series}
+          glow
+          loading={loading}
+        />
+        <StatCard
+          label={t("thisWeek")}
+          value={isOrder ? data?.orders_today ?? 0 : data?.leads_this_week ?? 0}
+          series={series}
+          loading={loading}
+        />
+        {!isOrder && (
           <StatCard
-            label={isOrder ? t("ordersToday") : t("newCustomers")}
-            value={isOrder ? data.orders_today : data.leads_today}
+            label={t("demos")}
+            value={data?.demos_scheduled ?? 0}
+            series={series}
+            loading={loading}
           />
+        )}
+        {isOrder && (
           <StatCard
-            label={t("thisWeek")}
-            value={isOrder ? data.orders_today : data.leads_this_week}
+            label={t("revenueToday")}
+            value={data?.revenue_today ?? 0}
+            series={series}
+            prefix="Rs "
+            loading={loading}
           />
-          {!isOrder && <StatCard label={t("demos")} value={data.demos_scheduled} />}
-          {isOrder && (
-            <StatCard label={t("revenueToday")} value={`Rs ${data.revenue_today}`} />
-          )}
-          <StatCard label={t("recentActivity")} value={data.active_conversations} />
-        </div>
-      )}
+        )}
+        <StatCard
+          label={t("recentActivity")}
+          value={data?.active_conversations ?? 0}
+          series={series}
+          loading={loading}
+        />
+      </div>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">

@@ -7,8 +7,9 @@ export default function SparkAreaInner({
   data: number[];
   className?: string;
 }) {
-  const chartData = data.map((v, i) => ({ i, v }));
-  const id = `spark-${data.length}-${data[0] ?? 0}-${data[data.length - 1] ?? 0}`;
+  const series = data ?? [];
+  const chartData = series.map((v, i) => ({ i, v }));
+  const id = `spark-${series.length}-${series[0] ?? 0}-${series[series.length - 1] ?? 0}`;
   return (
     <div className={className} style={{ width: "100%", height: 48 }}>
       <ResponsiveContainer>

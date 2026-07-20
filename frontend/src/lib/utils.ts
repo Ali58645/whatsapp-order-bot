@@ -90,8 +90,8 @@ export function eventsByDay(events: EventItem[], days = 7): number[] {
   return counts;
 }
 
-export function deltaVsPrior(values: number[]): { delta: number; pct: number | null } {
-  if (values.length < 2) return { delta: 0, pct: null };
+export function deltaVsPrior(values: number[] | null | undefined): { delta: number; pct: number | null } {
+  if (!values || values.length < 2) return { delta: 0, pct: null };
   const today = values[values.length - 1];
   const prior = values[values.length - 2];
   const delta = today - prior;

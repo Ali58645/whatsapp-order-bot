@@ -8,7 +8,7 @@ import { Skeleton } from "./avatar";
 export function StatCard({
   label,
   value,
-  series,
+  series = [],
   prefix = "",
   suffix = "",
   glow = false,
@@ -17,14 +17,15 @@ export function StatCard({
 }: {
   label: string;
   value: number;
-  series: number[];
+  series?: number[];
   prefix?: string;
   suffix?: string;
   glow?: boolean;
   delay?: number;
   loading?: boolean;
 }) {
-  const { delta, pct } = deltaVsPrior(series);
+  const spark = series ?? [];
+  const { delta, pct } = deltaVsPrior(spark);
   const up = delta >= 0;
 
   if (loading) {
@@ -47,7 +48,7 @@ export function StatCard({
             {label}
           </p>
           <p className="mt-2 font-stat text-stat tabular text-foreground">
-            <CountUp value={value} prefix={prefix} suffix={suffix} />
+            <CountUp value={Number(value) || 0} prefix={prefix} suffix={suffix} />
           </p>
         </div>
         {pct != null && (
@@ -63,7 +64,7 @@ export function StatCard({
         )}
       </div>
       <div className="mt-3 -mx-1">
-        <SparkArea data={series} />
+        <SparkArea data={spark} />
       </div>
     </motion.div>
   );
