@@ -125,9 +125,18 @@ export type Lead = {
   updated_at: string | null;
   last_activity: string | null;
   contact: ContactBrief;
-  history?: { role: string; content: string }[];
+  history?: { role: string; content: string; sender?: string }[];
   phase?: string | null;
   session_status?: string | null;
+};
+
+export type Conversation = {
+  contact: ContactBrief & { tenant_id: number; first_seen?: string | null; last_seen?: string | null };
+  muted_until: string | null;
+  window_open: boolean;
+  last_inbound_at: string | null;
+  history: { role: string; content: string; sender?: string }[];
+  phase?: string | null;
 };
 
 export type Order = {

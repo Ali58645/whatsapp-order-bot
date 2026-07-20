@@ -329,6 +329,103 @@ async def list_orders(
 
 # ── Conversations ─────────────────────────────────────────────────────────────
 
+MESSAGING_WINDOW_S = 24 * 3600
+
+
+def _aware_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def messaging_window_open(last_inbound_at: datetime | None) -> bool:
+    """True when a free-form session message may be sent (Meta 24h window)."""
+    if last_inbound_at is None:
+        return False
+    return (_utc_now() - _aware_utc(last_inbound_at)).total_seconds() < MESSAGING_WINDOW_S
+
+
+async def send_agent_reply(
+    db: AsyncSession,
+    *,
+    contact_id: int,
+    text: str,
+    agent_username: str = "",
+) -> dict:
+    """Send dashboard agent reply; persist history, mute, and human_takeover event."""
+    from app.gate import MUTE_DURATION_S, mute_contact
+    from app.main import send_whatsapp_message
+    from app.db.repo import (
+        append_event,
+        create_session,
+        get_active_session,
+        save_session_state,
+        set_mute,
+    )
+    from app.sessions import save_session as mem_save_session
+    from app.tenants import Tenant, get_tenant
+
+    contact = (
+        await db.execute(select(DBContact).where(DBContact.id == contact_id))
+    ).scalar_one_or_none()
+    if contact is None:
+        raise LookupError("contact_not_found")
+
+    if not messaging_window_open(contact.last_seen):
+        raise ValueError("window_closed")
+
+    tenant_row = (
+        await db.execute(select(DBTenant).where(DBTenant.id == contact.tenant_id))
+    ).scalar_one_or_none()
+    if tenant_row is None:
+        raise LookupError("tenant_not_found")
+
+    tenant = get_tenant(tenant_row.phone_number_id)
+    if tenant is None:
+        tenant = Tenant.from_db_row(tenant_row)
+
+    ok = await send_whatsapp_message(contact.wa_id, text, tenant=tenant)
+    if not ok:
+        raise RuntimeError("send_failed")
+
+    agent_msg = {"role": "human_agent", "content": text, "sender": "human_agent"}
+    db_sess = await get_active_session(db, contact.tenant_id, contact.id)
+    if db_sess is None:
+        db_sess = await create_session(
+            db,
+            contact.tenant_id,
+            contact.id,
+            flow_mode=tenant.flow_mode,
+            phase="GREETING",
+            meta={},
+        )
+        history = [agent_msg]
+    else:
+        history = list(db_sess.history or [])
+        history.append(agent_msg)
+
+    await save_session_state(db, db_sess, history=history)
+    mem_save_session(contact.wa_id, history, tenant_id=tenant.phone_number_id)
+
+    mute_contact(contact.wa_id, tenant.phone_number_id, MUTE_DURATION_S)
+    muted_until = _utc_now() + timedelta(seconds=MUTE_DURATION_S)
+    await set_mute(db, contact.tenant_id, contact.wa_id, muted_until)
+    await append_event(
+        db,
+        contact.tenant_id,
+        "human_takeover",
+        {
+            "wa_id": contact.wa_id,
+            "source": "dashboard_send",
+            "agent": agent_username,
+        },
+        contact_id=contact.id,
+    )
+    await db.flush()
+
+    return await conversation_for_contact(db, contact_id)
+
+
 async def conversation_for_contact(
     db: AsyncSession, contact_id: int
 ) -> dict | None:
@@ -381,6 +478,8 @@ async def conversation_for_contact(
             "last_seen": _iso(contact.last_seen),
         },
         "muted_until": muted_until,
+        "window_open": messaging_window_open(contact.last_seen),
+        "last_inbound_at": _iso(contact.last_seen),
         "active_session_id": primary.id if primary else None,
         "phase": primary.phase if primary else None,
         "history": list(primary.history or []) if primary else [],

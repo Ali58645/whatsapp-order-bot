@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { cn } from "../../lib/utils";
 
-type Msg = { role: string; content: string };
+type Msg = { role: string; content: string; sender?: string };
 
 function parseContent(content: string): { text: string; chips: string[] } {
   const chips: string[] = [];
@@ -18,7 +18,11 @@ function parseContent(content: string): { text: string; chips: string[] } {
   return { text, chips: [...new Set(chips)] };
 }
 
-function Bubble({ mine, content }: { mine: boolean; content: string }) {
+function isOutgoing(role: string): boolean {
+  return role === "user" || role === "human_agent";
+}
+
+function Bubble({ mine, content, agent }: { mine: boolean; content: string; agent?: boolean }) {
   const { text, chips } = parseContent(content);
   return (
     <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
@@ -30,7 +34,6 @@ function Bubble({ mine, content }: { mine: boolean; content: string }) {
             : "rounded-2xl rounded-bl-sm bg-[var(--wa-in)] text-zinc-100"
         )}
       >
-        {/* Tail */}
         <span
           className={cn(
             "absolute bottom-0 h-3 w-3",
@@ -43,6 +46,11 @@ function Bubble({ mine, content }: { mine: boolean; content: string }) {
           }}
           aria-hidden
         />
+        {agent && (
+          <span className="relative mb-1 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/90">
+            agent
+          </span>
+        )}
         <p className="transcript-text relative whitespace-pre-wrap">{text}</p>
         {chips.length > 0 && (
           <div className="relative mt-2 flex flex-wrap gap-1.5">
@@ -86,7 +94,12 @@ export function WhatsAppThread({ messages }: { messages: Msg[] }) {
         </span>
       </div>
       {items.map((m, i) => (
-        <Bubble key={i} mine={m.role === "user"} content={m.content} />
+        <Bubble
+          key={i}
+          mine={isOutgoing(m.role)}
+          content={m.content}
+          agent={m.role === "human_agent" || m.sender === "human_agent"}
+        />
       ))}
     </div>
   );

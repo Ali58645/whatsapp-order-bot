@@ -495,6 +495,59 @@ async def get_conversation(
     return data
 
 
+class SendMessageBody(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4096)
+
+
+@router.post("/api/dashboard/conversations/{contact_id}/send")
+async def send_conversation_message(
+    contact_id: int,
+    body: SendMessageBody,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    _require_db()
+    from app.prompt_data import sanitize_text
+
+    text = sanitize_text(body.text.strip(), max_len=4096)
+    if not text:
+        raise HTTPException(status_code=400, detail="Message text is required")
+
+    async with _get_db() as db:
+        preview = await queries.conversation_for_contact(db, contact_id)
+        if preview is None:
+            raise HTTPException(status_code=404, detail="Contact not found")
+        await _assert_resource_tenant(user, preview["contact"]["tenant_id"])
+
+        try:
+            data = await queries.send_agent_reply(
+                db,
+                contact_id=contact_id,
+                text=text,
+                agent_username=user.username,
+            )
+        except ValueError as exc:
+            if str(exc) == "window_closed":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Window closed — customer must message first",
+                ) from exc
+            raise
+        except LookupError as exc:
+            if str(exc) == "contact_not_found":
+                raise HTTPException(status_code=404, detail="Contact not found") from exc
+            if str(exc) == "tenant_not_found":
+                raise HTTPException(status_code=404, detail="Tenant not found") from exc
+            raise
+        except RuntimeError as exc:
+            if str(exc) == "send_failed":
+                raise HTTPException(
+                    status_code=502, detail="WhatsApp send failed"
+                ) from exc
+            raise
+
+    return data
+
+
 @router.get("/api/dashboard/events")
 async def get_events(
     tenant_id: str = Query("all"),
