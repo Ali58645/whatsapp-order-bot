@@ -1,8 +1,9 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Save, LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
+  filterPickerTenants,
   getTenantFilter,
   isReadonlySession,
   setTenantFilter,
@@ -58,6 +59,9 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
   const [templateBusy, setTemplateBusy] = useState(false);
   const readonly = isReadonlySession();
 
+  /** Live + draft only — paused/archived stay on the Businesses lifecycle UI. */
+  const pickerTenants = useMemo(() => filterPickerTenants(tenants), [tenants]);
+
   const loadTenants = useCallback(() => {
     api<{ items?: Tenant[] } | Tenant[]>("/api/dashboard/tenants", { tenant: false })
       .then((raw) => setTenants(Array.isArray(raw) ? raw : raw.items || []))
@@ -72,28 +76,35 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
   }, [loadTenants]);
 
   useEffect(() => {
-    if (!tenants.length) return;
+    if (!pickerTenants.length) {
+      setSelectedDbId(null);
+      return;
+    }
     const filter = getTenantFilter();
     const match =
       filter === "all"
-        ? tenants[0]
-        : tenants.find((t) => t.phone_number_id === filter) || tenants[0];
+        ? pickerTenants[0]
+        : pickerTenants.find((t) => t.phone_number_id === filter) || pickerTenants[0];
     setSelectedDbId(match?.id ?? null);
-  }, [tenants]);
+    if (match && filter !== match.phone_number_id) {
+      setTenantFilter(match.phone_number_id);
+    }
+  }, [pickerTenants]);
 
   useEffect(() => {
     const onFilterChange = () => {
-      if (!tenants.length) return;
+      if (!pickerTenants.length) return;
       const filter = getTenantFilter();
       const match =
         filter === "all"
-          ? tenants[0]
-          : tenants.find((t) => t.phone_number_id === filter);
+          ? pickerTenants[0]
+          : pickerTenants.find((t) => t.phone_number_id === filter);
       if (match) setSelectedDbId(match.id);
+      else if (pickerTenants[0]) setSelectedDbId(pickerTenants[0].id);
     };
     window.addEventListener("tenant-change", onFilterChange);
     return () => window.removeEventListener("tenant-change", onFilterChange);
-  }, [tenants]);
+  }, [pickerTenants]);
 
   useEffect(() => {
     if (selectedDbId == null) return;
@@ -463,7 +474,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
       )}
 
-      {!ownerMode && tenants.length > 1 && (
+      {!ownerMode && pickerTenants.length > 1 && (
         <div className="rounded-2xl border border-border bg-card p-5">
           <Label>Tenant</Label>
           <select
@@ -472,14 +483,14 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
             onChange={(e) => {
               const id = Number(e.target.value);
               setSelectedDbId(id);
-              const tn = tenants.find((x) => x.id === id);
+              const tn = pickerTenants.find((x) => x.id === id);
               if (tn) {
                 setTenantFilter(tn.phone_number_id);
                 window.dispatchEvent(new Event("tenant-change"));
               }
             }}
           >
-            {tenants.map((tn) => (
+            {pickerTenants.map((tn) => (
               <option key={tn.id} value={tn.id}>
                 {tn.name} ({tn.flow_mode})
               </option>

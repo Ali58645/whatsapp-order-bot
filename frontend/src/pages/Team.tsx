@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Eye, Loader2, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
-import { api, enterViewAs, Tenant } from "../api";
+import { api, enterViewAs, filterPickerTenants, Tenant } from "../api";
 import { useI18n } from "../i18n";
 import { Button } from "../components/ui/button";
 import { Input, Label } from "../components/ui/input";
@@ -37,7 +37,8 @@ export default function TeamPage() {
     ])
       .then(([u, raw]) => {
         setUsers(u.items || []);
-        const t = Array.isArray(raw) ? raw : raw.items || [];
+        const all = Array.isArray(raw) ? raw : raw.items || [];
+        const t = filterPickerTenants(all);
         setTenants(t);
         if (!tenantId && t[0]) setTenantId(t[0].id);
       })

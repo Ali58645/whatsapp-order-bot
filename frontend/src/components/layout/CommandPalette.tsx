@@ -10,7 +10,7 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { getRole, isOwner, isSupportSession, setTenantFilter, Tenant } from "../../api";
+import { filterPickerTenants, getRole, isOwner, isSupportSession, setTenantFilter, Tenant } from "../../api";
 import { Dialog, DialogContent } from "../ui/dialog";
 
 const ADMIN_PAGES = [
@@ -57,7 +57,7 @@ export function CommandPalette({
   const q = query.trim().toLowerCase();
   const filteredTenants =
     admin && !ownerShell && q
-      ? tenants.filter((t) => (t.name || "").toLowerCase().includes(q))
+      ? filterPickerTenants(tenants).filter((t) => (t.name || "").toLowerCase().includes(q))
       : [];
 
   return (

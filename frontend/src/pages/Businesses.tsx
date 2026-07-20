@@ -131,7 +131,7 @@ export default function BusinessesPage() {
     archived: 0,
     draft: 0,
   });
-  const [filter, setFilter] = useState<"all" | "live" | "paused" | "archived">("all");
+  const [filter, setFilter] = useState<"all" | "live" | "paused" | "archived">("live");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -635,7 +635,7 @@ export default function BusinessesPage() {
                 )}
 
                 <div className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">
-                  {st !== "archived" && (
+                  {(st === "live" || st === "paused") && (
                     <Button
                       variant="soft"
                       size="sm"
@@ -721,7 +721,7 @@ export default function BusinessesPage() {
                       Delete
                     </Button>
                   )}
-                  {st !== "archived" && (
+                  {(st === "live" || st === "draft") && (
                     <Button variant="outline" size="sm" onClick={() => openSettings(t)}>
                       <Settings className="h-3.5 w-3.5" />
                       Wiring

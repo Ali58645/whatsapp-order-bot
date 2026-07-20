@@ -40,6 +40,24 @@ export type Tenant = {
   template_id?: string | null;
 };
 
+/** Normalize status; missing → live. */
+export function tenantStatus(t: { status?: string | null }): string {
+  return (t.status || "live").toLowerCase();
+}
+
+/**
+ * Tenants shown in Settings / Team / command palette pickers.
+ * Paused + archived are lifecycle-only (Businesses filters).
+ */
+export function isPickerTenant(t: { status?: string | null }): boolean {
+  const s = tenantStatus(t);
+  return s === "live" || s === "draft";
+}
+
+export function filterPickerTenants<T extends { status?: string | null }>(tenants: T[]): T[] {
+  return tenants.filter(isPickerTenant);
+}
+
 export type TenantStatusCounts = {
   all: number;
   live: number;
