@@ -390,15 +390,14 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
       ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <p className="page-kicker">{ownerMode ? "Workspace" : "Wiring"}</p>
+          <h1 className="page-title mt-1">
             {ownerMode ? (menuOnly ? t("menu") : t("myBot")) : "Settings"}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Changes go live within ~60 seconds
-          </p>
+          <p className="page-subtitle">Changes go live within ~60 seconds</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {!ownerMode && (
@@ -475,10 +474,10 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
       )}
 
       {!ownerMode && pickerTenants.length > 1 && (
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="surface p-5">
           <Label>Tenant</Label>
           <select
-            className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus-ring"
+            className="field-select"
             value={selectedDbId ?? ""}
             onChange={(e) => {
               const id = Number(e.target.value);

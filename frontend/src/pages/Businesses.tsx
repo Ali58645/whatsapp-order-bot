@@ -495,76 +495,62 @@ export default function BusinessesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Businesses</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Platform console — onboard, monitor health, and open support view-as
+          <p className="page-kicker">Platform</p>
+          <h1 className="page-title mt-1">Businesses</h1>
+          <p className="page-subtitle">
+            Onboard, monitor health, and open support view-as for live operators.
           </p>
         </div>
-        <Button onClick={openWizard}>
+        <Button onClick={openWizard} size="lg">
           <Plus className="h-4 w-4" />
           New Business
         </Button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Leads today
-          </p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{overview?.leads_today ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Orders today
-          </p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{overview?.orders_today ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Live businesses
-          </p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{counts.live}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Active conversations
-          </p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">
-            {overview?.active_conversations ?? 0}
-          </p>
-        </div>
+        {[
+          { label: "Leads today", value: overview?.leads_today ?? 0 },
+          { label: "Orders today", value: overview?.orders_today ?? 0 },
+          { label: "Live businesses", value: counts.live },
+          { label: "Active conversations", value: overview?.active_conversations ?? 0 },
+        ].map((m) => (
+          <div key={m.label} className="metric-tile">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {m.label}
+            </p>
+            <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight">{m.value}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {FILTER_TABS.map((tab) => {
-          const n =
-            tab.id === "all"
-              ? counts.all - counts.archived
-              : counts[tab.id] ?? 0;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setFilter(tab.id)}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                filter === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
-              )}
-            >
-              {tab.label}
-              <span className="ml-1.5 tabular-nums opacity-80">{n}</span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="segmented">
+          {FILTER_TABS.map((tab) => {
+            const n =
+              tab.id === "all"
+                ? counts.all - counts.archived
+                : counts[tab.id] ?? 0;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                data-active={filter === tab.id}
+                onClick={() => setFilter(tab.id)}
+                className="segmented-item"
+              >
+                {tab.label}
+                <span className="ml-1.5 tabular-nums opacity-70">{n}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="relative ml-auto min-w-[200px] flex-1 sm:max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="h-9 pl-8"
+            className="h-10 pl-9"
             placeholder="Search by name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -579,13 +565,13 @@ export default function BusinessesPage() {
           ))}
         </div>
       ) : visible.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <Building2 className="mx-auto h-10 w-10 text-muted-foreground" />
+        <div className="surface border-dashed p-14 text-center">
+          <Building2 className="mx-auto h-10 w-10 text-muted-foreground/70" />
           <p className="mt-3 text-sm text-muted-foreground">
             {tenants.length === 0 ? "No businesses yet" : "No businesses in this filter"}
           </p>
           {tenants.length === 0 && (
-            <Button className="mt-4" onClick={openWizard}>
+            <Button className="mt-5" onClick={openWizard}>
               <Plus className="h-4 w-4" />
               Create your first business
             </Button>
@@ -599,12 +585,12 @@ export default function BusinessesPage() {
             return (
               <article
                 key={t.id}
-                className="flex flex-col rounded-2xl border border-border bg-card p-5"
+                className="surface-hover flex flex-col p-5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h2 className="truncate font-semibold">{t.name}</h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <h2 className="truncate text-[15px] font-semibold tracking-tight">{t.name}</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {flowLabel(t.flow_mode)}
                       {t.template_id ? ` · ${t.template_id}` : ""}
                     </p>
@@ -614,17 +600,21 @@ export default function BusinessesPage() {
                   </Badge>
                 </div>
 
-                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                  <p className="truncate font-mono">{t.phone_number_id}</p>
-                  <p>
-                    <span className="text-foreground">{t.stat_today ?? 0}</span>{" "}
-                    {statLabel.toLowerCase()}
+                <div className="mt-4 space-y-2">
+                  <p className="truncate rounded-lg bg-muted/40 px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground">
+                    {t.phone_number_id}
+                  </p>
+                  <p className="text-sm">
+                    <span className="text-lg font-bold tabular-nums tracking-tight text-foreground">
+                      {t.stat_today ?? 0}
+                    </span>{" "}
+                    <span className="text-xs text-muted-foreground">{statLabel.toLowerCase()}</span>
                   </p>
                 </div>
 
                 {st !== "archived" && (
-                  <div className="mt-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <div className="mt-3 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Onboarding
                       {t.checklist
                         ? ` · ${t.checklist.done_count}/${t.checklist.total_count}`
@@ -634,7 +624,7 @@ export default function BusinessesPage() {
                   </div>
                 )}
 
-                <div className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">
+                <div className="mt-4 flex flex-wrap gap-1.5 border-t border-border/60 pt-4">
                   {(st === "live" || st === "paused") && (
                     <Button
                       variant="soft"

@@ -73,11 +73,9 @@ export default function OwnerHome() {
     <div className="space-y-8">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("welcomeHome")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {me?.tenant?.name ? `${me.tenant.name} · ` : ""}
-            {t("homeSubtitle")}
-          </p>
+          <p className="page-kicker">{me?.tenant?.name || "Home"}</p>
+          <h1 className="page-title mt-1">{t("welcomeHome")}</h1>
+          <p className="page-subtitle">{t("homeSubtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
           <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />

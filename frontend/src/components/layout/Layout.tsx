@@ -160,14 +160,14 @@ export default function Layout() {
 
   const sidebarInner = (
     <>
-      <div className={cn("flex h-14 items-center gap-2 px-3", collapsed && "justify-center")}>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-bahi-400 to-bahi-700 text-sm font-bold text-white shadow-glow-sm">
+      <div className={cn("flex h-16 items-center gap-3 px-3.5", collapsed && "justify-center px-2")}>
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-bahi-400 via-bahi-500 to-bahi-700 text-sm font-extrabold text-white">
           B
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold tracking-tight">BahiDesk</p>
-            <p className="truncate text-[10px] text-muted-foreground">
+            <p className="truncate text-[15px] font-bold tracking-tight">BahiDesk</p>
+            <p className="truncate text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
               {ownerShell ? activeTenant?.name || viewAsName || "Your business" : "Platform"}
             </p>
           </div>
@@ -176,18 +176,18 @@ export default function Layout() {
 
       {ownerShell && !collapsed && (
         <div className="px-3 pb-3">
-          <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/30 px-3 py-2">
-            <p className="truncate text-xs font-medium">
+          <div className="rounded-xl border border-sidebar-border/80 bg-sidebar-accent/40 px-3 py-2.5">
+            <p className="truncate text-xs font-semibold">
               {activeTenant?.name || viewAsName || "…"}
             </p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
               {supportMode ? "Support mode" : "Your business"}
             </p>
           </div>
         </div>
       )}
 
-      <nav className="flex-1 space-y-0.5 px-2">
+      <nav className="flex-1 space-y-0.5 px-2.5">
         {nav.map((item) => (
           <NavLink
             key={item.to}
@@ -196,37 +196,37 @@ export default function Layout() {
             title={t(item.labelKey)}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-[13px] font-medium transition-all duration-150",
                 collapsed && "justify-center px-0",
                 isActive
-                  ? "bg-sidebar-accent text-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+                  ? "nav-item-active"
+                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
               )
             }
           >
-            <item.icon className="h-4 w-4 shrink-0" />
+            <item.icon className="h-4 w-4 shrink-0 opacity-90" />
             {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
           </NavLink>
         ))}
       </nav>
 
-      <div className={cn("space-y-1 border-t border-sidebar-border p-2", collapsed && "px-1")}>
+      <div className={cn("space-y-0.5 border-t border-sidebar-border/80 p-2.5", collapsed && "px-1")}>
         <button
           type="button"
           onClick={() => setLang(lang === "en" ? "ur" : "en")}
           className={cn(
-            "flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/60",
+            "flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] text-muted-foreground transition hover:bg-sidebar-accent/50 hover:text-foreground",
             collapsed && "justify-center px-0"
           )}
         >
-          <span className="text-xs font-semibold uppercase">{lang === "en" ? "EN" : "UR"}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">{lang === "en" ? "EN" : "UR"}</span>
           {!collapsed && <span>{t("language")}</span>}
         </button>
         <button
           type="button"
           onClick={logout}
           className={cn(
-            "flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/60",
+            "flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] text-muted-foreground transition hover:bg-sidebar-accent/50 hover:text-foreground",
             collapsed && "justify-center px-0"
           )}
         >
@@ -238,10 +238,10 @@ export default function Layout() {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="app-canvas min-h-screen text-foreground">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 md:flex",
+          "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-sidebar-border/80 bg-sidebar/90 backdrop-blur-xl transition-[width] duration-200 md:flex",
           collapsed ? "w-16" : "w-60"
         )}
       >
@@ -299,9 +299,13 @@ export default function Layout() {
         )}
       >
         {supportMode && (
-          <div className="flex items-center justify-between gap-3 bg-amber-500/15 px-4 py-2 text-sm text-amber-200">
+          <div className="flex items-center justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
             <span>
-              Viewing as {viewAsName || activeTenant?.name || "tenant"} — support mode
+              Viewing as{" "}
+              <span className="font-semibold text-amber-50">
+                {viewAsName || activeTenant?.name || "tenant"}
+              </span>{" "}
+              — support mode
               {impersonator ? ` · ${impersonator}` : ""}
             </span>
             <Button size="sm" variant="outline" onClick={onExitViewAs}>
@@ -310,7 +314,7 @@ export default function Layout() {
           </div>
         )}
 
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl">
           <Button
             variant="ghost"
             size="icon"
@@ -322,19 +326,20 @@ export default function Layout() {
           </Button>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs text-muted-foreground">
-              BahiDesk <span className="mx-1 opacity-40">/</span>
+            <p className="truncate text-[11px] font-medium tracking-wide text-muted-foreground">
+              BahiDesk
+              <span className="mx-1.5 text-border">/</span>
               <span className="text-foreground">{crumb}</span>
             </p>
           </div>
 
           <button
             onClick={() => setCmdOpen(true)}
-            className="hidden items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-muted sm:flex focus-ring"
+            className="hidden items-center gap-2 rounded-xl border border-border/70 bg-card/50 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-primary/30 hover:bg-card hover:text-foreground sm:flex focus-ring"
           >
             <Search className="h-3.5 w-3.5" />
             Search…
-            <kbd className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px]">
+            <kbd className="rounded-md border border-border/80 bg-background/80 px-1.5 py-0.5 text-[10px]">
               ⌘K
             </kbd>
           </button>
@@ -349,13 +354,13 @@ export default function Layout() {
             <Search className="h-4 w-4" />
           </Button>
 
-          <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2.5 py-1">
+          <div className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/40 px-2.5 py-1">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-40" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
             <span className="hidden text-[11px] font-medium text-muted-foreground sm:inline">
-              Bot online
+              Online
             </span>
           </div>
 
@@ -373,7 +378,7 @@ export default function Layout() {
           </Button>
         </header>
 
-        <main className="flex-1 px-4 py-6 pb-24 md:px-8 md:pb-8">
+        <main className="flex-1 px-4 py-7 pb-24 md:px-8 md:pb-10">
           <div className="mx-auto max-w-6xl">
             <AnimatePresence mode="wait">
               <motion.div

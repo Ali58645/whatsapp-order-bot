@@ -6,7 +6,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
     <input
       type={type}
       className={cn(
-        "flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-10 w-full rounded-xl border border-input bg-card/80 px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors hover:border-primary/30 focus-ring disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       ref={ref}
@@ -22,7 +22,7 @@ export const Textarea = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <textarea
     className={cn(
-      "flex min-h-[80px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-ring disabled:cursor-not-allowed disabled:opacity-50",
+      "flex min-h-[80px] w-full rounded-xl border border-input bg-card/80 px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors hover:border-primary/30 focus-ring disabled:cursor-not-allowed disabled:opacity-50",
       className
     )}
     ref={ref}
@@ -34,7 +34,7 @@ Textarea.displayName = "Textarea";
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn("text-xs font-medium text-muted-foreground", className)}
+      className={cn("text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground", className)}
       {...props}
     />
   );

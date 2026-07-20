@@ -95,15 +95,16 @@ export default function TeamPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("team")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Create owner logins and preview the client experience
+        <p className="page-kicker">Access</p>
+        <h1 className="page-title mt-1">{t("team")}</h1>
+        <p className="page-subtitle">
+          Create owner logins and open support view-as for a business
         </p>
       </div>
 
       <form
         onSubmit={onCreate}
-        className="grid gap-4 rounded-2xl border border-border bg-card p-5 sm:grid-cols-2"
+        className="surface grid gap-4 p-5 sm:grid-cols-2"
       >
         <h2 className="sm:col-span-2 text-sm font-semibold">{t("createOwner")}</h2>
         <div>
@@ -128,7 +129,7 @@ export default function TeamPage() {
         <div className="sm:col-span-2">
           <Label>{t("assignTenant")}</Label>
           <select
-            className="mt-1.5 flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+            className="field-select"
             value={tenantId}
             onChange={(e) => setTenantId(e.target.value ? Number(e.target.value) : "")}
           >
@@ -155,7 +156,7 @@ export default function TeamPage() {
         {loading ? (
           <Skeleton className="h-32 w-full rounded-2xl" />
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-border">
+          <div className="overflow-hidden rounded-2xl border border-border/80 bg-card/70 backdrop-blur-sm">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
@@ -211,7 +212,7 @@ export default function TeamPage() {
           {tenants.map((tn) => (
             <div
               key={tn.id}
-              className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3"
+              className="surface-hover flex items-center justify-between gap-2 px-4 py-3"
             >
               <div className="min-w-0">
                 <p className="truncate font-medium">{tn.name}</p>

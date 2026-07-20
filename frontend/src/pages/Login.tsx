@@ -63,11 +63,11 @@ export default function Login() {
       </div>
 
       {/* Right form */}
-      <div className="flex items-center justify-center bg-background px-6 py-12">
+      <div className="app-canvas relative flex items-center justify-center px-6 py-12">
         <motion.div
           animate={shake ? { x: [0, -8, 8, -6, 6, 0] } : { x: 0 }}
           transition={{ duration: 0.4 }}
-          className="w-full max-w-sm"
+          className="surface w-full max-w-sm p-8"
         >
           <div className="mb-8 lg:hidden">
             <div className="flex items-center gap-2">
@@ -78,7 +78,9 @@ export default function Login() {
             </div>
           </div>
           <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to your operator console</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            Sign in to your BahiDesk console
+          </p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             <div>

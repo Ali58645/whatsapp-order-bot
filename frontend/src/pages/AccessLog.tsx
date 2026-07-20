@@ -49,11 +49,12 @@ export default function AccessLogPage() {
   }, [load]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Access Log</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="page-kicker">Security</p>
+          <h1 className="page-title mt-1">Access Log</h1>
+          <p className="page-subtitle">
             Admin support sessions and actions taken while viewing as a tenant
           </p>
         </div>
@@ -73,12 +74,12 @@ export default function AccessLogPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <ScrollText className="mx-auto h-10 w-10 text-muted-foreground" />
+        <div className="surface border-dashed p-12 text-center">
+          <ScrollText className="mx-auto h-10 w-10 text-muted-foreground/70" />
           <p className="mt-3 text-sm text-muted-foreground">No support access events yet</p>
         </div>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+        <ul className="surface divide-y divide-border/70 overflow-hidden">
           {items.map((row) => (
             <li key={row.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
               <div className="min-w-0">
