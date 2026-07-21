@@ -474,3 +474,40 @@ async def test_advance_to_extra_sends_question_text(monkeypatch):
     ok = await main._maybe_send_interactive("92001", meta, tenant)
     assert ok is True
     assert sent and "software/tools" in sent[0].lower()
+
+
+def test_llm_advance_does_not_skip_extra_after_current_system():
+    """Classic PHASES jump used to skip Extra questions between CURRENT_SYSTEM and SCHEDULING."""
+    from app.flow import default_bahi_pos_flow
+    from app.lead import _advance_phase
+    from app.tenants import Tenant
+
+    flow = default_bahi_pos_flow()
+    sys_i = next(i for i, s in enumerate(flow) if s["key"] == "CURRENT_SYSTEM")
+    flow.insert(
+        sys_i + 1,
+        {
+            "id": "step_tools",
+            "key": "EXTRA_TOOLS",
+            "type": "free_text_capture",
+            "question_text": "Which tools?",
+            "options": [],
+            "capture_field": "custom_1",
+            "required": True,
+            "reserved": False,
+            "system": False,
+        },
+    )
+    tenant = Tenant(
+        phone_number_id="x",
+        name="T",
+        flow_mode="lead",
+        campaign_phrase="Bahi",
+        demo_slots=["A", "B"],
+    )
+    tenant._raw_config = {"flow": flow}
+
+    meta = {"phase": "CURRENT_SYSTEM", "lang": "en"}
+    # Claude says "slot" — old code jumped to SCHEDULING via PHASES index
+    _advance_phase(meta, "we will confirm a slot with you", "ok", tenant=tenant)
+    assert meta["phase"] == "EXTRA_TOOLS"

@@ -514,25 +514,27 @@ async def forward_lead_card(
 
 # ── Phase metadata extraction from Claude reply ───────────────────────────────
 
-def _advance_phase(meta: dict, reply_lower: str, user_text_lower: str) -> None:
+def _advance_phase(meta: dict, reply_lower: str, user_text_lower: str, tenant=None) -> None:
     """
     Heuristically advance the phase based on what Claude just said or
-    what the user said.  The LLM owns the conversation; we track phase
-    as a side-channel for lead card completeness.
+    what the user said.  Prefer the tenant's configured flow order so Extra
+    questions are not skipped.
     """
+    from app.flow import find_step, get_tenant_flow, next_phase_key
+
     phase = meta.get("phase", "GREETING")
 
     # Hot-lead jump toward demo booking when user asks for it
     hot_signals = ("demo chahiye", "meeting", "schedule", "book karo", "book karna")
     if any(s in user_text_lower for s in hot_signals) and phase not in ("SCHEDULING", "CONFIRMED"):
-        meta["phase"] = "SCHEDULING"
+        flow = get_tenant_flow(tenant)
+        if find_step(flow, "SCHEDULING"):
+            meta["phase"] = "SCHEDULING"
+        else:
+            meta["phase"] = next_phase_key(tenant, phase)
         return
 
-    # Normal linear advance
-    phase_order = {p: i for i, p in enumerate(PHASES)}
-    current_idx = phase_order.get(phase, 0)
-
-    # Detect phase transitions by keywords Claude used in its reply
+    # Normal linear advance — follow config.flow (includes Extra questions)
     transitions = {
         "GREETING":       ("kis type", "business hai", "kya karte"),
         "BUSINESS_NAME":  ("branches", "locations", "kitni"),
@@ -543,12 +545,10 @@ def _advance_phase(meta: dict, reply_lower: str, user_text_lower: str) -> None:
     }
     next_phase_triggers = transitions.get(phase, ())
     if any(kw in reply_lower for kw in next_phase_triggers):
-        next_idx = current_idx + 1
-        if next_idx < len(PHASES):
-            meta["phase"] = PHASES[next_idx]
+        meta["phase"] = next_phase_key(tenant, phase)
 
 
-def extract_meta_from_turn(meta: dict, user_text: str, reply: str) -> None:
+def extract_meta_from_turn(meta: dict, user_text: str, reply: str, tenant=None) -> None:
     """
     Pull structured fields out of the conversation for the lead card.
     Best-effort: we capture what we can without asking Claude to output JSON.
@@ -578,8 +578,15 @@ def extract_meta_from_turn(meta: dict, user_text: str, reply: str) -> None:
             meta["demo_slot"] = _slot_2
         else:
             meta["demo_slot"] = user_text.strip()
+    elif user_text and phase not in ("GREETING", "CONFIRMED", "STALLED"):
+        # Extra / custom steps — stash under capture field when known
+        from app.flow import find_step, get_tenant_flow
+        step = find_step(get_tenant_flow(tenant), phase)
+        field = (step or {}).get("capture_field")
+        if field and field.startswith("custom_"):
+            meta.setdefault(field, user_text.strip())
 
-    _advance_phase(meta, reply_lower, user_lower)
+    _advance_phase(meta, reply_lower, user_lower, tenant=tenant)
 
 
 # ── Interactive phase definitions ─────────────────────────────────────────────

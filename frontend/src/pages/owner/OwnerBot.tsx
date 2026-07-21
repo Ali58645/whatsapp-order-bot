@@ -9,7 +9,7 @@ import {
   MeResponse,
   TenantConfigResponse,
 } from "../../api";
-import { LeadOptionsEditor } from "../../components/LeadOptionsEditor";
+import { LeadOptionsEditor, ensureLeadFlow } from "../../components/LeadOptionsEditor";
 import { MessagesEditor } from "../../components/MessagesEditor";
 import { OptionListEditor, OptionListItem, stripEmptyOptionRows } from "../../components/OptionListEditor";
 import { TemplatePicker } from "../../components/TemplatePicker";
@@ -210,7 +210,7 @@ export default function OwnerBot() {
             facts_claims_note: cfg.config.facts_claims_note,
             faq: faqClean,
             messages_draft: draft,
-            ...(isLead && flow.length ? { flow } : {}),
+            ...(isLead ? { flow: ensureLeadFlow(flow) } : {}),
           }),
           tenant: false,
         }

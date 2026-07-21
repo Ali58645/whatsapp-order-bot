@@ -204,15 +204,19 @@ def get_tenant_flow(tenant=None) -> list[dict]:
 
 
 def find_step(flow: list[dict], key: str) -> Optional[dict]:
+    want = (key or "").strip().upper()
+    if not want:
+        return None
     for s in flow:
-        if s.get("key") == key:
+        if (s.get("key") or "").strip().upper() == want:
             return s
     return None
 
 
 def next_step_after(flow: list[dict], key: str) -> Optional[dict]:
+    want = (key or "").strip().upper()
     for i, s in enumerate(flow):
-        if s.get("key") == key and i + 1 < len(flow):
+        if (s.get("key") or "").strip().upper() == want and i + 1 < len(flow):
             return flow[i + 1]
     return None
 

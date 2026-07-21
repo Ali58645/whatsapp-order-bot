@@ -18,7 +18,7 @@ from app.tenants import Tenant, get_tenant as _registry_get
 
 log = logging.getLogger("orderbot.tenant_resolver")
 
-CACHE_TTL_S = 60
+CACHE_TTL_S = 5
 _cache: dict[str, tuple[Tenant, float]] = {}
 
 

@@ -543,10 +543,16 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
         log.info(f"[{tid}] lead: {sender} [{meta.get('phase')}]: {user_text!r}")
         meta.setdefault("lang", tenant.lang_code())
 
-        # FAQ before any LLM / phase logic (non-terminal phases)
+        # FAQ before any LLM / phase logic (non-terminal phases).
+        # Do not intercept answers to Extra / free-text capture steps.
         phase_now = meta.get("phase", "")
         if phase_now not in ("CONFIRMED", "STALLED") and user_text:
-            if await _maybe_faq_reply(sender, meta, user_text, meta.get("lang", "ur"), tenant):
+            from app.flow import find_step, get_tenant_flow
+            _faq_step = find_step(get_tenant_flow(tenant), phase_now)
+            _skip_faq = _is_free_text_flow_step(_faq_step)
+            if not _skip_faq and await _maybe_faq_reply(
+                sender, meta, user_text, meta.get("lang", "ur"), tenant
+            ):
                 asyncio.create_task(_db_persist_lead(sender, meta, tenant))
                 return {"status": "ok"}
 
@@ -627,20 +633,24 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
-        # Legacy hard-coded matchers (same as default flow keys)
+        # Legacy hard-coded matchers (same as default flow keys) — next step from flow
+        from app.flow import next_phase_key as _npk
         if phase == "BUSINESS_TYPE":
             result = await _handle_text_at_interactive_phase(
-                sender, meta, user_text, lang, _match_business_type, "LOCATIONS", "business_type", tenant)
+                sender, meta, user_text, lang, _match_business_type,
+                _npk(tenant, "BUSINESS_TYPE"), "business_type", tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
         if phase == "LOCATIONS":
             result = await _handle_text_at_interactive_phase(
-                sender, meta, user_text, lang, _match_locations, "CURRENT_SYSTEM", "locations", tenant)
+                sender, meta, user_text, lang, _match_locations,
+                _npk(tenant, "LOCATIONS"), "locations", tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
         if phase == "CURRENT_SYSTEM":
             result = await _handle_text_at_interactive_phase(
-                sender, meta, user_text, lang, _match_current_system, "SCHEDULING", "current_system", tenant)
+                sender, meta, user_text, lang, _match_current_system,
+                _npk(tenant, "CURRENT_SYSTEM"), "current_system", tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
@@ -699,7 +709,7 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict, tenant
     if not handled:
         user_text = reply_title or reply_id
         reply = await _generate_lead_reply(sender, user_text, tenant)
-        extract_meta_from_turn(meta, user_text, reply)
+        extract_meta_from_turn(meta, user_text, reply, tenant=tenant)
         marker, clean_reply = extract_lead_marker(reply)
         if marker == "CONFIRMED":
             meta["phase"] = "CONFIRMED"
@@ -1003,7 +1013,7 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
         await send_whatsapp_message(sender, combined, tenant=tenant)
         return {"status": "ok"}
 
-    extract_meta_from_turn(meta, user_text, reply)
+    extract_meta_from_turn(meta, user_text, reply, tenant=tenant)
     marker, clean_reply = extract_lead_marker(reply)
 
     if marker == "CONFIRMED":
