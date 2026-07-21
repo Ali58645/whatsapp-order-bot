@@ -12,6 +12,7 @@ type Props = {
   footer?: ReactNode;
   onBack?: () => void;
   className?: string;
+  takeoverActive?: boolean;
 };
 
 function StatusBar() {
@@ -49,6 +50,7 @@ export function PhoneChatFrame({
   footer,
   onBack,
   className,
+  takeoverActive = false,
 }: Props) {
   return (
     <div
@@ -104,7 +106,7 @@ export function PhoneChatFrame({
                   <ChannelBadge channel={channel} />
                 </div>
                 <p className="truncate text-[12px] text-emerald-400/90">
-                  {subtitle || botName}
+                  {takeoverActive ? "Human takeover · online" : subtitle || botName}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3 pr-2 text-[#aebac1]">

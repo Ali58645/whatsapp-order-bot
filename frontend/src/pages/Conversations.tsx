@@ -187,6 +187,7 @@ export default function Conversations() {
             contactId={selected.contact_id}
             leadId={selected.id}
             sessionId={selected.session_id}
+            tenantDbId={selected.tenant_id}
             contactName={leadName(selected)}
             channel={selected.contact.channel}
             waId={selected.contact.wa_id}
