@@ -114,8 +114,8 @@ def validate_template(data: dict) -> list[str]:
         inter = overlay.get("interactive") or {}
         for key in ("locations", "current_system"):
             rows = inter.get(key)
-            if rows is not None and len(rows) > 3:
-                errors.append(f"{tid}: interactive.{key} max 3 buttons (got {len(rows)})")
+            if rows is not None and len(rows) > 10:
+                errors.append(f"{tid}: interactive.{key} max 10 rows (got {len(rows)})")
         bt = inter.get("business_types") or []
         if len(bt) > 10:
             errors.append(f"{tid}: business_types max 10 rows")

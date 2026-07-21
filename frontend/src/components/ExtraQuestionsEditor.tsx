@@ -81,7 +81,7 @@ export function ExtraQuestionsEditor({ flow, onChange, readonly = false }: Props
     const step: FlowStep = {
       id: nid("step"),
       key: `EXTRA_${n}_${Date.now().toString(36).toUpperCase()}`.slice(0, 32),
-      type: kind === "buttons" ? "button_options" : "text_question",
+      type: kind === "buttons" ? "list_options" : "text_question",
       question_text:
         kind === "buttons"
           ? "Neeche se muntakhib karein."
@@ -177,14 +177,15 @@ export function ExtraQuestionsEditor({ flow, onChange, readonly = false }: Props
                 <OptionListEditor
                   title="Buttons"
                   items={items}
-                  constraints={{ maxItems: 3, maxLabelChars: 20, maxValueChars: 64 }}
+                  constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
                   features={{ reorder: true, valueField: true, valueLabel: "Saved as" }}
-                  addDisabledHint="WhatsApp button limit: 3"
+                  addDisabledHint="WhatsApp list limit: 10 rows"
                   onChange={(next) =>
                     patchExtra(step.id, {
-                      options: next.slice(0, 3).map((it) => ({
+                      type: "list_options",
+                      options: next.slice(0, 10).map((it) => ({
                         id: it.id,
-                        title: it.label.slice(0, 20),
+                        title: it.label.slice(0, 50),
                         value: (it.value || it.label).trim() || it.label,
                       })),
                     })

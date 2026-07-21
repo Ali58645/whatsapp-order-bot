@@ -331,8 +331,8 @@ function SortableStep({
   const isButtons = step.type === "button_options";
   const isList = step.type === "list_options";
   const showOptions = isButtons || isList;
-  const maxItems = isButtons ? 3 : 10;
-  const maxLabel = isButtons ? 20 : 24;
+  const maxItems = 10;
+  const maxLabel = 50;
 
   return (
     <div

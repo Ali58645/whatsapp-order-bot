@@ -120,7 +120,7 @@ def default_bahi_pos_flow() -> list[dict]:
         {
             "id": "step_locations",
             "key": "LOCATIONS",
-            "type": "button_options",
+            "type": "list_options",
             "question_text": "",
             "question_key": "q_locations",
             "options_key": "locations",
@@ -134,7 +134,7 @@ def default_bahi_pos_flow() -> list[dict]:
         {
             "id": "step_current_system",
             "key": "CURRENT_SYSTEM",
-            "type": "button_options",
+            "type": "list_options",
             "question_text": "",
             "question_key": "q_current_system",
             "options_key": "current_system",
@@ -337,10 +337,11 @@ def _validate_options(
     if not options and options_key:
         return []
 
-    if stype == "button_options":
+    if stype == "button_options" and key == "SCHEDULING":
         max_n, max_title = BUTTONS_MAX, BUTTON_TITLE_MAX
     else:
-        max_n, max_title = ROWS_MAX, 24
+        # List-style options (incl. locations / current_system / extras)
+        max_n, max_title = ROWS_MAX, 50
 
     if len(options) > max_n:
         raise FlowError(f"flow[{i}] options max {max_n} for {stype}")
@@ -493,6 +494,21 @@ def build_step_interactive(
         opts = resolve_step_options(step, tenant, lang)
         if not opts:
             return None
+        # WhatsApp reply-buttons max out at 3×20. Prefer a list whenever we have
+        # more options (or classic lead steps that used to be buttons).
+        key = step.get("key") or ""
+        if key in ("LOCATIONS", "CURRENT_SYSTEM") or len(opts) > BUTTONS_MAX:
+            from app.lead import _interactive_maps
+            maps = _interactive_maps(tenant, lang)
+            rows = [
+                (
+                    o["id"],
+                    o["title"][:24],
+                    str(o.get("description") or "")[:72],
+                )
+                for o in opts[:ROWS_MAX]
+            ]
+            return build_list(sender, body, str(maps["select_label"])[:20], rows)
         buttons = [(o["id"], o["title"][:BUTTON_TITLE_MAX]) for o in opts[:BUTTONS_MAX]]
         return build_buttons(sender, body, buttons)
 

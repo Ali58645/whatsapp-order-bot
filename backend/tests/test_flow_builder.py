@@ -53,22 +53,22 @@ def test_whatsapp_limits_on_options():
     from app.flow import FlowError, default_bahi_pos_flow, validate_flow
 
     flow = default_bahi_pos_flow()
-    # Inject 4 buttons on locations (max 3)
+    # Inject 11 rows on locations (max 10)
     loc = next(s for s in flow if s["key"] == "LOCATIONS")
     loc["options_key"] = None
     loc["options"] = [
-        {"id": f"x{i}", "title": f"Opt{i}"} for i in range(4)
+        {"id": f"x{i}", "title": f"Opt{i}"} for i in range(11)
     ]
-    with pytest.raises(FlowError, match="max 3"):
+    with pytest.raises(FlowError, match="max 10"):
         validate_flow(flow)
 
     flow = default_bahi_pos_flow()
     btype = next(s for s in flow if s["key"] == "BUSINESS_TYPE")
     btype["options_key"] = None
     btype["options"] = [
-        {"id": "x", "title": "This title is way too long for WhatsApp list row"}
+        {"id": "x", "title": "x" * 51}
     ]
-    with pytest.raises(FlowError, match="max 24"):
+    with pytest.raises(FlowError, match="max 50"):
         validate_flow(flow)
 
 

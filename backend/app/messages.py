@@ -19,6 +19,10 @@ from app.prompt_data import sanitize_text
 BODY_MAX = 1024
 BUTTON_TITLE_MAX = 20
 ROW_TITLE_MAX = 24
+# Owner-facing editor allows longer labels; WhatsApp truncates on send.
+OPTION_TITLE_EDIT_MAX = 50
+OPTION_ROWS_MAX = 10
+ROWS_MAX = 10  # WhatsApp list rows
 ROW_DESC_MAX = 72
 
 _VAR_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
@@ -465,19 +469,20 @@ def validate_messages_patch(raw: Any) -> dict:
     ]
     if not btypes:
         raise MessagesError("interactive.business_types required")
-    if len(btypes) > 10:
-        raise MessagesError("interactive.business_types max 10 rows")
+    if len(btypes) > OPTION_ROWS_MAX:
+        raise MessagesError(f"interactive.business_types max {OPTION_ROWS_MAX} rows")
     cleaned_bt = []
     seen_titles: set[str] = set()
     for i, row in enumerate(btypes):
         rid = sanitize_text(str(row.get("id") or f"bt_{i}"), max_len=64)
-        title = sanitize_text(str(row.get("title", "")), max_len=ROW_TITLE_MAX)
+        title_raw = str(row.get("title", ""))
+        if len(title_raw) > OPTION_TITLE_EDIT_MAX:
+            raise MessagesError(f"business_types[{i}].title max {OPTION_TITLE_EDIT_MAX}")
+        title = sanitize_text(title_raw, max_len=OPTION_TITLE_EDIT_MAX)
         desc = sanitize_text(str(row.get("description", "")), max_len=ROW_DESC_MAX)
         value = sanitize_text(str(row.get("value", title) or title), max_len=64)
         if not rid or not title:
             raise MessagesError(f"business_types[{i}] id and title required")
-        if len(str(row.get("title", ""))) > ROW_TITLE_MAX:
-            raise MessagesError(f"business_types[{i}].title max {ROW_TITLE_MAX}")
         key = title.lower()
         if key in seen_titles:
             raise MessagesError(f"business_types: duplicate label {title!r}")
@@ -500,16 +505,16 @@ def validate_messages_patch(raw: Any) -> dict:
         ]
         if not rows:
             raise MessagesError(f"interactive.{set_key} required")
-        if len(rows) > 3:
-            raise MessagesError(f"interactive.{set_key} max 3 buttons")
+        if len(rows) > OPTION_ROWS_MAX:
+            raise MessagesError(f"interactive.{set_key} max {OPTION_ROWS_MAX} rows")
         cleaned = []
         seen: set[str] = set()
         for i, row in enumerate(rows):
             rid = sanitize_text(str(row.get("id") or f"{set_key}_{i}"), max_len=64)
             title_raw = str(row.get("title", ""))
-            if len(title_raw) > BUTTON_TITLE_MAX:
-                raise MessagesError(f"{set_key}[{i}].title max {BUTTON_TITLE_MAX}")
-            title = sanitize_text(title_raw, max_len=BUTTON_TITLE_MAX)
+            if len(title_raw) > OPTION_TITLE_EDIT_MAX:
+                raise MessagesError(f"{set_key}[{i}].title max {OPTION_TITLE_EDIT_MAX}")
+            title = sanitize_text(title_raw, max_len=OPTION_TITLE_EDIT_MAX)
             val = sanitize_text(str(row.get(value_field, title) or title), max_len=64)
             if not rid or not title:
                 raise MessagesError(f"{set_key}[{i}] id and title required")

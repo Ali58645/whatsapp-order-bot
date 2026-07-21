@@ -56,8 +56,9 @@ def test_custom_business_types_payload_order_and_sheet_values():
     assert meta["phase"] == "LOCATIONS"
 
     loc_payload = get_phase_interactive("LOCATIONS", "92300", lang="ur", tenant=t)
-    btns = loc_payload["interactive"]["action"]["buttons"]
-    assert [b["reply"]["id"] for b in btns] == ["loc_a", "loc_b"]
+    rows = loc_payload["interactive"]["action"]["sections"][0]["rows"]
+    assert [r["id"] for r in rows] == ["loc_a", "loc_b"]
+    assert loc_payload["interactive"]["type"] == "list"
 
     meta["phase"] = "LOCATIONS"
     handled, _ = apply_interactive_answer(meta, "loc_b", "Many", tenant=t)
@@ -83,9 +84,9 @@ def test_empty_rows_stripped_and_limits_enforced():
     assert [r["id"] for r in cleaned["interactive"]["business_types"]] == ["a", "b"]
 
     msgs["interactive"]["locations"] = [
-        {"id": f"l{i}", "title": str(i), "value": str(i)} for i in range(4)
+        {"id": f"l{i}", "title": str(i), "value": str(i)} for i in range(11)
     ]
-    with pytest.raises(MessagesError, match="max 3"):
+    with pytest.raises(MessagesError, match="max 10"):
         validate_messages_patch(msgs)
 
     msgs = default_messages("roman_urdu")
@@ -135,8 +136,9 @@ def test_reorder_persists_in_payload():
     cleaned = validate_messages_patch(msgs)
     t = Tenant(phone_number_id="r1", name="R", flow_mode="lead", messages=cleaned)
     payload = get_phase_interactive("CURRENT_SYSTEM", "1", tenant=t)
-    ids = [b["reply"]["id"] for b in payload["interactive"]["action"]["buttons"]]
+    ids = [r["id"] for r in payload["interactive"]["action"]["sections"][0]["rows"]]
     assert ids == ["sys_none", "sys_manual", "sys_pos"]
+    assert payload["interactive"]["type"] == "list"
 
 
 def test_overlong_label_rejected():
@@ -144,7 +146,7 @@ def test_overlong_label_rejected():
 
     msgs = default_messages("roman_urdu")
     msgs["interactive"]["locations"] = [
-        {"id": "a", "title": "X" * 21, "value": "1"},
+        {"id": "a", "title": "X" * 51, "value": "1"},
     ]
-    with pytest.raises(MessagesError, match="max 20"):
+    with pytest.raises(MessagesError, match="max 50"):
         validate_messages_patch(msgs)

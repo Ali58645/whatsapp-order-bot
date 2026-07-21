@@ -346,7 +346,7 @@ export function LeadOptionsEditor({
           <OptionListEditor
             title="Rows"
             items={btItems}
-            constraints={{ maxItems: 10, maxLabelChars: 24, maxValueChars: 64, maxDescriptionChars: 72 }}
+            constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64, maxDescriptionChars: 72 }}
             features={{
               reorder: true,
               valueField: true,
@@ -374,7 +374,7 @@ export function LeadOptionsEditor({
         <AccordionSection
           title={`${num()}. ${STEP_META.LOCATIONS.title}`}
           count={locItems.length}
-          countLabel={locItems.length === 1 ? "button" : "buttons"}
+          countLabel={locItems.length === 1 ? "row" : "rows"}
         >
           <div>
             <Label>Question text</Label>
@@ -387,17 +387,17 @@ export function LeadOptionsEditor({
             />
           </div>
           <OptionListEditor
-            title="Buttons"
+            title="Rows"
             items={locItems}
-            constraints={{ maxItems: 3, maxLabelChars: 20, maxValueChars: 64 }}
+            constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
             features={{ reorder: true, valueField: true, valueLabel: "Value" }}
-            addDisabledHint="Button limit: 3"
+            addDisabledHint="WhatsApp list limit: 10 rows"
             onChange={(items) => {
               onInteractiveChange({
                 ...interactive,
-                locations: items.slice(0, 3).map((it) => ({
+                locations: items.slice(0, 10).map((it) => ({
                   id: it.id,
-                  title: it.label,
+                  title: it.label.slice(0, 50),
                   value: (it.value || it.label).trim() || it.label,
                 })),
               });
@@ -411,7 +411,7 @@ export function LeadOptionsEditor({
         <AccordionSection
           title={`${num()}. ${STEP_META.CURRENT_SYSTEM.title}`}
           count={sysItems.length}
-          countLabel={sysItems.length === 1 ? "button" : "buttons"}
+          countLabel={sysItems.length === 1 ? "row" : "rows"}
         >
           <div>
             <Label>Question text</Label>
@@ -424,17 +424,17 @@ export function LeadOptionsEditor({
             />
           </div>
           <OptionListEditor
-            title="Buttons"
+            title="Rows"
             items={sysItems}
-            constraints={{ maxItems: 3, maxLabelChars: 20, maxValueChars: 64 }}
+            constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
             features={{ reorder: true, valueField: true, valueLabel: "Value for sheet" }}
-            addDisabledHint="Button limit: 3"
+            addDisabledHint="WhatsApp list limit: 10 rows"
             onChange={(items) => {
               onInteractiveChange({
                 ...interactive,
-                current_system: items.slice(0, 3).map((it) => ({
+                current_system: items.slice(0, 10).map((it) => ({
                   id: it.id,
-                  title: it.label,
+                  title: it.label.slice(0, 50),
                   sheet_value: (it.value || it.label).trim() || it.label,
                 })),
               });
