@@ -4,23 +4,31 @@ Owner-facing helpers: business hours, greeting variants, image greeting.
 
 from __future__ import annotations
 
-import random
 from datetime import datetime
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 
-def pick_greeting_text(tenant) -> str:
-    """Primary greeting_text, or a random non-empty variant if configured."""
+def greeting_messages(tenant) -> list[str]:
+    """
+    All greeting bubbles to send, in order: primary greeting_text then extras.
+    Empty lines skipped. No random pick — every non-empty line is sent.
+    """
     custom = (getattr(tenant, "greeting_text", "") or "").strip()
     raw = getattr(tenant, "_raw_config", None) or {}
     variants = raw.get("greeting_variants") or []
-    opts = [str(v).strip() for v in variants if isinstance(v, str) and str(v).strip()]
-    if opts:
-        if custom and custom not in opts:
-            opts = [custom] + opts
-        return random.choice(opts)
-    return custom
+    extras = [str(v).strip() for v in variants if isinstance(v, str) and str(v).strip()]
+    lines: list[str] = []
+    if custom:
+        lines.append(custom)
+    lines.extend(extras)
+    return lines
+
+
+def pick_greeting_text(tenant) -> str:
+    """Joined greetings (compat). Prefer greeting_messages() for WhatsApp sends."""
+    msgs = greeting_messages(tenant)
+    return "\n\n".join(msgs) if msgs else ""
 
 
 def greeting_image_url(tenant) -> str:

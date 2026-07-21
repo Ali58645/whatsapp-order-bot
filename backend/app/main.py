@@ -657,16 +657,30 @@ async def _handle_entry_message(sender: str, meta: dict, user_text: str, tenant:
     meta["entry_intent"] = intent
     reply_text, next_phase = build_entry_response(intent, lang=lang, tenant=tenant)
     meta["phase"] = next_phase
-    from app.owner_tools import greeting_image_url
+    from app.lead import INTENT_DEMO_FIRST, INTENT_PRICE_FIRST, lead_text
+    from app.owner_tools import greeting_image_url, greeting_messages
 
     img = greeting_image_url(tenant)
-    if img:
+    greets = greeting_messages(tenant) if intent not in (INTENT_PRICE_FIRST, INTENT_DEMO_FIRST) else []
+
+    if greets:
+        # Send each greeting as its own bubble, then the opening question
+        for i, g in enumerate(greets):
+            if i == 0 and img:
+                await send_whatsapp_message(sender, g, tenant=tenant, image_link=img)
+            else:
+                await send_whatsapp_message(sender, g, tenant=tenant)
+        q = (lead_text("q_business_name", lang, tenant) or "").strip()
+        if q:
+            await send_whatsapp_message(sender, q, tenant=tenant)
+    elif img:
         caption = reply_text.split("\n\n", 1)[0][:1024]
         await send_whatsapp_message(sender, caption, tenant=tenant, image_link=img)
         if reply_text.strip() != caption.strip():
             await send_whatsapp_message(sender, reply_text, tenant=tenant)
     else:
         await send_whatsapp_message(sender, reply_text, tenant=tenant)
+
     if not _is_own_number(sender, tenant):
         _sheet_upsert(sender, {"status": STATUS_IN_PROGRESS, "interest": intent}, tenant)
     if intent == INTENT_DEMO_FIRST:

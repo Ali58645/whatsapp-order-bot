@@ -46,7 +46,7 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
         if not isinstance(raw, list):
             _err("greeting_variants must be a list of strings")
         cleaned = []
-        for item in raw[:5]:
+        for item in raw:
             t = sanitize_text(str(item), max_len=GREETING_MAX)
             if t:
                 cleaned.append(t)

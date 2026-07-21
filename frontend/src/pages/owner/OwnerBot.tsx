@@ -399,7 +399,7 @@ export default function OwnerBot() {
             />
           </div>
           <div>
-            <Label>Greeting (top of first message)</Label>
+            <Label>Greeting (first message)</Label>
             <Textarea
               className="mt-1.5"
               rows={3}
@@ -414,6 +414,33 @@ export default function OwnerBot() {
               placeholder="e.g. Assalam o Alaikum — thanks for messaging us."
             />
           </div>
+          {isLead && (
+            <div>
+              <Label>More greeting messages (optional)</Label>
+              <Textarea
+                className="mt-1.5"
+                rows={4}
+                placeholder={"One message per line — each is sent as its own WhatsApp bubble"}
+                value={(cfg.config.greeting_variants || []).join("\n")}
+                onChange={(e) =>
+                  setCfg({
+                    ...cfg,
+                    config: {
+                      ...cfg.config,
+                      greeting_variants: e.target.value
+                        .split("\n")
+                        .map((l) => l.trim())
+                        .filter(Boolean),
+                    },
+                  })
+                }
+                disabled={readonly}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sent after the first greeting, in order. No limit — add as many lines as you want.
+              </p>
+            </div>
+          )}
           {isLead && (
             <div>
               <Label>Opening question (asks for business name)</Label>
@@ -432,7 +459,7 @@ export default function OwnerBot() {
                 disabled={readonly}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Sent right after the greeting in the same chat bubble.
+                Sent after all greeting messages.
               </p>
             </div>
           )}
@@ -440,22 +467,34 @@ export default function OwnerBot() {
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">
               Preview — what WhatsApp sends
             </p>
-            <div className="rounded-xl bg-[var(--wa-bg)] p-3">
-              <div className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
-                <p className="transcript-text whitespace-pre-wrap">
-                  {[
-                    (cfg.config.greeting_text || "").trim(),
-                    isLead
-                      ? (
-                          leadMsgs.q_business_name ||
-                          "Barah-e-karam apne business ya shop ka naam farmaayein."
-                        ).trim()
-                      : "",
-                  ]
-                    .filter(Boolean)
-                    .join("\n\n") || "…"}
-                </p>
-              </div>
+            <div className="space-y-2 rounded-xl bg-[var(--wa-bg)] p-3">
+              {[
+                ...(cfg.config.greeting_text || "").trim()
+                  ? [(cfg.config.greeting_text || "").trim()]
+                  : [],
+                ...(cfg.config.greeting_variants || []),
+                isLead
+                  ? (
+                      leadMsgs.q_business_name ||
+                      "Barah-e-karam apne business ya shop ka naam farmaayein."
+                    ).trim()
+                  : "",
+              ]
+                .filter(Boolean)
+                .map((bubble, i) => (
+                  <div
+                    key={`${i}-${bubble.slice(0, 24)}`}
+                    className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100"
+                  >
+                    <p className="transcript-text whitespace-pre-wrap">{bubble}</p>
+                  </div>
+                ))}
+              {!(cfg.config.greeting_text || "").trim() &&
+                !(cfg.config.greeting_variants || []).length && (
+                  <div className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
+                    …
+                  </div>
+                )}
             </div>
           </div>
           <div>
@@ -513,31 +552,6 @@ export default function OwnerBot() {
               Public https image — sent with the first greeting. Host on your CDN or Imgur.
             </p>
           </div>
-          {isLead && (
-            <div>
-              <Label>Extra greetings (optional — one is picked at random)</Label>
-              <Textarea
-                className="mt-1.5"
-                rows={3}
-                placeholder={"One greeting per line"}
-                value={(cfg.config.greeting_variants || []).join("\n")}
-                onChange={(e) =>
-                  setCfg({
-                    ...cfg,
-                    config: {
-                      ...cfg.config,
-                      greeting_variants: e.target.value
-                        .split("\n")
-                        .map((l) => l.trim())
-                        .filter(Boolean)
-                        .slice(0, 5),
-                    },
-                  })
-                }
-                disabled={readonly}
-              />
-            </div>
-          )}
           {isLead && (
             <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
               <div className="flex items-center justify-between gap-3">
