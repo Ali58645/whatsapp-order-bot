@@ -26,15 +26,21 @@ type LeadDraft = {
   [key: string]: string | undefined;
 };
 
-/** Built-in lead steps owners can remove (scheduling is required). */
-export type RemovableLeadStep = "BUSINESS_TYPE" | "LOCATIONS" | "CURRENT_SYSTEM";
+/** Built-in lead steps owners can remove / restore / rename. */
+export type RemovableLeadStep =
+  | "BUSINESS_TYPE"
+  | "LOCATIONS"
+  | "CURRENT_SYSTEM"
+  | "SCHEDULING";
 
-const REMOVABLE: RemovableLeadStep[] = ["BUSINESS_TYPE", "LOCATIONS", "CURRENT_SYSTEM"];
+const REMOVABLE: RemovableLeadStep[] = [
+  "BUSINESS_TYPE",
+  "LOCATIONS",
+  "CURRENT_SYSTEM",
+  "SCHEDULING",
+];
 
-const STEP_META: Record<
-  RemovableLeadStep | "SCHEDULING",
-  { title: string; restoreLabel: string }
-> = {
+const STEP_META: Record<RemovableLeadStep, { title: string; restoreLabel: string }> = {
   BUSINESS_TYPE: { title: "Business type", restoreLabel: "Business type" },
   LOCATIONS: { title: "Locations", restoreLabel: "Locations" },
   CURRENT_SYSTEM: { title: "Current system", restoreLabel: "Current system" },
@@ -46,6 +52,7 @@ const DEFAULT_BUILTIN: Record<RemovableLeadStep, FlowStep> = {
     id: "step_business_type",
     key: "BUSINESS_TYPE",
     type: "list_options",
+    label: "Business type",
     question_text: "",
     question_key: "q_business_type",
     options_key: "business_types",
@@ -59,7 +66,8 @@ const DEFAULT_BUILTIN: Record<RemovableLeadStep, FlowStep> = {
   LOCATIONS: {
     id: "step_locations",
     key: "LOCATIONS",
-    type: "button_options",
+    type: "list_options",
+    label: "Locations",
     question_text: "",
     question_key: "q_locations",
     options_key: "locations",
@@ -73,12 +81,27 @@ const DEFAULT_BUILTIN: Record<RemovableLeadStep, FlowStep> = {
   CURRENT_SYSTEM: {
     id: "step_current_system",
     key: "CURRENT_SYSTEM",
-    type: "button_options",
+    type: "list_options",
+    label: "Current system",
     question_text: "",
     question_key: "q_current_system",
     options_key: "current_system",
     options: [],
     capture_field: "current_system",
+    required: true,
+    skip_if_declined: false,
+    reserved: false,
+    system: false,
+  },
+  SCHEDULING: {
+    id: "step_scheduling",
+    key: "SCHEDULING",
+    type: "button_options",
+    label: "Demo scheduling",
+    question_text: "",
+    question_key: "q_scheduling",
+    options: [],
+    capture_field: "demo_slot",
     required: true,
     skip_if_declined: false,
     reserved: false,
@@ -114,18 +137,7 @@ const DEFAULT_LEAD_FLOW: FlowStep[] = [
   DEFAULT_BUILTIN.BUSINESS_TYPE,
   DEFAULT_BUILTIN.LOCATIONS,
   DEFAULT_BUILTIN.CURRENT_SYSTEM,
-  {
-    id: "step_scheduling",
-    key: "SCHEDULING",
-    type: "button_options",
-    question_text: "",
-    question_key: "q_scheduling",
-    options: [],
-    capture_field: "demo_slot",
-    required: true,
-    reserved: true,
-    system: true,
-  },
+  DEFAULT_BUILTIN.SCHEDULING,
   {
     id: "step_confirmed",
     key: "CONFIRMED",
@@ -150,7 +162,7 @@ type Props = {
   onLeadChange: (lead: LeadDraft) => void;
   onInteractiveChange: (interactive: Interactive) => void;
   onDemoSlotsChange: (slots: string[]) => void;
-  /** When set with onFlowChange, owners can remove/restore built-in steps */
+  /** When set with onFlowChange, owners can remove/restore/rename built-in steps */
   flow?: FlowStep[];
   onFlowChange?: (flow: FlowStep[]) => void;
   allowRemove?: boolean;
@@ -196,6 +208,12 @@ function hasStep(flow: FlowStep[] | undefined, key: string): boolean {
   return resolveFlow(flow).some((s) => (s.key || "").toUpperCase() === key);
 }
 
+function stepTitle(flow: FlowStep[] | undefined, key: RemovableLeadStep): string {
+  const s = resolveFlow(flow).find((x) => (x.key || "").toUpperCase() === key);
+  const custom = (s?.label || "").trim();
+  return custom || STEP_META[key].title;
+}
+
 function insertBuiltin(flow: FlowStep[], key: RemovableLeadStep): FlowStep[] {
   const base = resolveFlow(flow);
   if (base.some((s) => (s.key || "").toUpperCase() === key)) return base;
@@ -203,7 +221,7 @@ function insertBuiltin(flow: FlowStep[], key: RemovableLeadStep): FlowStep[] {
   const order = ["BUSINESS_NAME", "BUSINESS_TYPE", "LOCATIONS", "CURRENT_SYSTEM", "SCHEDULING"];
   const targetIdx = order.indexOf(key);
   const next = [...base];
-  let insertAt = next.findIndex((s) => (s.key || "").toUpperCase() === "SCHEDULING");
+  let insertAt = next.findIndex((s) => (s.key || "").toUpperCase() === "CONFIRMED");
   if (insertAt < 0) insertAt = next.length;
   for (let i = targetIdx - 1; i >= 0; i--) {
     const earlier = next.findIndex((s) => (s.key || "").toUpperCase() === order[i]);
@@ -255,6 +273,23 @@ export function LeadOptionsEditor({
     onFlowChange(insertBuiltin(flow, key));
   }
 
+  function renameStep(key: RemovableLeadStep, label: string) {
+    if (!onFlowChange) return;
+    const nextLabel = label.slice(0, 40);
+    const base = resolveFlow(flow);
+    if (!base.some((s) => (s.key || "").toUpperCase() === key)) {
+      onFlowChange(insertBuiltin(flow, key).map((s) =>
+        (s.key || "").toUpperCase() === key ? { ...s, label: nextLabel } : s
+      ));
+      return;
+    }
+    onFlowChange(
+      base.map((s) =>
+        (s.key || "").toUpperCase() === key ? { ...s, label: nextLabel } : s
+      )
+    );
+  }
+
   const showBt = hasStep(flow, "BUSINESS_TYPE");
   const showLoc = hasStep(flow, "LOCATIONS");
   const showSys = hasStep(flow, "CURRENT_SYSTEM");
@@ -283,6 +318,29 @@ export function LeadOptionsEditor({
     );
   }
 
+  function SectionNameField({ stepKey }: { stepKey: RemovableLeadStep }) {
+    if (!onFlowChange || readonly) return null;
+    const value = stepTitle(flow, stepKey);
+    return (
+      <div>
+        <div className="mb-1 flex items-center justify-between">
+          <Label>Section name</Label>
+          <CharHint len={value.length} max={40} />
+        </div>
+        <Input
+          className="mt-1"
+          maxLength={40}
+          value={value}
+          onChange={(e) => renameStep(stepKey, e.target.value)}
+          placeholder={STEP_META[stepKey].title}
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Shown in My Bot / Settings only — WhatsApp uses the question text below.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {allowRemove && missing.length > 0 && onFlowChange && !readonly && (
@@ -306,11 +364,12 @@ export function LeadOptionsEditor({
 
       {showBt && (
         <AccordionSection
-          title={`${num()}. ${STEP_META.BUSINESS_TYPE.title}`}
+          title={`${num()}. ${stepTitle(flow, "BUSINESS_TYPE")}`}
           count={btItems.length}
           countLabel={btItems.length === 1 ? "row" : "rows"}
           defaultOpen
         >
+          <SectionNameField stepKey="BUSINESS_TYPE" />
           <div>
             <div className="mb-1 flex items-center justify-between">
               <Label>Question text</Label>
@@ -372,10 +431,11 @@ export function LeadOptionsEditor({
 
       {showLoc && (
         <AccordionSection
-          title={`${num()}. ${STEP_META.LOCATIONS.title}`}
+          title={`${num()}. ${stepTitle(flow, "LOCATIONS")}`}
           count={locItems.length}
           countLabel={locItems.length === 1 ? "row" : "rows"}
         >
+          <SectionNameField stepKey="LOCATIONS" />
           <div>
             <Label>Question text</Label>
             <Textarea
@@ -390,7 +450,7 @@ export function LeadOptionsEditor({
             title="Rows"
             items={locItems}
             constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
-            features={{ reorder: true, valueField: true, valueLabel: "Value" }}
+            features={{ reorder: true, valueField: true, valueLabel: "Saved as" }}
             addDisabledHint="WhatsApp list limit: 10 rows"
             onChange={(items) => {
               onInteractiveChange({
@@ -409,10 +469,11 @@ export function LeadOptionsEditor({
 
       {showSys && (
         <AccordionSection
-          title={`${num()}. ${STEP_META.CURRENT_SYSTEM.title}`}
+          title={`${num()}. ${stepTitle(flow, "CURRENT_SYSTEM")}`}
           count={sysItems.length}
           countLabel={sysItems.length === 1 ? "row" : "rows"}
         >
+          <SectionNameField stepKey="CURRENT_SYSTEM" />
           <div>
             <Label>Question text</Label>
             <Textarea
@@ -446,10 +507,11 @@ export function LeadOptionsEditor({
 
       {showSched && (
         <AccordionSection
-          title={`${num()}. ${STEP_META.SCHEDULING.title}`}
+          title={`${num()}. ${stepTitle(flow, "SCHEDULING")}`}
           count={schedulingItems.length}
           countLabel="slot buttons"
         >
+          <SectionNameField stepKey="SCHEDULING" />
           <div>
             <Label>Question text</Label>
             <Textarea
@@ -465,7 +527,7 @@ export function LeadOptionsEditor({
             items={schedulingItems}
             constraints={{ maxItems: 3, maxLabelChars: 20 }}
             features={{ reorder: false }}
-            addDisabledHint="Scheduling uses 2 slots + other"
+            addDisabledHint="WhatsApp reply-button limit: 3 (2 slots + other)"
             onChange={(items) => {
               const s1 = items.find((i) => i.id === "slot_1")?.label || slots[0];
               const s2 = items.find((i) => i.id === "slot_2")?.label || slots[1];
@@ -478,8 +540,10 @@ export function LeadOptionsEditor({
             }}
           />
           <p className="text-[11px] text-muted-foreground">
-            Required for demo booking — can’t be removed. The third button (“another time”) always stays.
+            WhatsApp allows 3 reply buttons max — 2 time slots + “another time”. You can remove this
+            whole step if you don’t book demos.
           </p>
+          <RemoveBtn stepKey="SCHEDULING" />
         </AccordionSection>
       )}
     </div>

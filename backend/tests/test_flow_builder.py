@@ -38,10 +38,15 @@ def test_validate_rejects_deleted_reserved_and_bad_capture():
     from app.flow import FlowError, default_bahi_pos_flow, validate_flow
 
     flow = default_bahi_pos_flow()
-    # Remove SCHEDULING
+    # Remove SCHEDULING — now allowed (optional booking step)
     trimmed = [s for s in flow if s["key"] != "SCHEDULING"]
-    with pytest.raises(FlowError, match="SCHEDULING"):
-        validate_flow(trimmed)
+    assert validate_flow(trimmed)
+    assert "SCHEDULING" not in [s["key"] for s in trimmed]
+
+    # Cannot remove GREETING
+    no_greet = [s for s in flow if s["key"] != "GREETING"]
+    with pytest.raises(FlowError, match="GREETING"):
+        validate_flow(no_greet)
 
     flow2 = default_bahi_pos_flow()
     flow2[1]["capture_field"] = "not_a_field!!"
@@ -330,14 +335,34 @@ async def test_save_reordered_flow_and_delete_step(client, flow_db):
     assert [s["key"] for s in saved] == keys_order
     assert not any(s["key"] == "LOCATIONS" for s in saved)
 
-    # Cannot delete SCHEDULING
-    bad = [s for s in saved if s["key"] != "SCHEDULING"]
+    # Can delete SCHEDULING (optional)
+    no_sched = [s for s in saved if s["key"] != "SCHEDULING"]
+    r = await client.post(
+        f"/api/dashboard/tenants/{tid}/config",
+        headers=h,
+        json={"flow": no_sched},
+    )
+    assert r.status_code == 200, r.text
+    assert not any(s["key"] == "SCHEDULING" for s in r.json()["config"]["flow"])
+
+    # Cannot delete GREETING
+    bad = [s for s in no_sched if s["key"] != "GREETING"]
     r = await client.post(
         f"/api/dashboard/tenants/{tid}/config",
         headers=h,
         json={"flow": bad},
     )
     assert r.status_code == 400
+
+
+def test_flow_step_label_preserved():
+    from app.flow import default_bahi_pos_flow, validate_flow
+
+    flow = default_bahi_pos_flow()
+    bt = next(s for s in flow if s["key"] == "BUSINESS_TYPE")
+    bt["label"] = "Service type"
+    cleaned = validate_flow(flow)
+    assert next(s for s in cleaned if s["key"] == "BUSINESS_TYPE")["label"] == "Service type"
 
 
 @pytest.mark.asyncio

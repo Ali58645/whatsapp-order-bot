@@ -622,6 +622,15 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
               config: { ...cfg.config, demo_slots: nextSlots },
             })
           }
+          flow={(cfg.config.flow || []) as FlowStep[]}
+          onFlowChange={(nextFlow) =>
+            setCfg({
+              ...cfg,
+              config: { ...cfg.config, flow: nextFlow },
+            })
+          }
+          allowRemove
+          readonly={readonly}
         />
       )}
 

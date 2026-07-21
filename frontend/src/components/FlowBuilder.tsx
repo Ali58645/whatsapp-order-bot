@@ -199,7 +199,7 @@ export function FlowBuilder({
           <div>
             <h2 className="text-sm font-semibold">Conversation steps</h2>
             <p className="text-xs text-muted-foreground">
-              Drag to reorder. Reserved steps (greeting, scheduling, confirm) stay but can move.
+              Drag to reorder. Reserved steps (greeting + confirm) stay; scheduling and questions can be removed.
             </p>
           </div>
           {!readonly && (

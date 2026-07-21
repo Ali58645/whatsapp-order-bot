@@ -755,8 +755,8 @@ export default function OwnerBot() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold">Questions & buttons</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Open a section to edit or remove it. Use Extra questions to add new ones.
-              Demo scheduling stays — it’s required to book demos.
+              Rename sections, edit questions, or remove any step (including demo scheduling). Use Extra
+              questions to add new ones.
             </p>
           </div>
           <LeadOptionsEditor

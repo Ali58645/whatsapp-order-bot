@@ -110,6 +110,8 @@ export type FlowStep = {
   id: string;
   key: string;
   type: "text_question" | "button_options" | "list_options" | "free_text_capture" | string;
+  /** Dashboard section title (My Bot) — not WhatsApp customer copy */
+  label?: string;
   question_text?: string;
   question_key?: string | null;
   options_key?: string | null;

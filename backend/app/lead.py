@@ -383,9 +383,11 @@ def build_entry_response(intent: str, lang: str = "ur", tenant=None) -> tuple[st
         )
         return text, "BUSINESS_NAME"
     if intent == INTENT_DEMO_FIRST:
+        from app.flow import scheduling_phase_or_fallback
+
         greet = custom_greeting or lead_text("greeting_line", lang, tenant)
         suffix = lead_text("entry_demo_suffix", lang, tenant)
-        return f"{greet}\n{suffix}", "SCHEDULING"
+        return f"{greet}\n{suffix}", scheduling_phase_or_fallback(tenant)
     if tenant is not None:
         from app.owner_tools import pick_greeting_text
 
@@ -520,7 +522,7 @@ def _advance_phase(meta: dict, reply_lower: str, user_text_lower: str) -> None:
     """
     phase = meta.get("phase", "GREETING")
 
-    # Hot-lead jump
+    # Hot-lead jump toward demo booking when user asks for it
     hot_signals = ("demo chahiye", "meeting", "schedule", "book karo", "book karna")
     if any(s in user_text_lower for s in hot_signals) and phase not in ("SCHEDULING", "CONFIRMED"):
         meta["phase"] = "SCHEDULING"

@@ -28,7 +28,10 @@ STEP_TYPES = frozenset({
 })
 
 # Keys that cannot be deleted (may be reordered)
-RESERVED_KEYS = frozenset({"GREETING", "SCHEDULING", "CONFIRMED"})
+RESERVED_KEYS = frozenset({"GREETING", "CONFIRMED"})
+# SCHEDULING is optional — owners may remove demo booking from the lead flow
+OPTIONAL_BUILTIN_KEYS = frozenset({"BUSINESS_TYPE", "LOCATIONS", "CURRENT_SYSTEM", "SCHEDULING"})
+
 
 # Standard capture fields + custom_1..custom_5
 STANDARD_CAPTURE_FIELDS = frozenset({
@@ -109,6 +112,7 @@ def default_bahi_pos_flow() -> list[dict]:
             "type": "list_options",
             "question_text": "",
             "question_key": "q_business_type",
+            "label": "Business type",
             "options_key": "business_types",
             "options": [],
             "capture_field": "business_type",
@@ -123,6 +127,7 @@ def default_bahi_pos_flow() -> list[dict]:
             "type": "list_options",
             "question_text": "",
             "question_key": "q_locations",
+            "label": "Locations",
             "options_key": "locations",
             "options": [],
             "capture_field": "locations",
@@ -137,6 +142,7 @@ def default_bahi_pos_flow() -> list[dict]:
             "type": "list_options",
             "question_text": "",
             "question_key": "q_current_system",
+            "label": "Current system",
             "options_key": "current_system",
             "options": [],
             "capture_field": "current_system",
@@ -151,12 +157,13 @@ def default_bahi_pos_flow() -> list[dict]:
             "type": "button_options",
             "question_text": "",
             "question_key": "q_scheduling",
+            "label": "Demo scheduling",
             "options": [],  # built from demo_slots + slot_other at runtime
             "capture_field": "demo_slot",
             "required": True,
             "skip_if_declined": False,
-            "reserved": True,
-            "system": True,
+            "reserved": False,
+            "system": False,
         },
         {
             "id": "step_confirmed",
@@ -228,14 +235,22 @@ def walkable_steps(flow: list[dict]) -> list[dict]:
 
 
 def activation_path_ok(flow: list[dict]) -> bool:
-    """At least one path from GREETING → qualification → SCHEDULING → CONFIRMED."""
+    """GREETING → at least one question → CONFIRMED (scheduling optional)."""
     keys = [s.get("key") for s in flow]
     if "GREETING" not in keys or "CONFIRMED" not in keys:
         return False
-    if "SCHEDULING" not in keys:
-        return False
-    # Must have at least one capture step before scheduling (or DEMO_FIRST skip)
-    return True
+    return len(walkable_steps(flow)) >= 1
+
+
+def scheduling_phase_or_fallback(tenant=None) -> str:
+    """Prefer SCHEDULING when present; otherwise first walkable step or CONFIRMED."""
+    flow = get_tenant_flow(tenant)
+    if find_step(flow, "SCHEDULING"):
+        return "SCHEDULING"
+    walk = walkable_steps(flow)
+    if walk:
+        return str(walk[0]["key"])
+    return "CONFIRMED"
 
 
 def validate_flow(flow: Any) -> list[dict]:
@@ -272,6 +287,8 @@ def validate_flow(flow: Any) -> list[dict]:
         q_text = str(raw.get("question_text") or "")[:1024]
         q_key = str(raw.get("question_key") or "").strip()[:64] or None
         options_key = str(raw.get("options_key") or "").strip()[:64] or None
+        # Owner-facing section title in My Bot / Settings (not WhatsApp copy)
+        label = str(raw.get("label") or "").strip()[:40]
 
         capture = raw.get("capture_field")
         if capture is not None and capture != "":
@@ -293,7 +310,7 @@ def validate_flow(flow: Any) -> list[dict]:
 
         opts_clean = _validate_options(i, stype, options, options_key, key)
 
-        cleaned.append({
+        step_out: dict = {
             "id": sid,
             "key": key,
             "type": stype,
@@ -306,7 +323,10 @@ def validate_flow(flow: Any) -> list[dict]:
             "skip_if_declined": bool(raw.get("skip_if_declined", False)),
             "reserved": reserved,
             "system": system,
-        })
+        }
+        if label:
+            step_out["label"] = label
+        cleaned.append(step_out)
 
     # Reserved keys that exist in default must still be present if we started from default
     for rk in RESERVED_KEYS:
@@ -314,7 +334,7 @@ def validate_flow(flow: Any) -> list[dict]:
             raise FlowError(f"reserved step {rk} cannot be removed")
 
     if not activation_path_ok(cleaned):
-        raise FlowError("flow must preserve GREETING → … → SCHEDULING → CONFIRMED")
+        raise FlowError("flow must preserve GREETING → at least one question → CONFIRMED")
 
     return cleaned
 
