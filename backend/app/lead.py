@@ -693,6 +693,18 @@ def _interactive_maps(tenant=None, lang: str = "ur") -> dict:
         for r in systems
         if isinstance(r, dict) and r.get("id")
     }
+    next_keys: dict[tuple[str, str], str] = {}
+    for key_name, rows in (
+        ("business_types", btypes),
+        ("locations", locs),
+        ("current_system", systems),
+    ):
+        for r in rows:
+            if not isinstance(r, dict) or not r.get("id"):
+                continue
+            nk = str(r.get("next_key") or "").strip().upper().replace(" ", "_")
+            if nk:
+                next_keys[(key_name, r["id"])] = nk
     return {
         "btype_rows": btype_rows or _BUSINESS_TYPE_ROWS,
         "loc_buttons": loc_buttons or _LOCATIONS_BUTTONS,
@@ -700,6 +712,7 @@ def _interactive_maps(tenant=None, lang: str = "ur") -> dict:
         "btype_labels": btype_labels or _BUSINESS_TYPE_LABELS,
         "loc_labels": loc_labels or _LOC_LABELS,
         "sys_labels": sys_labels or _SYS_LABELS,
+        "next_keys": next_keys,
         "select_label": mr.interactive("select_button_label") or (
             "Muntakhib karein" if lang == "ur" else "Select"
         ),

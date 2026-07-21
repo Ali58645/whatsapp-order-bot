@@ -104,6 +104,8 @@ export type FlowStepOption = {
   description?: string;
   value?: string;
   sheet_value?: string;
+  /** When set, selecting this option jumps to that flow step key (niche branch). */
+  next_key?: string | null;
 };
 
 export type FlowStep = {
@@ -121,6 +123,8 @@ export type FlowStep = {
   skip_if_declined?: boolean;
   reserved?: boolean;
   system?: boolean;
+  /** Default next step after answering (overridden by option.next_key). */
+  next_key?: string | null;
 };
 
 export type TenantConfig = {

@@ -19,7 +19,7 @@ from app.interactive import (
     build_list,
 )
 
-FLOW_MAX_STEPS = 12
+FLOW_MAX_STEPS = 20
 STEP_TYPES = frozenset({
     "text_question",
     "button_options",
@@ -221,13 +221,65 @@ def next_step_after(flow: list[dict], key: str) -> Optional[dict]:
     return None
 
 
-def next_phase_key(tenant, current_key: str) -> str:
-    """Next phase key after current; CONFIRMED if end."""
+def _normalize_next_key(raw: Any) -> Optional[str]:
+    if raw is None or raw == "":
+        return None
+    key = str(raw).strip().upper().replace(" ", "_")
+    return key or None
+
+
+def resolve_next_key(
+    tenant,
+    current_key: str,
+    *,
+    option: Optional[dict] = None,
+    option_id: Optional[str] = None,
+) -> str:
+    """
+    Resolve the next phase after answering current_key.
+
+    Priority:
+      1. option.next_key (niche branch)
+      2. step.next_key (step-level override)
+      3. linear next step in flow
+      4. CONFIRMED
+    """
     flow = get_tenant_flow(tenant)
+    step = find_step(flow, current_key)
+
+    opt = option
+    if opt is None and option_id and step is not None:
+        opts = resolve_step_options(step, tenant)
+        oid = str(option_id)
+        opt = next((o for o in opts if str(o.get("id")) == oid), None)
+
+    if opt:
+        nk = _normalize_next_key(opt.get("next_key"))
+        if nk and find_step(flow, nk):
+            return nk
+
+    if step is not None:
+        nk = _normalize_next_key(step.get("next_key"))
+        if nk and find_step(flow, nk):
+            return nk
+
     nxt = next_step_after(flow, current_key)
     if nxt:
         return str(nxt["key"])
     return "CONFIRMED"
+
+
+def next_phase_key(
+    tenant,
+    current_key: str,
+    *,
+    option: Optional[dict] = None,
+    option_id: Optional[str] = None,
+) -> str:
+    """Next phase key after current; CONFIRMED if end. Honors niche branches."""
+    return resolve_next_key(
+        tenant, current_key, option=option, option_id=option_id
+    )
 
 
 def walkable_steps(flow: list[dict]) -> list[dict]:
@@ -330,6 +382,9 @@ def validate_flow(flow: Any) -> list[dict]:
         }
         if label:
             step_out["label"] = label
+        nk = _normalize_next_key(raw.get("next_key"))
+        if nk:
+            step_out["next_key"] = nk
         cleaned.append(step_out)
 
     # Reserved keys that exist in default must still be present if we started from default
@@ -339,6 +394,18 @@ def validate_flow(flow: Any) -> list[dict]:
 
     if not activation_path_ok(cleaned):
         raise FlowError("flow must preserve GREETING → at least one question → CONFIRMED")
+
+    # Validate next_key targets exist
+    for i, step in enumerate(cleaned):
+        nk = step.get("next_key")
+        if nk and nk not in seen_keys:
+            raise FlowError(f"flow[{i}].next_key {nk!r} does not exist")
+        for j, opt in enumerate(step.get("options") or []):
+            onk = opt.get("next_key")
+            if onk and onk not in seen_keys:
+                raise FlowError(
+                    f"flow[{i}].options[{j}].next_key {onk!r} does not exist"
+                )
 
     return cleaned
 
@@ -400,6 +467,9 @@ def _validate_options(
             row["value"] = str(opt["value"])[:64]
         if opt.get("sheet_value") is not None:
             row["sheet_value"] = str(opt["sheet_value"])[:64]
+        nk = _normalize_next_key(opt.get("next_key"))
+        if nk:
+            row["next_key"] = nk
         cleaned.append(row)
     return cleaned
 
@@ -420,6 +490,7 @@ def resolve_step_options(step: dict, tenant=None, lang: str = "ur") -> list[dict
     """
     Options for button/list steps.
     Prefer step.options; else options_key → messages.interactive; else maps.
+    Preserves next_key for niche branching when present on interactive rows.
     """
     opts = step.get("options") or []
     if opts:
@@ -431,34 +502,47 @@ def resolve_step_options(step: dict, tenant=None, lang: str = "ur") -> list[dict
 
     from app.lead import _interactive_maps
     maps = _interactive_maps(tenant, lang)
+    next_map = maps.get("next_keys") or {}
+
     if options_key == "business_types":
-        # Convert rows (id, title, desc) to option dicts
         rows = maps["btype_rows"]
         labels = maps["btype_labels"]
         out = []
         for rid, title, desc in rows:
-            out.append({
+            row = {
                 "id": rid,
                 "title": title,
                 "description": desc,
                 "value": labels.get(rid, title),
-            })
+            }
+            nk = _normalize_next_key(next_map.get(("business_types", rid)))
+            if nk:
+                row["next_key"] = nk
+            out.append(row)
         return out
     if options_key == "locations":
-        return [
-            {"id": bid, "title": title, "value": maps["loc_labels"].get(bid, title)}
-            for bid, title in maps["loc_buttons"]
-        ]
+        out = []
+        for bid, title in maps["loc_buttons"]:
+            row = {"id": bid, "title": title, "value": maps["loc_labels"].get(bid, title)}
+            nk = _normalize_next_key(next_map.get(("locations", bid)))
+            if nk:
+                row["next_key"] = nk
+            out.append(row)
+        return out
     if options_key == "current_system":
-        return [
-            {
+        out = []
+        for bid, title in maps["sys_buttons"]:
+            row = {
                 "id": bid,
                 "title": title,
                 "sheet_value": maps["sys_labels"].get(bid, title),
                 "value": maps["sys_labels"].get(bid, title),
             }
-            for bid, title in maps["sys_buttons"]
-        ]
+            nk = _normalize_next_key(next_map.get(("current_system", bid)))
+            if nk:
+                row["next_key"] = nk
+            out.append(row)
+        return out
     return []
 
 
@@ -604,15 +688,37 @@ def apply_flow_interactive_answer(
             return False, None
         if field:
             meta[field] = label
-        meta["phase"] = next_phase_key(tenant, phase)
+        meta["phase"] = next_phase_key(tenant, phase, option_id=reply_id)
         return True, None
 
     opt = by_id[reply_id]
     field = step.get("capture_field")
     if field:
         meta[field] = option_capture_value(opt)
-    meta["phase"] = next_phase_key(tenant, phase)
+    if opt.get("next_key"):
+        meta["branch"] = str(opt.get("id") or reply_id)
+    meta["phase"] = next_phase_key(tenant, phase, option=opt)
     return True, None
+
+
+def match_step_option(
+    step: dict,
+    text: str,
+    tenant=None,
+    lang: str = "ur",
+) -> Optional[dict]:
+    """Return the matched option dict if free text matches; else None."""
+    opts = resolve_step_options(step, tenant, lang)
+    lower = text.lower().strip()
+    for o in opts:
+        title = str(o.get("title") or "").lower()
+        val = str(o.get("value") or "").lower()
+        sid = str(o.get("id") or "").lower()
+        if lower == title or lower == val or lower == sid:
+            return o
+        if title and title in lower:
+            return o
+    return None
 
 
 def match_text_to_step_option(
@@ -622,17 +728,10 @@ def match_text_to_step_option(
     lang: str = "ur",
 ) -> Optional[str]:
     """Return capture value if free text matches an option; else None."""
-    opts = resolve_step_options(step, tenant, lang)
-    lower = text.lower().strip()
-    for o in opts:
-        title = str(o.get("title") or "").lower()
-        val = str(o.get("value") or "").lower()
-        sid = str(o.get("id") or "").lower()
-        if lower == title or lower == val or lower == sid:
-            return option_capture_value(o)
-        if title and title in lower:
-            return option_capture_value(o)
-    return None
+    matched = match_step_option(step, text, tenant, lang)
+    if matched is None:
+        return None
+    return option_capture_value(matched)
 
 
 def sheet_fields_from_meta(meta: dict) -> dict:

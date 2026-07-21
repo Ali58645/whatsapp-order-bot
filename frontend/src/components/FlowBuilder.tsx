@@ -54,7 +54,7 @@ const CAPTURE_FIELDS = [
   "custom_5",
 ] as const;
 
-const FLOW_MAX = 12;
+const FLOW_MAX = 20;
 
 function nid(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;

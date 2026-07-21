@@ -754,8 +754,8 @@ export default function OwnerBot() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold">Questions & buttons</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Drag to fully rearrange the WhatsApp order — including Extra questions. Rename, edit,
-              or remove any step (including demo scheduling).
+              Drag to rearrange. On list/button rows, set <strong>Then go to</strong> so each niche
+              (e.g. Assisted living) follows its own questions, then merges back to Demo.
             </p>
           </div>
           <LeadOptionsEditor

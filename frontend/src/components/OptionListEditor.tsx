@@ -28,6 +28,8 @@ export type OptionListItem = {
   description?: string;
   answer?: string;
   locked?: boolean;
+  /** Flow step key to jump to after this option (niche branch). Empty = default next. */
+  next_key?: string;
 };
 
 type Constraints = {
@@ -38,12 +40,17 @@ type Constraints = {
   maxDescriptionChars?: number;
 };
 
+export type NextKeyOption = { value: string; label: string };
+
 type Features = {
   reorder?: boolean;
   valueField?: boolean;
   valueLabel?: string;
   descriptionField?: boolean;
   answerField?: boolean;
+  /** Per-row "Then go to" branch picker */
+  nextKeyField?: boolean;
+  nextKeyOptions?: NextKeyOption[];
 };
 
 type Props = {
@@ -87,6 +94,8 @@ export function OptionListEditor({
     valueLabel = "Value",
     descriptionField = false,
     answerField = false,
+    nextKeyField = false,
+    nextKeyOptions = [],
   } = features;
   const { maxItems, maxLabelChars } = constraints;
   const maxValueChars = constraints.maxValueChars ?? 64;
@@ -179,6 +188,8 @@ export function OptionListEditor({
                 valueLabel={valueLabel}
                 descriptionField={descriptionField}
                 answerField={answerField}
+                nextKeyField={nextKeyField}
+                nextKeyOptions={nextKeyOptions}
                 maxLabelChars={maxLabelChars}
                 maxValueChars={maxValueChars}
                 maxAnswerChars={maxAnswerChars}
@@ -226,6 +237,8 @@ function SortableRow({
   valueLabel,
   descriptionField,
   answerField,
+  nextKeyField,
+  nextKeyOptions,
   maxLabelChars,
   maxValueChars,
   maxAnswerChars,
@@ -243,6 +256,8 @@ function SortableRow({
   valueLabel: string;
   descriptionField: boolean;
   answerField: boolean;
+  nextKeyField: boolean;
+  nextKeyOptions: NextKeyOption[];
   maxLabelChars: number;
   maxValueChars: number;
   maxAnswerChars: number;
@@ -366,6 +381,24 @@ function SortableRow({
                 placeholder="Answer"
                 onChange={(e) => onChange({ answer: e.target.value })}
               />
+            </div>
+          )}
+
+          {nextKeyField && nextKeyOptions.length > 0 && (
+            <div>
+              <Label className="mb-1 text-[11px] text-muted-foreground">Then go to</Label>
+              <select
+                className="mt-1 flex h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
+                value={item.next_key || ""}
+                onChange={(e) => onChange({ next_key: e.target.value })}
+              >
+                <option value="">Next in list (default)</option>
+                {nextKeyOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>

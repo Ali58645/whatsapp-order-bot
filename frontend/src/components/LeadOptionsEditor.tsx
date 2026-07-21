@@ -31,9 +31,15 @@ type Interactive = {
     title: string;
     description?: string;
     value?: string;
+    next_key?: string;
   }>;
-  locations?: Array<{ id: string; title: string; value?: string }>;
-  current_system?: Array<{ id: string; title: string; sheet_value?: string }>;
+  locations?: Array<{ id: string; title: string; value?: string; next_key?: string }>;
+  current_system?: Array<{
+    id: string;
+    title: string;
+    sheet_value?: string;
+    next_key?: string;
+  }>;
 };
 
 type LeadDraft = {
@@ -63,7 +69,7 @@ const REMOVABLE_SET = new Set<string>(REMOVABLE);
 /** Always first / last — not shown in the arrangeable Questions list. */
 const ANCHOR_KEYS = new Set(["GREETING", "BUSINESS_NAME", "CONFIRMED", "STALLED"]);
 
-const FLOW_MAX = 12;
+const FLOW_MAX = 20;
 const CUSTOM_FIELDS = ["custom_1", "custom_2", "custom_3", "custom_4", "custom_5"] as const;
 
 const STEP_META: Record<RemovableLeadStep, { title: string; restoreLabel: string }> = {
@@ -260,6 +266,7 @@ function btToItems(rows: Interactive["business_types"] = []): OptionListItem[] {
     label: r.title || "",
     value: r.value || r.title || "",
     description: r.description || "",
+    next_key: r.next_key || "",
   }));
 }
 
@@ -268,6 +275,7 @@ function locToItems(rows: Interactive["locations"] = []): OptionListItem[] {
     id: r.id,
     label: r.title || "",
     value: r.value || r.title || "",
+    next_key: r.next_key || "",
   }));
 }
 
@@ -276,7 +284,28 @@ function sysToItems(rows: Interactive["current_system"] = []): OptionListItem[] 
     id: r.id,
     label: r.title || "",
     value: r.sheet_value || r.title || "",
+    next_key: r.next_key || "",
   }));
+}
+
+function branchTargets(
+  flow: FlowStep[] | undefined,
+  excludeKey?: string
+): { value: string; label: string }[] {
+  const exclude = (excludeKey || "").toUpperCase();
+  return ensureLeadFlow(flow)
+    .filter((s) => {
+      const k = (s.key || "").toUpperCase();
+      if (k === "GREETING" || k === exclude) return false;
+      return true;
+    })
+    .map((s) => {
+      const k = (s.key || "").toUpperCase();
+      const label =
+        (s.label || "").trim() ||
+        (isRemovableKey(k) ? STEP_META[k].title : k);
+      return { value: k, label: `${label} (${k})` };
+    });
 }
 
 function CharHint({ len, max }: { len: number; max: number }) {
@@ -421,6 +450,52 @@ export function LeadOptionsEditor({
   function setLeadQ(key: keyof LeadDraft, value: string) {
     onLeadChange({ ...lead, [key]: value });
   }
+
+  function setStepNextKey(stepKey: string, nextKey: string) {
+    if (!onFlowChange) return;
+    const nk = nextKey.trim().toUpperCase();
+    onFlowChange(
+      ensureLeadFlow(flow).map((s) =>
+        (s.key || "").toUpperCase() === stepKey.toUpperCase()
+          ? { ...s, next_key: nk || null }
+          : s
+      )
+    );
+  }
+
+  function StepNextKeyField({
+    stepKey,
+    current,
+  }: {
+    stepKey: string;
+    current?: string | null;
+  }) {
+    if (!onFlowChange || readonly) return null;
+    const targets = branchTargets(flow, stepKey);
+    if (!targets.length) return null;
+    return (
+      <div>
+        <Label>After answer, go to</Label>
+        <select
+          className="mt-1.5 flex h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+          value={(current || "").toUpperCase()}
+          onChange={(e) => setStepNextKey(stepKey, e.target.value)}
+        >
+          <option value="">Next in list (default)</option>
+          {targets.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Use this for niche paths — e.g. after Assisted Living questions jump to Demo scheduling.
+        </p>
+      </div>
+    );
+  }
+
+  const gotoTargets = branchTargets(flow);
 
   function removeStep(key: RemovableLeadStep) {
     if (!onFlowChange) return;
@@ -606,6 +681,8 @@ export function LeadOptionsEditor({
               valueField: true,
               valueLabel: "Saved as",
               descriptionField: true,
+              nextKeyField: Boolean(onFlowChange) && !readonly,
+              nextKeyOptions: gotoTargets.filter((t) => t.value !== "BUSINESS_TYPE"),
             }}
             addDisabledHint="WhatsApp list limit: 10 rows"
             onChange={(items) => {
@@ -616,9 +693,17 @@ export function LeadOptionsEditor({
                   title: it.label,
                   value: (it.value || it.label).trim() || it.label,
                   description: it.description || "",
+                  ...(it.next_key ? { next_key: it.next_key } : {}),
                 })),
               });
             }}
+          />
+          <StepNextKeyField
+            stepKey="BUSINESS_TYPE"
+            current={
+              ensureLeadFlow(flow).find((s) => (s.key || "").toUpperCase() === "BUSINESS_TYPE")
+                ?.next_key
+            }
           />
           <RemoveBtn stepKey="BUSINESS_TYPE" />
         </AccordionSection>
@@ -648,7 +733,13 @@ export function LeadOptionsEditor({
             title="Rows"
             items={locItems}
             constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
-            features={{ reorder: true, valueField: true, valueLabel: "Saved as" }}
+            features={{
+              reorder: true,
+              valueField: true,
+              valueLabel: "Saved as",
+              nextKeyField: Boolean(onFlowChange) && !readonly,
+              nextKeyOptions: gotoTargets.filter((t) => t.value !== "LOCATIONS"),
+            }}
             addDisabledHint="WhatsApp list limit: 10 rows"
             onChange={(items) => {
               onInteractiveChange({
@@ -657,9 +748,16 @@ export function LeadOptionsEditor({
                   id: it.id,
                   title: it.label.slice(0, 50),
                   value: (it.value || it.label).trim() || it.label,
+                  ...(it.next_key ? { next_key: it.next_key } : {}),
                 })),
               });
             }}
+          />
+          <StepNextKeyField
+            stepKey="LOCATIONS"
+            current={
+              ensureLeadFlow(flow).find((s) => (s.key || "").toUpperCase() === "LOCATIONS")?.next_key
+            }
           />
           <RemoveBtn stepKey="LOCATIONS" />
         </AccordionSection>
@@ -689,7 +787,13 @@ export function LeadOptionsEditor({
             title="Rows"
             items={sysItems}
             constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
-            features={{ reorder: true, valueField: true, valueLabel: "Value for sheet" }}
+            features={{
+              reorder: true,
+              valueField: true,
+              valueLabel: "Value for sheet",
+              nextKeyField: Boolean(onFlowChange) && !readonly,
+              nextKeyOptions: gotoTargets.filter((t) => t.value !== "CURRENT_SYSTEM"),
+            }}
             addDisabledHint="WhatsApp list limit: 10 rows"
             onChange={(items) => {
               onInteractiveChange({
@@ -698,9 +802,17 @@ export function LeadOptionsEditor({
                   id: it.id,
                   title: it.label.slice(0, 50),
                   sheet_value: (it.value || it.label).trim() || it.label,
+                  ...(it.next_key ? { next_key: it.next_key } : {}),
                 })),
               });
             }}
+          />
+          <StepNextKeyField
+            stepKey="CURRENT_SYSTEM"
+            current={
+              ensureLeadFlow(flow).find((s) => (s.key || "").toUpperCase() === "CURRENT_SYSTEM")
+                ?.next_key
+            }
           />
           <RemoveBtn stepKey="CURRENT_SYSTEM" />
         </AccordionSection>
@@ -758,10 +870,12 @@ export function LeadOptionsEditor({
       id: o.id,
       label: o.title,
       value: o.value || o.sheet_value || o.title,
+      next_key: o.next_key || "",
     }));
     const label =
       (step.label || "").trim() ||
       (isButtons ? "Buttons question" : "Text question");
+    const stepKey = (step.key || "").toUpperCase();
 
     return (
       <AccordionSection
@@ -803,7 +917,13 @@ export function LeadOptionsEditor({
               title="Buttons"
               items={items}
               constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
-              features={{ reorder: true, valueField: true, valueLabel: "Saved as" }}
+              features={{
+                reorder: true,
+                valueField: true,
+                valueLabel: "Saved as",
+                nextKeyField: !readonly,
+                nextKeyOptions: gotoTargets.filter((t) => t.value !== stepKey),
+              }}
               addDisabledHint="WhatsApp list limit: 10 rows"
               onChange={(next) =>
                 patchExtra(step.id, {
@@ -812,11 +932,13 @@ export function LeadOptionsEditor({
                     id: it.id,
                     title: it.label.slice(0, 50),
                     value: (it.value || it.label).trim() || it.label,
+                    ...(it.next_key ? { next_key: it.next_key } : {}),
                   })),
                 })
               }
             />
           )}
+          <StepNextKeyField stepKey={stepKey} current={step.next_key} />
           {!readonly && onFlowChange && (
             <Button
               type="button"
@@ -858,7 +980,8 @@ export function LeadOptionsEditor({
       {showExtras && !readonly && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            Drag any step to set WhatsApp order. Add extras anytime — they join this same list.
+            Drag to set order. On each option, use <strong>Then go to</strong> for niche branches
+            (e.g. Assisted living → its questions → Demo).
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => addExtra("text")}>

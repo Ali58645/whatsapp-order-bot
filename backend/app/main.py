@@ -830,7 +830,7 @@ async def _handle_text_at_flow_step(
     sender: str, meta: dict, user_text: str, lang: str, step: dict, tenant: Tenant
 ) -> dict:
     """Free-text answer while on a button/list step — match option or re-prompt."""
-    from app.flow import match_text_to_step_option, next_phase_key, step_question_text
+    from app.flow import match_step_option, match_text_to_step_option, next_phase_key, step_question_text
     from app.lead import (
         build_handoff,
         increment_reprompt,
@@ -848,6 +848,7 @@ async def _handle_text_at_flow_step(
     # Prefer legacy fuzzy matchers for classic steps (byte-identical)
     display_val = None
     sheet_val = None
+    matched_opt = None
     if phase == "BUSINESS_TYPE":
         display_val, sheet_val = _match_business_type(user_text)
     elif phase == "LOCATIONS":
@@ -855,14 +856,28 @@ async def _handle_text_at_flow_step(
     elif phase == "CURRENT_SYSTEM":
         display_val, sheet_val = _match_current_system(user_text)
     else:
-        matched = match_text_to_step_option(step, user_text, tenant, lang)
-        if matched is not None:
-            display_val = sheet_val = matched
+        matched_opt = match_step_option(step, user_text, tenant, lang)
+        if matched_opt is not None:
+            display_val = sheet_val = match_text_to_step_option(step, user_text, tenant, lang)
 
     if display_val is not None:
         if field:
             meta[field] = sheet_val
-        meta["phase"] = next_phase_key(tenant, phase)
+        if matched_opt and matched_opt.get("next_key"):
+            meta["branch"] = str(matched_opt.get("id") or "")
+        # For classic matchers, still honor interactive next_key via option_id lookup
+        option_id = (matched_opt or {}).get("id")
+        if option_id is None and phase in ("BUSINESS_TYPE", "LOCATIONS", "CURRENT_SYSTEM"):
+            # Best-effort: find option whose capture value matches
+            from app.flow import resolve_step_options, option_capture_value
+            for o in resolve_step_options(step, tenant, lang):
+                if option_capture_value(o) == sheet_val or o.get("title") == display_val:
+                    option_id = o.get("id")
+                    matched_opt = o
+                    break
+        meta["phase"] = next_phase_key(
+            tenant, phase, option=matched_opt, option_id=option_id
+        )
         reset_reprompts(meta)
         _sheet_field_update(sender, meta, tenant)
         await _maybe_send_interactive(sender, meta, tenant, phase=meta["phase"])

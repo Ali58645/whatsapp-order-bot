@@ -493,6 +493,9 @@ def validate_messages_patch(raw: Any) -> dict:
             "description": desc,
             "value": value or title,
         })
+        nk = sanitize_text(str(row.get("next_key") or ""), max_len=64).upper().replace(" ", "_")
+        if nk:
+            cleaned_bt[-1]["next_key"] = nk
     inter_out["business_types"] = cleaned_bt
 
     for set_key, value_field in (("locations", "value"), ("current_system", "sheet_value")):
@@ -522,7 +525,11 @@ def validate_messages_patch(raw: Any) -> dict:
             if key in seen:
                 raise MessagesError(f"{set_key}: duplicate label {title!r}")
             seen.add(key)
-            cleaned.append({"id": rid, "title": title, value_field: val or title})
+            item = {"id": rid, "title": title, value_field: val or title}
+            nk = sanitize_text(str(row.get("next_key") or ""), max_len=64).upper().replace(" ", "_")
+            if nk:
+                item["next_key"] = nk
+            cleaned.append(item)
         inter_out[set_key] = cleaned
 
     out["interactive"] = inter_out

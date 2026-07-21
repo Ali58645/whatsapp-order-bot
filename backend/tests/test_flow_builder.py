@@ -511,3 +511,101 @@ def test_llm_advance_does_not_skip_extra_after_current_system():
     # Claude says "slot" — old code jumped to SCHEDULING via PHASES index
     _advance_phase(meta, "we will confirm a slot with you", "ok", tenant=tenant)
     assert meta["phase"] == "EXTRA_TOOLS"
+
+
+def test_niche_branch_option_next_key():
+    """Selecting Assisted living jumps to niche questions, then merges to SCHEDULING."""
+    from app.flow import (
+        apply_flow_interactive_answer,
+        default_bahi_pos_flow,
+        next_phase_key,
+        validate_flow,
+    )
+    from app.tenants import Tenant
+
+    flow = default_bahi_pos_flow()
+    # Niche picker after business name
+    bn_i = next(i for i, s in enumerate(flow) if s["key"] == "BUSINESS_NAME")
+    flow.insert(
+        bn_i + 1,
+        {
+            "id": "step_niche",
+            "key": "NICHE_PICK",
+            "type": "list_options",
+            "question_text": "Which facility type?",
+            "options": [
+                {
+                    "id": "assisted",
+                    "title": "Assisted living",
+                    "value": "Assisted living",
+                    "next_key": "ASSISTED_Q1",
+                },
+                {
+                    "id": "memory",
+                    "title": "Memory care",
+                    "value": "Memory care",
+                    "next_key": "MEMORY_Q1",
+                },
+            ],
+            "capture_field": "custom_1",
+            "required": True,
+            "reserved": False,
+            "system": False,
+        },
+    )
+    flow.insert(
+        bn_i + 2,
+        {
+            "id": "step_al1",
+            "key": "ASSISTED_Q1",
+            "type": "free_text_capture",
+            "question_text": "How many assisted living beds?",
+            "options": [],
+            "capture_field": "custom_2",
+            "next_key": "SCHEDULING",
+            "required": True,
+            "reserved": False,
+            "system": False,
+        },
+    )
+    flow.insert(
+        bn_i + 3,
+        {
+            "id": "step_mc1",
+            "key": "MEMORY_Q1",
+            "type": "free_text_capture",
+            "question_text": "Memory care census?",
+            "options": [],
+            "capture_field": "custom_3",
+            "next_key": "SCHEDULING",
+            "required": True,
+            "reserved": False,
+            "system": False,
+        },
+    )
+    cleaned = validate_flow(flow)
+    tenant = Tenant(
+        phone_number_id="x",
+        name="T",
+        flow_mode="lead",
+        campaign_phrase="Bahi",
+        demo_slots=["A", "B"],
+    )
+    tenant._raw_config = {"flow": cleaned}
+
+    assert next_phase_key(tenant, "BUSINESS_NAME") == "NICHE_PICK"
+
+    meta = {"phase": "NICHE_PICK", "lang": "en"}
+    ok, _ = apply_flow_interactive_answer(meta, "assisted", "Assisted living", tenant=tenant)
+    assert ok
+    assert meta["phase"] == "ASSISTED_Q1"
+    assert meta.get("custom_1") == "Assisted living"
+    assert meta.get("branch") == "assisted"
+
+    assert next_phase_key(tenant, "ASSISTED_Q1") == "SCHEDULING"
+    assert next_phase_key(tenant, "MEMORY_Q1") == "SCHEDULING"
+
+    meta2 = {"phase": "NICHE_PICK", "lang": "en"}
+    ok2, _ = apply_flow_interactive_answer(meta2, "memory", "Memory care", tenant=tenant)
+    assert ok2
+    assert meta2["phase"] == "MEMORY_Q1"
