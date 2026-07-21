@@ -71,6 +71,9 @@ async def process_webhook_body(body: dict) -> dict:
                 tenant.phone_number_id,
                 nm.channel,
             )
+            from app.main import _record_inbound_for_inbox
+
+            await _record_inbound_for_inbox(nm, tenant)
             try:
                 from app.db.store import EventStore
 
@@ -94,11 +97,11 @@ async def process_webhook_body(body: dict) -> dict:
         from app.owner_tools import away_message, is_within_business_hours
 
         if not is_within_business_hours(tenant):
-            entry = entry_for_handlers(nm)
+            from app.main import _record_inbound_for_inbox, send_whatsapp_message
+
+            await _record_inbound_for_inbox(nm, tenant)
             sender = nm.sender_id or ""
             if sender and tenant.flow_mode == "lead":
-                from app.main import send_whatsapp_message
-
                 await send_whatsapp_message(sender, away_message(tenant), tenant=tenant)
             result = {"status": "ok", "bot": "away"}
             continue

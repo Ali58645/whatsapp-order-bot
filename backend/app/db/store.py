@@ -35,6 +35,27 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("orderbot.store")
 
+
+def _merge_histories(db_hist: list, mem_hist: list) -> list:
+    """
+    Prefer the longer transcript; never shrink DB history when memory is partial
+    (common after process restart — memory may only hold the newest line).
+    """
+    db_hist = list(db_hist or [])
+    mem_hist = list(mem_hist or [])
+    if not mem_hist:
+        return db_hist
+    if not db_hist:
+        return mem_hist
+    if len(mem_hist) > len(db_hist):
+        return mem_hist
+    last = mem_hist[-1]
+    prev = db_hist[-1]
+    if (prev.get("role"), prev.get("content")) != (last.get("role"), last.get("content")):
+        return db_hist + [last]
+    return db_hist
+
+
 # ── In-process sender locks (always in-memory, fine for single instance) ────
 _locks: dict[tuple[str, str], asyncio.Lock] = {}
 
@@ -154,9 +175,17 @@ class SessionStore:
             phase = db_sess.phase or meta.get("phase", "GREETING")
             meta["phase"] = phase  # keep in sync
 
-            return cls(
+            # Merge any in-memory messages recorded before this load (e.g. just-
+            # arrived webhook text) so we never drop a fresh inbound on hydrate.
+            from app.sessions import get_session as _mem_get_session
+
+            db_hist = list(db_sess.history or [])
+            mem_hist = list(_mem_get_session(sender, tenant_id=tenant.phone_number_id))
+            history = _merge_histories(db_hist, mem_hist)
+
+            store = cls(
                 sender, tenant,
-                history=list(db_sess.history or []),
+                history=history,
                 meta=meta,
                 phase=phase,
                 _db_session_row=db_sess,
@@ -164,6 +193,8 @@ class SessionStore:
                 _contact_id=contact_id,
                 _tenant_db_id=tenant_db_id,
             )
+            store._sync_to_memory()
+            return store
 
     # ── Persistence ──────────────────────────────────────────────────────────
 
@@ -264,8 +295,11 @@ class SessionStore:
                     status=status,
                 )
 
-            # Upsert lead record if this is a lead session
-            if self.tenant.flow_mode == "lead" and self.meta.get("lead_source"):
+            # Upsert lead so Conversations inbox always lists chats with history
+            if self.tenant.flow_mode == "lead" and (
+                self.meta.get("lead_source") or self.history
+            ):
+                self.meta.setdefault("lead_source", "inbound")
                 await upsert_lead_record(
                     db, tenant_db_id, contact_id, db_sess.id, self.meta
                 )

@@ -62,9 +62,12 @@ def is_within_business_hours(tenant, *, now: Optional[datetime] = None) -> bool:
     day_keys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
     day = day_keys[now.weekday()]
     windows = bh.get("days") or {}
+    # Enabled but never configured → treat as always open (don't silently drop inbox)
+    if not windows:
+        return True
     slots = windows.get(day) or windows.get(day[:3]) or []
     if not slots:
-        return False  # closed all day
+        return False  # closed all day (day present/empty intentionally)
     hm = now.hour * 60 + now.minute
     for slot in slots:
         if not isinstance(slot, (list, tuple)) or len(slot) < 2:

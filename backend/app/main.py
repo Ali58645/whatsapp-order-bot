@@ -181,11 +181,14 @@ def _sheet_field_update(sender: str, meta: dict, tenant: Tenant) -> None:
 async def _db_save_lead_state(sender: str, meta: dict, tenant: Tenant) -> None:
     """Persist active lead session state. Errors logged only."""
     try:
-        from app.db.store import SessionStore
+        from app.db.store import SessionStore, _merge_histories
         store = await SessionStore.load(sender, tenant)
         store.meta = dict(meta)
         store.phase = meta.get("phase", store.phase or "GREETING")
-        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        store.history = _merge_histories(
+            store.history,
+            get_session(sender, tenant_id=tenant.phone_number_id),
+        )
         await store.save()
     except Exception as exc:
         log.error(f"db: save lead state failed for {sender} — {exc}")
@@ -196,11 +199,14 @@ async def _db_close_lead(
 ) -> None:
     """Close lead session + append audit event. Errors logged only."""
     try:
-        from app.db.store import SessionStore, EventStore
+        from app.db.store import SessionStore, EventStore, _merge_histories
         store = await SessionStore.load(sender, tenant)
         store.meta = dict(meta)
         store.phase = meta.get("phase", store.phase or "GREETING")
-        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        store.history = _merge_histories(
+            store.history,
+            get_session(sender, tenant_id=tenant.phone_number_id),
+        )
         await store.close(status)
         await EventStore.append(
             tenant, status, {"phase": meta.get("phase", "")}, wa_id=sender
@@ -237,9 +243,12 @@ async def _db_append_event(
 async def _db_save_order_state(sender: str, tenant: Tenant) -> None:
     """Persist order-flow session history. Errors logged only."""
     try:
-        from app.db.store import SessionStore
+        from app.db.store import SessionStore, _merge_histories
         store = await SessionStore.load(sender, tenant)
-        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        store.history = _merge_histories(
+            store.history,
+            get_session(sender, tenant_id=tenant.phone_number_id),
+        )
         store.phase = "ORDERING"
         store.meta = {"phase": "ORDERING"}
         await store.save()
@@ -252,11 +261,12 @@ async def _db_confirm_order(
 ) -> None:
     """Persist confirmed order + close session + event. Errors logged only."""
     try:
-        from app.db.store import SessionStore, OrderStore, EventStore
+        from app.db.store import SessionStore, OrderStore, EventStore, _merge_histories
         store = await SessionStore.load(sender, tenant)
-        store.history = list(
+        store.history = _merge_histories(
+            store.history,
             history if history is not None
-            else get_session(sender, tenant_id=tenant.phone_number_id)
+            else get_session(sender, tenant_id=tenant.phone_number_id),
         )
         store.phase = "CONFIRMED"
         store.meta = {"phase": "CONFIRMED", "order": order}
@@ -380,17 +390,57 @@ async def readyz():
 async def _db_record_muted_inbound(
     sender: str, tenant: Tenant, text: str, profile_name: str = ""
 ) -> None:
-    """Persist inbound message during human takeover (memory already updated)."""
+    """Persist inbound message for inbox (takeover / away / paused). Memory already updated."""
     try:
-        from app.db.store import SessionStore
+        from app.db.store import SessionStore, _merge_histories
 
         store = await SessionStore.load(sender, tenant, profile_name=profile_name)
-        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        store.history = _merge_histories(
+            store.history,
+            get_session(sender, tenant_id=tenant.phone_number_id),
+        )
         store.meta = dict(store.meta or {})
         store.meta.setdefault("phase", store.phase or "GREETING")
+        store.meta.setdefault("lead_source", "inbound")
         await store.save()
     except Exception as exc:
         log.error(f"db: muted inbound persist failed for {sender} — {exc}")
+
+
+def _inbound_display_text(nm) -> str:
+    """Best-effort text for transcript when customer messages the bot."""
+    text = (getattr(nm, "text", None) or "").strip()
+    if text:
+        return text
+    reply = getattr(nm, "interactive_reply", None)
+    if reply:
+        rid, title = reply
+        return (title or rid or "").strip()
+    mtype = (getattr(nm, "message_type", None) or "").strip()
+    if mtype and mtype not in ("text", "unknown", ""):
+        return f"[{mtype}]"
+    return ""
+
+
+async def _record_inbound_for_inbox(nm, tenant: Tenant) -> None:
+    """Always store customer messages so Conversations shows them (even if bot is silent)."""
+    sender = (getattr(nm, "sender_id", None) or "").strip()
+    text = _inbound_display_text(nm)
+    if not sender or not text:
+        return
+    from app.transcript import record_user
+
+    record_user(sender, tenant.phone_number_id, text)
+    profile_name = ""
+    try:
+        contacts = getattr(nm, "contacts", None) or []
+        if contacts:
+            profile_name = contacts[0].get("profile", {}).get("name", "") or ""
+    except Exception:
+        pass
+    asyncio.create_task(
+        _db_record_muted_inbound(sender, tenant, text, profile_name)
+    )
 
 
 async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
