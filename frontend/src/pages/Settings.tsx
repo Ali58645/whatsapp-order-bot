@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Save, LayoutTemplate } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Loader2, Radio, Save, LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -639,6 +640,22 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
 
       {tab === "general" && (
         <form onSubmit={onSave} className="space-y-6">
+          {!ownerMode && (
+            <section className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+              <div>
+                <h2 className="text-sm font-semibold">Channels</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  WhatsApp, Instagram, and Messenger connections for this business.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/channels">
+                  <Radio className="mr-2 h-4 w-4" />
+                  Manage channels
+                </Link>
+              </Button>
+            </section>
+          )}
           <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
             <h2 className="text-sm font-semibold">Profile</h2>
             <div>

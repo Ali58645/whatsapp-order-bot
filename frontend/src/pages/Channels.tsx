@@ -1,8 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getRole, isOwner, MeResponse } from "../api";
+import {
+  api,
+  filterPickerTenants,
+  getRole,
+  getTenantFilter,
+  isOwner,
+  MeResponse,
+  setTenantFilter,
+  Tenant,
+} from "../api";
 import { ChannelBadge } from "../components/ChannelBadge";
 import { Button } from "../components/ui/button";
+import { Label } from "../components/ui/input";
 import { Skeleton } from "../components/ui/avatar";
 import { cn } from "../lib/utils";
 
@@ -24,33 +34,89 @@ type ChannelsResponse = {
 
 export default function ChannelsPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedDbId, setSelectedDbId] = useState<number | null>(null);
   const [data, setData] = useState<ChannelsResponse | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const tenantId = me?.tenant?.id ?? me?.tenant_id;
+  const isAdmin = getRole() === "admin" && !isOwner();
+  const pickerTenants = filterPickerTenants(tenants);
+
+  const resolveTenantId = useCallback(
+    (list: Tenant[], profile: MeResponse | null): number | null => {
+      if (profile?.tenant?.id) return profile.tenant.id;
+      if (profile?.tenant_id) return profile.tenant_id;
+      const filter = getTenantFilter();
+      if (filter && filter !== "all") {
+        const match = list.find((t) => t.phone_number_id === filter);
+        if (match) return match.id;
+      }
+      return list[0]?.id ?? null;
+    },
+    []
+  );
 
   useEffect(() => {
+    setLoading(true);
     api<MeResponse>("/api/dashboard/me", { tenant: false })
-      .then(setMe)
-      .catch((e) => setError(e.message));
-  }, []);
+      .then((profile) => {
+        setMe(profile);
+        return api<{ items?: Tenant[] } | Tenant[]>("/api/dashboard/tenants", {
+          tenant: false,
+        }).then((raw) => {
+          const all = Array.isArray(raw) ? raw : raw.items || [];
+          setTenants(all);
+          const picked = resolveTenantId(filterPickerTenants(all), profile);
+          setSelectedDbId(picked);
+        });
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [resolveTenantId]);
 
   useEffect(() => {
-    if (!tenantId) return;
-    api<ChannelsResponse>(`/api/dashboard/tenants/${tenantId}/channels`, {
+    const onTenantChange = () => {
+      const list = filterPickerTenants(tenants);
+      const filter = getTenantFilter();
+      const match =
+        filter === "all"
+          ? list[0]
+          : list.find((t) => t.phone_number_id === filter) || list[0];
+      if (match) setSelectedDbId(match.id);
+    };
+    window.addEventListener("tenant-change", onTenantChange);
+    return () => window.removeEventListener("tenant-change", onTenantChange);
+  }, [tenants]);
+
+  useEffect(() => {
+    if (!selectedDbId) {
+      setData(null);
+      return;
+    }
+    api<ChannelsResponse>(`/api/dashboard/tenants/${selectedDbId}/channels`, {
       tenant: false,
     })
       .then(setData)
       .catch((e) => setError(e.message));
-  }, [tenantId]);
+  }, [selectedDbId]);
+
+  function onPickTenant(id: number) {
+    setSelectedDbId(id);
+    const row = tenants.find((t) => t.id === id);
+    if (row) {
+      setTenantFilter(row.phone_number_id);
+      window.dispatchEvent(new Event("tenant-change"));
+    }
+  }
 
   async function connect(ch: string) {
-    if (!tenantId) return;
+    if (!selectedDbId) return;
     setBusy(ch);
     try {
       const res = await api<{ message: string }>(
-        `/api/dashboard/tenants/${tenantId}/channels/${ch}/connect`,
+        `/api/dashboard/tenants/${selectedDbId}/channels/${ch}/connect`,
         { method: "POST", tenant: false }
       );
       alert(res.message);
@@ -61,12 +127,13 @@ export default function ChannelsPage() {
     }
   }
 
-  const isAdmin = getRole() === "admin" && !isOwner();
+  const activeTenant = tenants.find((t) => t.id === selectedDbId);
 
-  if (!me && !error) {
+  if (loading && !data) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-10 w-full max-w-sm rounded-xl" />
         <Skeleton className="h-40 w-full rounded-2xl" />
       </div>
     );
@@ -85,13 +152,37 @@ export default function ChannelsPage() {
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
       )}
 
-      {!tenantId && isAdmin && (
+      {isAdmin && pickerTenants.length > 0 && (
+        <div className="max-w-md space-y-2">
+          <Label htmlFor="channel-tenant">Business</Label>
+          <select
+            id="channel-tenant"
+            value={selectedDbId ?? ""}
+            onChange={(e) => onPickTenant(Number(e.target.value))}
+            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm"
+          >
+            {pickerTenants.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.status || "live"})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {!pickerTenants.length && (
         <p className="text-sm text-muted-foreground">
-          Select a business in{" "}
-          <Link to="/settings" className="text-primary underline">
-            Settings
-          </Link>{" "}
-          to manage channels, or use View as from Businesses.
+          No businesses yet.{" "}
+          <Link to="/" className="text-primary underline">
+            Create one on Businesses
+          </Link>
+          .
+        </p>
+      )}
+
+      {activeTenant && (
+        <p className="text-sm text-muted-foreground">
+          Managing channels for <span className="font-medium text-foreground">{activeTenant.name}</span>
         </p>
       )}
 
