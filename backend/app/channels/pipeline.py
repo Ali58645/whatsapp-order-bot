@@ -91,6 +91,18 @@ async def process_webhook_body(body: dict) -> dict:
             result = {"status": "ok", "bot": "paused"}
             continue
 
+        from app.owner_tools import away_message, is_within_business_hours
+
+        if not is_within_business_hours(tenant):
+            entry = entry_for_handlers(nm)
+            sender = nm.sender_id or ""
+            if sender and tenant.flow_mode == "lead":
+                from app.main import send_whatsapp_message
+
+                await send_whatsapp_message(sender, away_message(tenant), tenant=tenant)
+            result = {"status": "ok", "bot": "away"}
+            continue
+
         entry = entry_for_handlers(nm)
         if tenant.flow_mode == "lead":
             result = await _handle_lead_flow(entry, tenant)

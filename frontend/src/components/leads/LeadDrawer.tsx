@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Megaphone, Send, X } from "lucide-react";
+import { Loader2, Megaphone, MessageCircle, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -14,7 +15,7 @@ import { StatusPill } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { Skeleton } from "../ui/avatar";
-import { Textarea } from "../ui/input";
+import { Textarea, Input } from "../ui/input";
 import { WhatsAppThread } from "./WhatsAppThread";
 import { cn } from "../../lib/utils";
 
@@ -45,6 +46,9 @@ export default function LeadDrawer({ leadId, onClose, onMuted }: Props) {
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
+  const [notes, setNotes] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const [notesBusy, setNotesBusy] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
@@ -53,6 +57,8 @@ export default function LeadDrawer({ leadId, onClose, onMuted }: Props) {
     try {
       const data = await api<Lead>(`/api/dashboard/leads/${leadId}`, { tenant: false });
       setLead(data);
+      setNotes(data.notes || "");
+      setTagsText((data.tags || []).join(", "));
       if (data.contact_id) {
         try {
           const conv = await api<Conversation>(
@@ -221,6 +227,12 @@ export default function LeadDrawer({ leadId, onClose, onMuted }: Props) {
                     {lead.contact.profile_name && lead.contact.wa_id ? " · " : ""}
                     {lead.contact.wa_id}
                   </p>
+                  <Button size="sm" variant="soft" className="mt-2" asChild>
+                    <Link to={`/conversations?open=${lead.id}`} onClick={onClose}>
+                      <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                      Open chat
+                    </Link>
+                  </Button>
                 </>
               )}
             </div>
@@ -291,21 +303,72 @@ export default function LeadDrawer({ leadId, onClose, onMuted }: Props) {
                 )}
               </section>
 
+              {/* Owner notes */}
+              {!loading && lead && (
+                <section className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Your notes
+                  </h3>
+                  <Textarea
+                    rows={3}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Private notes about this customer…"
+                  />
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Tags (comma-separated)
+                    </p>
+                    <Input
+                      className="mt-1"
+                      value={tagsText}
+                      onChange={(e) => setTagsText(e.target.value)}
+                      placeholder="vip, follow-up"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    disabled={notesBusy}
+                    onClick={() => {
+                      setNotesBusy(true);
+                      void api(`/api/dashboard/leads/${leadId}/notes`, {
+                        method: "PATCH",
+                        body: JSON.stringify({
+                          notes,
+                          tags: tagsText
+                            .split(",")
+                            .map((t) => t.trim())
+                            .filter(Boolean),
+                        }),
+                        tenant: false,
+                      })
+                        .then(() => toast.success("Notes saved"))
+                        .catch((e: unknown) =>
+                          toast.error(e instanceof Error ? e.message : "Save failed")
+                        )
+                        .finally(() => setNotesBusy(false));
+                    }}
+                  >
+                    Save notes
+                  </Button>
+                </section>
+              )}
+
               {/* Details */}
               <section>
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Lead details
+                  Answers from the bot
                 </h3>
                 {loading || !lead ? (
                   <Skeleton className="h-32 w-full rounded-xl" />
                 ) : (
                   <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/20 p-4">
-                    <Field label="Status" value={lead.status} />
                     <Field label="Business type" value={lead.business_type} />
                     <Field label="Locations" value={lead.locations} />
                     <Field label="Current system" value={lead.current_system} />
-                    <Field label="Demo slot" value={lead.demo_slot} />
-                    <Field label="Entry intent" value={lead.entry_intent} />
+                    <Field label="Demo time" value={lead.demo_slot} />
+                    <Field label="What they wanted" value={lead.entry_intent} />
                     <div className="col-span-2">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         Ad source

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Hand, MessageCircle, Search } from "lucide-react";
 import { api, Lead } from "../api";
 import { ChannelBadge } from "../components/ChannelBadge";
@@ -36,6 +37,7 @@ function previewText(lead: Lead): string {
 }
 
 export default function Conversations() {
+  const [params, setParams] = useSearchParams();
   const [items, setItems] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,8 @@ export default function Conversations() {
   const [inbox, setInbox] = useState<InboxFilter>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
+  const openFromUrl = params.get("open");
+
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
       const silent = opts?.silent ?? false;
@@ -51,7 +55,7 @@ export default function Conversations() {
       try {
         const params = new URLSearchParams({
           search: q,
-          limit: "100",
+          limit: "80",
           offset: "0",
         });
         const r = await api<{ items: Lead[]; total: number }>(
@@ -78,9 +82,13 @@ export default function Conversations() {
     return () => window.removeEventListener("tenant-change", onTenant);
   }, [load]);
 
-  // Keep list previews fresh while inbox is open
+  // Poll only while tab is visible — was every 5s even in background
   useEffect(() => {
-    const id = window.setInterval(() => void load({ silent: true }), 5000);
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      void load({ silent: true });
+    };
+    const id = window.setInterval(tick, 10_000);
     return () => window.clearInterval(id);
   }, [load]);
 
@@ -100,13 +108,23 @@ export default function Conversations() {
     [filtered, items, selectedId]
   );
 
+  // Deep link from Customers “Chat”
+  useEffect(() => {
+    if (!openFromUrl) return;
+    const id = Number(openFromUrl);
+    if (!Number.isFinite(id)) return;
+    setSelectedId(id);
+    setInbox("all");
+    setParams({}, { replace: true });
+  }, [openFromUrl, setParams]);
+
   // Auto-pick first chat on desktop when nothing selected
   useEffect(() => {
-    if (loading || selectedId != null || !filtered.length) return;
+    if (loading || selectedId != null || !filtered.length || openFromUrl) return;
     if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
       setSelectedId(filtered[0].id);
     }
-  }, [loading, filtered, selectedId]);
+  }, [loading, filtered, selectedId, openFromUrl]);
 
   const showPhone = selected !== null;
   const listHiddenOnMobile = showPhone;

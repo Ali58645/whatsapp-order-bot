@@ -41,9 +41,11 @@ type Props = {
   initial: MenuV2 | null | undefined;
   published: MenuV2 | null | undefined;
   onSaved: (draft: MenuV2, published?: MenuV2 | null) => void;
+  /** Owner Order Menu — plainer labels, less builder jargon */
+  simple?: boolean;
 };
 
-export function MenuBuilder({ tenantDbId, initial, published, onSaved }: Props) {
+export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = false }: Props) {
   const [menu, setMenu] = useState<MenuV2>(() => initial || emptyMenuV2());
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
   const [editingItem, setEditingItem] = useState<MenuV2Item | null>(null);
@@ -213,9 +215,13 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved }: Props) 
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Menu Builder</h2>
+          <h2 className="text-sm font-semibold">
+            {simple ? "Your menu" : "Menu Builder"}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            Design the WhatsApp lists customers tap through · Draft vs Publish
+            {simple
+              ? "Add categories → items → prices · Save, then Go live"
+              : "Design the WhatsApp lists customers tap through · Draft vs Publish"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -225,11 +231,11 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved }: Props) 
           </Button>
           <Button variant="secondary" size="sm" onClick={saveDraft} disabled={!!busy}>
             {busy === "draft" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            Save Draft
+            {simple ? "Save" : "Save Draft"}
           </Button>
           <Button size="sm" onClick={publish} disabled={!!busy}>
             {busy === "publish" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            Publish
+            {simple ? "Go live" : "Publish"}
           </Button>
         </div>
       </div>
@@ -237,7 +243,7 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved }: Props) 
       {/* Settings strip */}
       <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-2">
         <div>
-          <Label>Greeting text</Label>
+          <Label>{simple ? "First WhatsApp message" : "Greeting text"}</Label>
           <Textarea
             className="mt-1.5"
             rows={2}
@@ -252,7 +258,9 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved }: Props) 
         </div>
         <div className="space-y-3">
           <div>
-            <Label>Menu button label (≤{LIMITS.buttonLabel})</Label>
+            <Label>
+              {simple ? "Menu button text" : `Menu button label (≤${LIMITS.buttonLabel})`}
+            </Label>
             <Input
               className={cn(
                 "mt-1.5",

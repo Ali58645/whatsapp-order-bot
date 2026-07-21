@@ -195,6 +195,8 @@ def build_draft_patch(
         "facts_features": cfg_in.get("facts_features") or "",
         "facts_pricing_note": cfg_in.get("facts_pricing_note") or "",
         "facts_claims_note": cfg_in.get("facts_claims_note") or "",
+        # Replace FAQ with template's list (empty clears prior vertical FAQs)
+        "faq": cfg_in.get("faq") if isinstance(cfg_in.get("faq"), list) else [],
         "onboarding": {
             "template_id": data.get("id"),
             "content_set": True,
@@ -202,7 +204,7 @@ def build_draft_patch(
         },
     }
 
-    # Messages draft: defaults + overlay
+    # Messages draft: defaults + overlay (questions, buttons, reply texts)
     base = default_messages(lang)
     overlay = cfg_in.get("messages_overlay") or {}
     msgs = _deep_merge(base, overlay) if overlay else base
@@ -217,6 +219,15 @@ def build_draft_patch(
             "order": {**msgs.get("order", {}), "greeting": patch["greeting_text"]},
         }
     patch["messages_draft"] = msgs
+
+    # Reset lead conversation steps to the classic built-in flow
+    if flow == "lead":
+        from app.flow import default_bahi_pos_flow
+
+        patch["flow"] = default_bahi_pos_flow()
+        # Clear owner greeting variants / image so template greeting is the source of truth
+        patch["greeting_variants"] = []
+        patch["greeting_image_url"] = ""
 
     if flow == "order":
         menu = cfg_in.get("menu_v2")

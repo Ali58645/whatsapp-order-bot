@@ -91,7 +91,9 @@ app = FastAPI(title="WhatsApp Bot", lifespan=lifespan)
 
 # Dashboard API (404 when DASHBOARD_* env vars absent; 503 without DATABASE_URL)
 from app.dashboard.routes import router as dashboard_router  # noqa: E402
+from app.dashboard.owner_routes import router as owner_dashboard_router  # noqa: E402
 app.include_router(dashboard_router)
+app.include_router(owner_dashboard_router)
 
 # Serve built React dashboard (Vite → app/static/dashboard)
 from fastapi.responses import RedirectResponse  # noqa: E402
@@ -605,7 +607,16 @@ async def _handle_entry_message(sender: str, meta: dict, user_text: str, tenant:
     meta["entry_intent"] = intent
     reply_text, next_phase = build_entry_response(intent, lang=lang, tenant=tenant)
     meta["phase"] = next_phase
-    await send_whatsapp_message(sender, reply_text, tenant=tenant)
+    from app.owner_tools import greeting_image_url
+
+    img = greeting_image_url(tenant)
+    if img:
+        caption = reply_text.split("\n\n", 1)[0][:1024]
+        await send_whatsapp_message(sender, caption, tenant=tenant, image_link=img)
+        if reply_text.strip() != caption.strip():
+            await send_whatsapp_message(sender, reply_text, tenant=tenant)
+    else:
+        await send_whatsapp_message(sender, reply_text, tenant=tenant)
     if not _is_own_number(sender, tenant):
         _sheet_upsert(sender, {"status": STATUS_IN_PROGRESS, "interest": intent}, tenant)
     if intent == INTENT_DEMO_FIRST:
@@ -1094,12 +1105,24 @@ async def send_whatsapp_message(
     text: str = "",
     interactive_payload: dict = None,
     tenant: Tenant = None,
+    *,
+    image_link: str = "",
 ) -> bool:
     """Send a WhatsApp message through the tenant's phone number."""
     if interactive_payload is not None:
         payload = interactive_payload
         # Ensure the 'to' field in the payload uses the recipient, not a stale value
         payload = {**payload, "to": to}
+    elif image_link:
+        img: dict = {"link": image_link}
+        if text:
+            img["caption"] = text[:1024]
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "image",
+            "image": img,
+        }
     else:
         payload = {"messaging_product": "whatsapp", "to": to,
                    "type": "text", "text": {"body": text}}
@@ -1123,7 +1146,12 @@ async def send_whatsapp_message(
             if to != owner:
                 from app.transcript import record_bot
 
-                record_bot(to, tenant.phone_number_id, text=text, interactive_payload=interactive_payload)
+                record_bot(
+                    to,
+                    tenant.phone_number_id,
+                    text=text or (f"[image] {image_link}" if image_link else ""),
+                    interactive_payload=interactive_payload,
+                )
         return True
     except Exception as exc:
         log.error(f"Send failed (network): {exc}")

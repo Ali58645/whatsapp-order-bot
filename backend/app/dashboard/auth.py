@@ -177,11 +177,11 @@ async def audit_support_action(
 # Config keys owners must never change (wiring / credentials)
 OWNER_FORBIDDEN_CONFIG_KEYS = frozenset({
     "business_wa_id",
-    "owner_whatsapp",
     "sheet",
     "phone_number_id",
     "flow_mode",
 })
+# owner_whatsapp allowed — owners set where demo/order alerts go
 
 
 def assert_owner_config_patch(user: AuthUser, patch: dict) -> None:

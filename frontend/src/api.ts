@@ -31,6 +31,7 @@ export type Tenant = {
   name: string;
   flow_mode: string;
   status?: string;
+  logo_url?: string;
   business_wa_id?: string;
   owner_whatsapp?: string;
   leads_today?: number;
@@ -141,6 +142,14 @@ export type TenantConfig = {
   messages_draft?: Record<string, unknown> | null;
   business_wa_id: string;
   owner_whatsapp: string;
+  greeting_image_url?: string;
+  greeting_variants?: string[];
+  business_hours?: {
+    enabled?: boolean;
+    timezone?: string;
+    away_message?: string;
+    days?: Record<string, string[][]>;
+  };
   flow?: FlowStep[];
 };
 
@@ -302,6 +311,8 @@ export type Lead = {
   entry_intent: string;
   ad_source: string;
   status: string;
+  notes?: string;
+  tags?: string[];
   created_at: string | null;
   updated_at: string | null;
   last_activity: string | null;
@@ -367,6 +378,25 @@ export function clearSession() {
   localStorage.removeItem(IMPERSONATOR_KEY);
   localStorage.removeItem(VIEW_AS_TENANT_NAME_KEY);
   localStorage.removeItem(TENANT_KEY);
+  clearMeCache();
+}
+
+/** Short-lived /me cache — Layout + every page were hitting this repeatedly. */
+let _meCache: { at: number; data: MeResponse } | null = null;
+const ME_TTL_MS = 30_000;
+
+export function clearMeCache() {
+  _meCache = null;
+}
+
+export async function fetchMe(opts?: { force?: boolean }): Promise<MeResponse> {
+  const now = Date.now();
+  if (!opts?.force && _meCache && now - _meCache.at < ME_TTL_MS) {
+    return _meCache.data;
+  }
+  const data = await api<MeResponse>("/api/dashboard/me", { tenant: false });
+  _meCache = { at: now, data };
+  return data;
 }
 
 function applySession(data: {
@@ -405,6 +435,7 @@ export async function login(username: string, password: string) {
     tenant: false,
   });
   applySession(data);
+  clearMeCache();
   return data;
 }
 
@@ -426,6 +457,7 @@ export async function enterViewAs(tenantDbId: number) {
     tenant: false,
   });
   applySession(data);
+  clearMeCache();
   return data;
 }
 
@@ -439,6 +471,7 @@ export function exitViewAs(): boolean {
   setToken(backup);
   localStorage.setItem(ROLE_KEY, "admin");
   localStorage.removeItem(USER_TENANT_KEY);
+  clearMeCache();
   return true;
 }
 
@@ -492,4 +525,29 @@ export async function api<T>(
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+/** Download authenticated CSV (or other binary) from dashboard API. */
+export async function downloadAuthenticated(path: string, filename: string): Promise<void> {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(path, { headers });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, typeof detail === "string" ? detail : "Download failed");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }

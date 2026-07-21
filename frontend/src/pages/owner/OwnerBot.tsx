@@ -1,16 +1,21 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Check, Loader2, Save } from "lucide-react";
+import { Check, LayoutTemplate, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
+  fetchMe,
+  FlowStep,
   isReadonlySession,
   MeResponse,
   TenantConfigResponse,
 } from "../../api";
+import { ExtraQuestionsEditor } from "../../components/ExtraQuestionsEditor";
 import { LeadOptionsEditor } from "../../components/LeadOptionsEditor";
 import { MessagesEditor } from "../../components/MessagesEditor";
 import { OptionListEditor, OptionListItem, stripEmptyOptionRows } from "../../components/OptionListEditor";
+import { TemplatePicker } from "../../components/TemplatePicker";
 import { Button } from "../../components/ui/button";
+import { Dialog, DialogContent, DialogSrTitle } from "../../components/ui/dialog";
 import { Input, Label, Textarea } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/avatar";
 import { cn } from "../../lib/utils";
@@ -26,7 +31,7 @@ type MessagesDraft = {
 };
 
 const STEPS: { id: Step; label: string; hint: string }[] = [
-  { id: "greeting", label: "1. Greeting", hint: "First thing customers see" },
+  { id: "greeting", label: "1. Greeting", hint: "First WhatsApp message" },
   { id: "questions", label: "2. Questions", hint: "Buttons & demo slots" },
   { id: "faq", label: "3. FAQ", hint: "Common answers" },
   { id: "more", label: "More replies", hint: "Optional advanced text" },
@@ -40,10 +45,15 @@ export default function OwnerBot() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [cfg, setCfg] = useState<TenantConfigResponse | null>(null);
   const [faqRows, setFaqRows] = useState<OptionListItem[]>([]);
+  const [flow, setFlow] = useState<FlowStep[]>([]);
   const [step, setStep] = useState<Step>("greeting");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [pickTemplateId, setPickTemplateId] = useState("pos_lead");
+  const [templateConfirm, setTemplateConfirm] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
   const readonly = isReadonlySession();
 
   const tenantId = me?.tenant?.id ?? me?.tenant_id ?? null;
@@ -53,7 +63,7 @@ export default function OwnerBot() {
     setLoading(true);
     setError("");
     try {
-      const profile = await api<MeResponse>("/api/dashboard/me", { tenant: false });
+      const profile = await fetchMe();
       setMe(profile);
       const tid = profile.tenant?.id ?? profile.tenant_id;
       if (!tid) {
@@ -72,6 +82,7 @@ export default function OwnerBot() {
           answer: f.answer,
         }))
       );
+      setFlow((data.config.flow as FlowStep[] | undefined) || []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -148,6 +159,10 @@ export default function OwnerBot() {
             name: cfg.name,
             greeting_text: cfg.config.greeting_text,
             greeting_language: cfg.config.greeting_language,
+            greeting_image_url: cfg.config.greeting_image_url || "",
+            greeting_variants: cfg.config.greeting_variants || [],
+            business_hours: cfg.config.business_hours || { enabled: false },
+            owner_whatsapp: cfg.config.owner_whatsapp || "",
             campaign_phrase: cfg.config.campaign_phrase,
             demo_slots: cfg.config.demo_slots,
             facts_features: cfg.config.facts_features,
@@ -155,6 +170,7 @@ export default function OwnerBot() {
             facts_claims_note: cfg.config.facts_claims_note,
             faq: faqClean,
             messages_draft: draft,
+            ...(isLead && flow.length ? { flow } : {}),
           }),
           tenant: false,
         }
@@ -179,6 +195,55 @@ export default function OwnerBot() {
       toast.error(msg);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function applyTemplate() {
+    if (!tenantId || !pickTemplateId || !templateConfirm) {
+      toast.error("Confirm that you want to replace your bot content");
+      return;
+    }
+    setTemplateBusy(true);
+    try {
+      const res = await api<{
+        message?: string;
+        config?: TenantConfigResponse;
+        template_id?: string;
+      }>(`/api/dashboard/tenants/${tenantId}/apply-template`, {
+        method: "POST",
+        body: JSON.stringify({
+          template_id: pickTemplateId,
+          confirm: true,
+          go_live: true,
+          greeting_language: cfg?.config.greeting_language || "roman_urdu",
+        }),
+        tenant: false,
+      });
+      const data =
+        res.config ||
+        (await api<TenantConfigResponse>(`/api/dashboard/tenants/${tenantId}/config`, {
+          tenant: false,
+        }));
+      setCfg(data);
+      setFlow((data.config.flow as FlowStep[] | undefined) || []);
+      setFaqRows(
+        (data.config.faq || []).map((f, i) => ({
+          id: `faq_${Date.now()}_${i}`,
+          label: f.question,
+          answer: f.answer,
+        }))
+      );
+      setStep("greeting");
+      setTemplateOpen(false);
+      setTemplateConfirm(false);
+      toast.success(
+        res.message ||
+          "Template applied — greeting, questions, and FAQ replaced. Edit anything below."
+      );
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to apply template");
+    } finally {
+      setTemplateBusy(false);
     }
   }
 
@@ -214,13 +279,80 @@ export default function OwnerBot() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-24">
-      <div>
-        <p className="page-kicker">{cfg.name}</p>
-        <h1 className="page-title mt-1">My Bot</h1>
-        <p className="page-subtitle">
-          Edit what customers see. Work top to bottom, then hit Save & go live.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="page-kicker">{cfg.name}</p>
+          <h1 className="page-title mt-1">My Bot</h1>
+          <p className="page-subtitle">
+            Pick a starter template, then edit greeting, questions, and FAQ.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={readonly}
+          onClick={() => {
+            setPickTemplateId(isLead ? "pos_lead" : "restaurant");
+            setTemplateConfirm(false);
+            setTemplateOpen(true);
+          }}
+        >
+          <LayoutTemplate className="h-4 w-4" />
+          Load template
+        </Button>
       </div>
+
+      <Dialog open={templateOpen} onOpenChange={(o) => !o && setTemplateOpen(false)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-2xl">
+          <DialogSrTitle>Load starter template</DialogSrTitle>
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-lg font-semibold">Load starter template</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Replaces greeting, questions &amp; buttons, FAQ, and reply texts for this business.
+              You can edit everything afterward.
+            </p>
+          </div>
+          <div className="space-y-4 px-5 py-4">
+            <TemplatePicker
+              selectedId={pickTemplateId}
+              flowMode={isLead ? "lead" : "order"}
+              onSelect={(id) => {
+                setPickTemplateId(id);
+                setTemplateConfirm(false);
+              }}
+            />
+            <label className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={templateConfirm}
+                onChange={(e) => setTemplateConfirm(e.target.checked)}
+              />
+              <span>
+                I understand this will <strong>replace</strong> my current greeting, questions,
+                FAQ, and related bot copy (goes live immediately).
+              </span>
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+            <Button
+              variant="ghost"
+              onClick={() => setTemplateOpen(false)}
+              disabled={templateBusy}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!templateConfirm || templateBusy || !pickTemplateId}
+              onClick={() => void applyTemplate()}
+            >
+              {templateBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Apply template
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {error && (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
@@ -254,7 +386,7 @@ export default function OwnerBot() {
           <div>
             <h2 className="text-base font-semibold">Greeting</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              This is the first message when someone opens a chat.
+              Edit the full first WhatsApp message customers see — greeting plus opening question.
             </p>
           </div>
           <div>
@@ -267,10 +399,10 @@ export default function OwnerBot() {
             />
           </div>
           <div>
-            <Label>Greeting message</Label>
+            <Label>Greeting (top of first message)</Label>
             <Textarea
               className="mt-1.5"
-              rows={4}
+              rows={3}
               value={cfg.config.greeting_text}
               onChange={(e) =>
                 setCfg({
@@ -279,11 +411,49 @@ export default function OwnerBot() {
                 })
               }
               disabled={readonly}
+              placeholder="e.g. Assalam o Alaikum — thanks for messaging us."
             />
-            <div className="mt-3 rounded-xl bg-[var(--wa-bg)] p-3">
-              <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-[var(--wa-out)] px-3 py-2 text-[13px] text-white">
+          </div>
+          {isLead && (
+            <div>
+              <Label>Opening question (asks for business name)</Label>
+              <Textarea
+                className="mt-1.5"
+                rows={2}
+                value={
+                  leadMsgs.q_business_name ||
+                  "Barah-e-karam apne business ya shop ka naam farmaayein."
+                }
+                onChange={(e) =>
+                  patchMessagesDraft({
+                    lead: { ...leadMsgs, q_business_name: e.target.value },
+                  })
+                }
+                disabled={readonly}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sent right after the greeting in the same chat bubble.
+              </p>
+            </div>
+          )}
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+              Preview — what WhatsApp sends
+            </p>
+            <div className="rounded-xl bg-[var(--wa-bg)] p-3">
+              <div className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
                 <p className="transcript-text whitespace-pre-wrap">
-                  {cfg.config.greeting_text || "…"}
+                  {[
+                    (cfg.config.greeting_text || "").trim(),
+                    isLead
+                      ? (
+                          leadMsgs.q_business_name ||
+                          "Barah-e-karam apne business ya shop ka naam farmaayein."
+                        ).trim()
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("\n\n") || "…"}
                 </p>
               </div>
             </div>
@@ -305,6 +475,142 @@ export default function OwnerBot() {
               <option value="en">English</option>
             </select>
           </div>
+          {isLead && (
+            <div>
+              <Label>Your alert WhatsApp (demos / handoffs)</Label>
+              <Input
+                className="mt-1.5"
+                placeholder="92xxxxxxxxxx"
+                value={cfg.config.owner_whatsapp || ""}
+                onChange={(e) =>
+                  setCfg({
+                    ...cfg,
+                    config: { ...cfg.config, owner_whatsapp: e.target.value },
+                  })
+                }
+                disabled={readonly}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Number that receives demo confirmations (with country code).
+              </p>
+            </div>
+          )}
+          <div>
+            <Label>Greeting image URL (optional)</Label>
+            <Input
+              className="mt-1.5"
+              placeholder="https://…"
+              value={cfg.config.greeting_image_url || ""}
+              onChange={(e) =>
+                setCfg({
+                  ...cfg,
+                  config: { ...cfg.config, greeting_image_url: e.target.value },
+                })
+              }
+              disabled={readonly}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Public https image — sent with the first greeting. Host on your CDN or Imgur.
+            </p>
+          </div>
+          {isLead && (
+            <div>
+              <Label>Extra greetings (optional — one is picked at random)</Label>
+              <Textarea
+                className="mt-1.5"
+                rows={3}
+                placeholder={"One greeting per line"}
+                value={(cfg.config.greeting_variants || []).join("\n")}
+                onChange={(e) =>
+                  setCfg({
+                    ...cfg,
+                    config: {
+                      ...cfg.config,
+                      greeting_variants: e.target.value
+                        .split("\n")
+                        .map((l) => l.trim())
+                        .filter(Boolean)
+                        .slice(0, 5),
+                    },
+                  })
+                }
+                disabled={readonly}
+              />
+            </div>
+          )}
+          {isLead && (
+            <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Business hours</p>
+                  <p className="text-xs text-muted-foreground">
+                    Outside hours the bot sends an away message only.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(cfg.config.business_hours?.enabled)}
+                    disabled={readonly}
+                    onChange={(e) =>
+                      setCfg({
+                        ...cfg,
+                        config: {
+                          ...cfg.config,
+                          business_hours: {
+                            timezone: "Asia/Karachi",
+                            days: {
+                              mon: [["09:00", "18:00"]],
+                              tue: [["09:00", "18:00"]],
+                              wed: [["09:00", "18:00"]],
+                              thu: [["09:00", "18:00"]],
+                              fri: [["09:00", "18:00"]],
+                              sat: [["10:00", "14:00"]],
+                              sun: [],
+                            },
+                            away_message:
+                              cfg.config.business_hours?.away_message ||
+                              "Shukriya — abhi team available nahi. Business hours mein rabta karein.",
+                            ...cfg.config.business_hours,
+                            enabled: e.target.checked,
+                          },
+                        },
+                      })
+                    }
+                  />
+                  Enabled
+                </label>
+              </div>
+              {cfg.config.business_hours?.enabled && (
+                <div>
+                  <Label>Away message</Label>
+                  <Textarea
+                    className="mt-1.5"
+                    rows={2}
+                    value={cfg.config.business_hours?.away_message || ""}
+                    disabled={readonly}
+                    onChange={(e) =>
+                      setCfg({
+                        ...cfg,
+                        config: {
+                          ...cfg.config,
+                          business_hours: {
+                            ...cfg.config.business_hours,
+                            enabled: true,
+                            away_message: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Default schedule: Mon–Fri 9–18, Sat 10–14 (Asia/Karachi). Ask AccellionX to
+                    customize days.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           {isLead && (
             <div>
               <Label>Campaign keyword (optional)</Label>
@@ -336,7 +642,8 @@ export default function OwnerBot() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold">Questions & buttons</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              What the bot asks, and the choices customers can tap.
+              Open a section to edit or remove it. Use Extra questions to add new ones.
+              Demo scheduling stays — it’s required to book demos.
             </p>
           </div>
           <LeadOptionsEditor
@@ -350,6 +657,15 @@ export default function OwnerBot() {
             onDemoSlotsChange={(nextSlots) =>
               setCfg({ ...cfg, config: { ...cfg.config, demo_slots: nextSlots } })
             }
+            flow={flow}
+            onFlowChange={setFlow}
+            allowRemove
+            readonly={readonly}
+          />
+          <ExtraQuestionsEditor
+            flow={flow}
+            onChange={setFlow}
+            readonly={readonly}
           />
           <Button type="button" variant="outline" onClick={() => setStep("faq")}>
             Next: FAQ

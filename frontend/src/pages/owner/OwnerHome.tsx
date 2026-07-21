@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { RefreshCw, Sparkles, AlertTriangle } from "lucide-react";
 import {
   api,
+  fetchMe,
   MeResponse,
   Overview as OverviewData,
   TenantConfigResponse,
@@ -10,7 +11,7 @@ import {
 import { useI18n } from "../../i18n";
 import { StatCard } from "../../components/ui/stat-card";
 import { Button } from "../../components/ui/button";
-import { cn, relativeTime, eventIconType, eventsByDay } from "../../lib/utils";
+import { cn, eventsByDay } from "../../lib/utils";
 
 export default function OwnerHome() {
   const { t } = useI18n();
@@ -24,18 +25,21 @@ export default function OwnerHome() {
     setLoading(true);
     setError("");
     try {
+      // Paint stats ASAP — config nudge loads in background
       const [overview, meRes] = await Promise.all([
         api<OverviewData>("/api/dashboard/overview"),
-        api<MeResponse>("/api/dashboard/me", { tenant: false }),
+        fetchMe(),
       ]);
       setData(overview);
       setMe(meRes);
-      if (meRes.tenant?.id) {
-        try {
-          const cfg = await api<TenantConfigResponse>(
-            `/api/dashboard/tenants/${meRes.tenant.id}/config`,
-            { tenant: false }
-          );
+      setLoading(false);
+
+      const tid = meRes.tenant?.id;
+      if (!tid) return;
+      void api<TenantConfigResponse>(`/api/dashboard/tenants/${tid}/config`, {
+        tenant: false,
+      })
+        .then((cfg) => {
           const greet = (cfg.config.greeting_text || "").toLowerCase();
           const defaultish =
             !greet ||
@@ -46,13 +50,10 @@ export default function OwnerHome() {
             cfg.flow_mode === "order" &&
             !(cfg.config.menu_v2_draft?.items?.length || cfg.config.menu_v2?.items?.length);
           setNudge({ greeting: defaultish, menu: menuEmpty });
-        } catch {
-          setNudge({});
-        }
-      }
+        })
+        .catch(() => setNudge({}));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load");
-    } finally {
       setLoading(false);
     }
   }, []);
@@ -156,35 +157,6 @@ export default function OwnerHome() {
           />
         </Link>
       </div>
-
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          {t("recentActivity")}
-        </h2>
-        <div className="space-y-2 rounded-2xl border border-border bg-card p-4">
-          {(data?.recent_events || []).slice(0, 8).map((ev) => (
-            <div
-              key={ev.id}
-              className="flex items-center justify-between gap-3 border-b border-border/50 py-2 last:border-0"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {eventIconType(ev.type)} · {ev.type}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {ev.contact?.profile_name || ev.contact?.wa_id || "—"}
-                </p>
-              </div>
-              <span className="shrink-0 text-[11px] text-muted-foreground">
-                {relativeTime(ev.created_at)}
-              </span>
-            </div>
-          ))}
-          {!loading && !(data?.recent_events || []).length && (
-            <p className="py-6 text-center text-sm text-muted-foreground">No activity yet</p>
-          )}
-        </div>
-      </section>
     </div>
   );
 }

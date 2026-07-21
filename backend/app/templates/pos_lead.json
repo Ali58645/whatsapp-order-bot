@@ -31,6 +31,16 @@
         "greeting_line": "Assalam o Alaikum 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
         "value_line": "Bahi POS aap ke business ki sales, stock, khata aur invoicing ko ek jagah manage karta hai."
       }
-    }
+    },
+    "faq": [
+      {
+        "question": "Price kitna hai?",
+        "answer": "Pricing aap ke business size ke mutabiq hai — demo mein personalised quote milti hai."
+      },
+      {
+        "question": "Demo kitni der ka hota hai?",
+        "answer": "Laga bhag 20–30 minutes. Online ya on-site, aap ke hisaab se."
+      }
+    ]
   }
 }

@@ -25,13 +25,13 @@ import {
   api,
   clearSession,
   exitViewAs,
+  fetchMe,
   getImpersonatedBy,
   getRole,
   getTenantFilter,
   getViewAsTenantName,
   isOwner,
   isSupportSession,
-  MeResponse,
   setTenantFilter,
   Tenant,
 } from "../../api";
@@ -55,6 +55,8 @@ type NavItem = {
     | "accessLog"
     | "channels"
     | "conversations"
+    | "account"
+    | "broadcast"
     | "settings";
   icon: typeof Home;
   end?: boolean;
@@ -69,6 +71,9 @@ const OWNER_NAV: NavItem[] = [
   { to: "/my-bot", labelKey: "myBot", icon: Bot },
   { to: "/channels", labelKey: "channels", icon: Radio },
   { to: "/menu", labelKey: "menu", icon: Package, orderOnly: true },
+  { to: "/broadcast", labelKey: "broadcast", icon: MessageCircle },
+  { to: "/team", labelKey: "team", icon: Users },
+  { to: "/account", labelKey: "account", icon: Settings },
   { to: "/billing", labelKey: "billing", icon: CreditCard },
 ];
 
@@ -111,28 +116,23 @@ export default function Layout() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const me = await api<MeResponse>("/api/dashboard/me", { tenant: false });
-        if (cancelled) return;
+      const [meRes, listRes] = await Promise.allSettled([
+        fetchMe(),
+        api<{ items?: Tenant[] } | Tenant[]>("/api/dashboard/tenants", { tenant: false }),
+      ]);
+      if (cancelled) return;
+      if (meRes.status === "fulfilled") {
+        const me = meRes.value;
         if (me.tenant?.phone_number_id && (me.role === "owner" || me.impersonated_by)) {
           setTenantFilter(me.tenant.phone_number_id);
           setTenantId(me.tenant.phone_number_id);
           setFlowMode(me.tenant.flow_mode || "lead");
           window.dispatchEvent(new Event("tenant-change"));
         }
-      } catch {
-        /* ignore bootstrap errors */
       }
-      try {
-        const list = await api<{ items?: Tenant[] } | Tenant[]>("/api/dashboard/tenants", {
-          tenant: false,
-        });
-        if (!cancelled) {
-          const items = Array.isArray(list) ? list : list.items || [];
-          setTenants(items);
-        }
-      } catch {
-        /* ignore */
+      if (listRes.status === "fulfilled") {
+        const list = listRes.value;
+        setTenants(Array.isArray(list) ? list : list.items || []);
       }
     })();
     return () => {

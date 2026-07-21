@@ -386,8 +386,12 @@ def build_entry_response(intent: str, lang: str = "ur", tenant=None) -> tuple[st
         greet = custom_greeting or lead_text("greeting_line", lang, tenant)
         suffix = lead_text("entry_demo_suffix", lang, tenant)
         return f"{greet}\n{suffix}", "SCHEDULING"
-    if custom_greeting:
-        return f"{custom_greeting}\n\n{lead_text('q_business_name', lang, tenant)}", "BUSINESS_NAME"
+    if tenant is not None:
+        from app.owner_tools import pick_greeting_text
+
+        greeter = pick_greeting_text(tenant)
+        if greeter:
+            return f"{greeter}\n\n{lead_text('q_business_name', lang, tenant)}", "BUSINESS_NAME"
     return _greeting_text(lang, tenant), "BUSINESS_NAME"
 
 

@@ -326,11 +326,12 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
         body: JSON.stringify({
           template_id: pickTemplateId,
           confirm: true,
+          go_live: false,
           greeting_language: cfg?.config.greeting_language || "roman_urdu",
         }),
         tenant: false,
       });
-      toast.success("Starter template loaded into draft — review & publish");
+      toast.success("Template applied to draft — review greeting, questions, FAQ, then publish");
       setTemplateOpen(false);
       setTemplateConfirm(false);
       // Reload config
@@ -480,7 +481,8 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-lg font-semibold">Load starter template</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Applies to draft config only. Published messages/menu stay until you publish.
+              Replaces greeting, questions &amp; buttons, FAQ, and reply texts in{" "}
+              <strong>draft</strong>. Check below to also publish live.
             </p>
           </div>
           <div className="space-y-4 px-5 py-4">
@@ -499,8 +501,8 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
                 onChange={(e) => setTemplateConfirm(e.target.checked)}
               />
               <span>
-                I understand this will overwrite the current <strong>draft</strong>{" "}
-                messages / menu for this business.
+                I understand this will overwrite greeting, questions, FAQ, and related bot copy
+                for this business.
               </span>
             </label>
           </div>
@@ -513,7 +515,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
               onClick={() => void applyStarterTemplate()}
             >
               {templateBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Apply to draft
+              Apply template
             </Button>
           </div>
         </DialogContent>

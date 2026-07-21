@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils";
 
 type Props = {
   title: string;
-  count: number;
+  count?: number;
   countLabel?: string;
   defaultOpen?: boolean;
   children: ReactNode;
@@ -39,9 +39,11 @@ export function AccordionSection({
       >
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-foreground">{title}</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">
-            {count} {countLabel}
-          </div>
+          {count != null && (
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              {count} {countLabel}
+            </div>
+          )}
         </div>
         <ChevronDown
           className={cn(

@@ -35,6 +35,31 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
     if "greeting_text" in patch:
         out["greeting_text"] = sanitize_text(patch["greeting_text"], max_len=GREETING_MAX)
 
+    if "greeting_image_url" in patch:
+        url = str(patch["greeting_image_url"] or "").strip()
+        if url and not url.startswith("https://"):
+            _err("greeting_image_url must be an https:// link")
+        out["greeting_image_url"] = url[:2048]
+
+    if "greeting_variants" in patch:
+        raw = patch["greeting_variants"]
+        if not isinstance(raw, list):
+            _err("greeting_variants must be a list of strings")
+        cleaned = []
+        for item in raw[:5]:
+            t = sanitize_text(str(item), max_len=GREETING_MAX)
+            if t:
+                cleaned.append(t)
+        out["greeting_variants"] = cleaned
+
+    if "business_hours" in patch:
+        try:
+            from app.owner_tools import validate_business_hours
+
+            out["business_hours"] = validate_business_hours(patch["business_hours"])
+        except ValueError as exc:
+            _err(str(exc))
+
     if "greeting_language" in patch:
         lang = str(patch["greeting_language"]).strip().lower()
         if lang not in ("roman_urdu", "en", "ur"):

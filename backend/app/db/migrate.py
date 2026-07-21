@@ -89,10 +89,13 @@ def check_migrations_at_head(database_url: str) -> bool | None:
 
 def _run_sync_migrations(database_url: str) -> None:
     """Sync helper executed in a worker thread."""
+    import time
     from pathlib import Path
 
     from alembic import command
     from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
     from sqlalchemy import create_engine, text
 
     sync_url = _to_sync_url(database_url)
@@ -104,18 +107,44 @@ def _run_sync_migrations(database_url: str) -> None:
     cfg.set_main_option("script_location", str(script_location))
     cfg.set_main_option("sqlalchemy.url", sync_url)
 
-    engine = create_engine(sync_url)
+    # Fast path: already at head — don't open a long-lived lock connection.
+    # Holding pg_advisory_lock on one Neon connection while Alembic opens another
+    # has hung local startup after --reload.
+    engine = create_engine(sync_url, connect_args={"connect_timeout": 20})
     try:
+        script = ScriptDirectory.from_config(cfg)
+        head = script.get_current_head()
         with engine.connect() as conn:
-            if conn.dialect.name == "postgresql":
-                # Block until we hold the lock — never skip migrations on contention.
-                conn.execute(text(f"SELECT pg_advisory_lock({_ADVISORY_LOCK_KEY})"))
-                try:
-                    command.upgrade(cfg, "head")
-                finally:
-                    conn.execute(text(f"SELECT pg_advisory_unlock({_ADVISORY_LOCK_KEY})"))
-                    conn.commit()
-            else:
-                command.upgrade(cfg, "head")
+            current = MigrationContext.configure(conn).get_current_revision()
+        if head is not None and current == head:
+            log.info("migrate: already at head (%s)", head)
+            return
+
+        if engine.dialect.name == "postgresql":
+            deadline = time.monotonic() + 20
+            locked = False
+            while time.monotonic() < deadline:
+                with engine.connect() as conn:
+                    locked = bool(
+                        conn.execute(
+                            text(f"SELECT pg_try_advisory_lock({_ADVISORY_LOCK_KEY})")
+                        ).scalar()
+                    )
+                    if locked:
+                        try:
+                            command.upgrade(cfg, "head")
+                        finally:
+                            conn.execute(
+                                text(f"SELECT pg_advisory_unlock({_ADVISORY_LOCK_KEY})")
+                            )
+                            conn.commit()
+                        return
+                time.sleep(0.5)
+            raise RuntimeError(
+                "Could not acquire migration lock within 20s — "
+                "stop other uvicorn processes and retry"
+            )
+
+        command.upgrade(cfg, "head")
     finally:
         engine.dispose()

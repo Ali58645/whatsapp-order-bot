@@ -216,6 +216,8 @@ class DBLead(Base):
     entry_intent: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     ad_source: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

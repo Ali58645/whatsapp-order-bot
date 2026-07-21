@@ -225,6 +225,8 @@ def _lead_dict(
         "entry_intent": lead.entry_intent,
         "ad_source": lead.ad_source,
         "status": lead.status,
+        "notes": getattr(lead, "notes", None) or "",
+        "tags": list(getattr(lead, "tags", None) or []),
         "created_at": _iso(lead.created_at),
         "updated_at": _iso(lead.updated_at),
         "last_activity": _iso(lead.updated_at or lead.created_at),

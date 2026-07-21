@@ -547,6 +547,8 @@ class ApplyTemplateBody(BaseModel):
     template_id: str = Field(..., min_length=1, max_length=64)
     confirm: bool = False
     greeting_language: Optional[str] = None
+    """When true, also copy drafts → published (owner My Bot expects this)."""
+    go_live: bool = False
 
 
 @router.post("/api/dashboard/tenants/{tenant_db_id}/apply-template")
@@ -556,29 +558,33 @@ async def apply_starter_template(
     user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     """
-    Apply a starter template to the tenant's DRAFT config only.
-    Requires confirm=true. Does not touch published messages/menu_v2.
+    Apply a starter template — replaces greeting, questions/buttons, FAQ, and
+    related draft copy. With go_live=true (owners), also publishes messages/menu.
     """
     _require_db()
     if not body.confirm:
         raise HTTPException(
             status_code=400,
-            detail="confirm=true required — applying a template overwrites draft config",
+            detail="confirm=true required — applying a template overwrites bot content",
         )
     await dash_auth.assert_tenant_access(user, tenant_db_id)
     dash_auth.assert_writable(user)
     await dash_auth.audit_support_action(
         user, "apply_template", tenant_id=tenant_db_id, detail={"template_id": body.template_id}
     )
+    from app.dashboard.config_api import tenant_config_response
     from app.dashboard.config_validate import validate_config_patch
     from app.db.repo import get_tenant_row, save_tenant_config
     from app.templates import build_draft_patch, get_template
     from app.tenant_resolver import invalidate_tenant
+    import copy
 
     tmpl = get_template(body.template_id)
     if tmpl is None:
         raise HTTPException(status_code=404, detail="Template not found")
 
+    # Owners (incl. support view-as) go live by default; admins need go_live=true
+    go_live = bool(body.go_live) or user.role == "owner"
     async with _get_db() as db:
         row = await get_tenant_row(db, tenant_db_id)
         if row is None:
@@ -597,20 +603,27 @@ async def apply_starter_template(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         cleaned = validate_config_patch(tmpl_flow, patch)
-        # Merge: draft keys from template; preserve published messages/menu_v2
         new_cfg = dict(cfg)
         for key, val in cleaned.items():
-            if key in ("messages", "menu_v2"):
-                continue  # never overwrite published via apply-template
+            if key in ("messages", "menu_v2") and not go_live:
+                continue
             new_cfg[key] = val
         if "messages_draft" in patch:
             new_cfg["messages_draft"] = patch["messages_draft"]
+            if go_live:
+                new_cfg["messages"] = copy.deepcopy(patch["messages_draft"])
         if "menu_v2_draft" in patch:
             new_cfg["menu_v2_draft"] = patch["menu_v2_draft"]
+            if go_live:
+                new_cfg["menu_v2"] = copy.deepcopy(patch["menu_v2_draft"])
         if "onboarding" in patch:
             ob = dict(new_cfg.get("onboarding") or {})
             ob.update(patch["onboarding"])
             new_cfg["onboarding"] = ob
+        if "flow" in patch:
+            new_cfg["flow"] = patch["flow"]
+        if "faq" in cleaned:
+            new_cfg["faq"] = cleaned["faq"]
 
         if tmpl_flow in ("lead", "order") and row.flow_mode != tmpl_flow:
             row.flow_mode = tmpl_flow
@@ -623,16 +636,23 @@ async def apply_starter_template(
             changed_by=user.username,
         )
         phone = row.phone_number_id
-        flow = row.flow_mode
+        # Refresh row for response
+        row = await get_tenant_row(db, tenant_db_id)
+        out = tenant_config_response(row) if row else None
 
     invalidate_tenant(phone)
     return {
         "ok": True,
         "tenant_id": tenant_db_id,
         "template_id": tmpl.get("id"),
-        "flow_mode": flow,
-        "draft_only": True,
-        "message": "Draft updated — publish from Settings to go live",
+        "flow_mode": out["flow_mode"] if out else tmpl_flow,
+        "go_live": go_live,
+        "message": (
+            "Template applied and live — edit greeting, questions, and FAQ anytime"
+            if go_live
+            else "Draft updated — publish from Settings to go live"
+        ),
+        "config": out,
     }
 
 
@@ -961,6 +981,7 @@ async def get_me(user: dash_auth.AuthUser = Depends(dash_auth.require_auth)):
                     "phone_number_id": row.phone_number_id,
                     "flow_mode": row.flow_mode,
                     "status": getattr(row, "status", None) or "live",
+                    "logo_url": (cfg.get("logo_url") or "").strip(),
                     "waba_id": (cfg.get("onboarding") or {}).get("waba_id") or "",
                     "checklist": build_checklist(row),
                 }

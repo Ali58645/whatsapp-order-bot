@@ -14,9 +14,9 @@ import { cn, relativeTime } from "../lib/utils";
 
 const STATUS_FILTERS = [
   { id: "", label: "All" },
-  { id: "active", label: "In Progress" },
-  { id: "confirmed", label: "Demo Scheduled" },
-  { id: "stalled", label: "Not Responding" },
+  { id: "active", label: "Talking" },
+  { id: "confirmed", label: "Demo booked" },
+  { id: "stalled", label: "Quiet" },
   { id: "new", label: "New" },
 ];
 

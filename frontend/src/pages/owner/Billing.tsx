@@ -58,11 +58,22 @@ export default function BillingPage() {
               </p>
             </div>
             {data.placeholder && (
-              <p className="mt-4 text-xs text-muted-foreground">{t("placeholderBilling")}</p>
+              <p className="mt-4 text-xs text-muted-foreground">
+                {t("placeholderBilling")} · WhatsApp approved template campaigns and self-serve
+                Meta connect are coming with billing.
+              </p>
             )}
           </div>
         </div>
       )}
+      <div className="rounded-2xl border border-dashed border-border bg-muted/10 px-4 py-4 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Not available yet</p>
+        <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
+          <li>Pay invoices / change plan in-app</li>
+          <li>WhatsApp Cloud template (HSM) campaign builder</li>
+          <li>Self-serve WhatsApp / Instagram connect (Meta App Review)</li>
+        </ul>
+      </div>
     </div>
   );
 }

@@ -228,15 +228,15 @@ async def test_apply_template_populates_draft_not_published(client, tpl_db):
     r = await client.post(
         f"/api/dashboard/tenants/{tid}/apply-template",
         headers=headers,
-        json={"template_id": "restaurant", "confirm": True},
+        json={"template_id": "restaurant", "confirm": True, "go_live": False},
     )
     assert r.status_code == 200, r.text
-    assert r.json()["draft_only"] is True
+    assert r.json()["go_live"] is False
 
     cfg = await client.get(f"/api/dashboard/tenants/{tid}/config", headers=headers)
     assert cfg.status_code == 200
     body = cfg.json()["config"]
-    # Published untouched
+    # Published untouched when go_live=false
     assert body["messages"]["order"]["greeting"] == "PUBLISHED ORDER GREETING"
     assert body["menu_v2"]["settings"]["greeting_text"] == "PUBLISHED MENU"
     # Draft populated from restaurant template

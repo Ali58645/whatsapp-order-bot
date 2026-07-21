@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Hand, Loader2, Mic, Plus, Send, Smile } from "lucide-react";
 import { toast } from "sonner";
-import { api, Conversation, Lead, MeResponse, getTenantFilter } from "../../api";
+import { api, Conversation, Lead, fetchMe, getTenantFilter } from "../../api";
 import { WhatsAppThread } from "../leads/WhatsAppThread";
 import { PhoneChatFrame } from "./PhoneChatFrame";
 import { Skeleton } from "../ui/avatar";
@@ -39,7 +39,8 @@ export function ConversationPhone({
   onBack,
   onUpdated,
 }: Props) {
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const [mePhone, setMePhone] = useState<string>("");
+  const [botName, setBotName] = useState("Your bot");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -56,8 +57,9 @@ export function ConversationPhone({
     try {
       const sessionQ = sessionId ? `?session_id=${sessionId}` : "";
       if (!silent) {
-        const profile = await api<MeResponse>("/api/dashboard/me", { tenant: false });
-        setMe(profile);
+        const profile = await fetchMe();
+        setMePhone(profile.tenant?.phone_number_id || "");
+        setBotName(profile.tenant?.name || "Your bot");
       }
       const conv = await api<Conversation>(
         `/api/dashboard/conversations/${contactId}${sessionQ}`,
@@ -96,19 +98,21 @@ export function ConversationPhone({
     void refresh({ silent: false });
   }, [refresh]);
 
-  // Live inbox: poll while this chat is open (inbound during takeover)
+  // Poll only while tab is visible; slower when bot-handled (less need for live replies)
   useEffect(() => {
-    const id = window.setInterval(() => {
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
       void refresh({ silent: true });
-    }, 2500);
+    };
+    const ms = muted ? 4000 : 8000;
+    const id = window.setInterval(tick, ms);
     return () => window.clearInterval(id);
-  }, [refresh]);
+  }, [refresh, muted]);
 
   const load = useCallback(() => refresh({ silent: false }), [refresh]);
 
   async function resolveTenantPhone(): Promise<string> {
-    const fromMe = me?.tenant?.phone_number_id;
-    if (fromMe) return fromMe;
+    if (mePhone) return mePhone;
     const filter = getTenantFilter();
     if (filter && filter !== "all") return filter;
     if (tenantDbId) {
@@ -120,7 +124,10 @@ export function ConversationPhone({
       const match = list.find((t) => t.id === tenantDbId);
       if (match) return match.phone_number_id;
     }
-    throw new Error("Could not resolve business for takeover");
+    const profile = await fetchMe();
+    const phone = profile.tenant?.phone_number_id || "";
+    if (!phone) throw new Error("Could not resolve business for takeover");
+    return phone;
   }
 
   async function toggleTakeover() {
@@ -189,7 +196,6 @@ export function ConversationPhone({
 
   const messages = conversation?.history ?? [];
   const windowOpen = conversation?.window_open ?? false;
-  const botName = me?.tenant?.name || "Your bot";
 
   const composer = (
     <div className="space-y-2">

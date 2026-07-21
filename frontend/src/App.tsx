@@ -8,7 +8,6 @@ import { Skeleton } from "./components/ui/avatar";
 const Leads = lazy(() => import("./pages/Leads"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Conversations = lazy(() => import("./pages/Conversations"));
-const Activity = lazy(() => import("./pages/Activity"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Businesses = lazy(() => import("./pages/Businesses"));
 const Team = lazy(() => import("./pages/Team"));
@@ -16,7 +15,11 @@ const AccessLog = lazy(() => import("./pages/AccessLog"));
 const OwnerHome = lazy(() => import("./pages/owner/OwnerHome"));
 const OwnerBot = lazy(() => import("./pages/owner/OwnerBot"));
 const Customers = lazy(() => import("./pages/owner/Customers"));
+const OwnerMenu = lazy(() => import("./pages/owner/OwnerMenu"));
 const Billing = lazy(() => import("./pages/owner/Billing"));
+const Account = lazy(() => import("./pages/owner/Account"));
+const OwnerTeam = lazy(() => import("./pages/owner/OwnerTeam"));
+const Broadcast = lazy(() => import("./pages/owner/Broadcast"));
 const Channels = lazy(() => import("./pages/Channels"));
 
 function Private({ children }: { children: React.ReactNode }) {
@@ -35,6 +38,11 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
 function OwnerOnly({ children }: { children: React.ReactNode }) {
   if (!(isOwner() || isSupportSession())) return <Navigate to="/" replace />;
   return <>{children}</>;
+}
+
+function TeamRoute() {
+  if (isOwner() || isSupportSession()) return <OwnerTeam />;
+  return <Team />;
 }
 
 function HomeRoute() {
@@ -110,7 +118,7 @@ export default function App() {
           element={
             <OwnerOnly>
               <SuspensePage>
-                <Settings ownerMode menuOnly />
+                <OwnerMenu />
               </SuspensePage>
             </OwnerOnly>
           }
@@ -121,6 +129,26 @@ export default function App() {
             <SuspensePage>
               <Billing />
             </SuspensePage>
+          }
+        />
+        <Route
+          path="account"
+          element={
+            <OwnerOnly>
+              <SuspensePage>
+                <Account />
+              </SuspensePage>
+            </OwnerOnly>
+          }
+        />
+        <Route
+          path="broadcast"
+          element={
+            <OwnerOnly>
+              <SuspensePage>
+                <Broadcast />
+              </SuspensePage>
+            </OwnerOnly>
           }
         />
 
@@ -164,16 +192,6 @@ export default function App() {
             </OwnerOnly>
           }
         />
-        <Route
-          path="activity"
-          element={
-            <OwnerOnly>
-              <SuspensePage>
-                <Activity />
-              </SuspensePage>
-            </OwnerOnly>
-          }
-        />
 
         {/* Admin platform console */}
         <Route
@@ -183,11 +201,9 @@ export default function App() {
         <Route
           path="team"
           element={
-            <AdminOnly>
-              <SuspensePage>
-                <Team />
-              </SuspensePage>
-            </AdminOnly>
+            <SuspensePage>
+              <TeamRoute />
+            </SuspensePage>
           }
         />
         <Route

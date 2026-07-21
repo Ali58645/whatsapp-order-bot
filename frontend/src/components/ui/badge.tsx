@@ -21,9 +21,9 @@ export function Badge({
 
 export function StatusPill({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    active: { label: "In Progress", cls: "bg-warning/15 text-warning ring-1 ring-warning/25" },
-    confirmed: { label: "Demo Scheduled", cls: "bg-primary/15 text-primary ring-1 ring-primary/25" },
-    stalled: { label: "Not Responding", cls: "bg-muted text-muted-foreground ring-1 ring-border" },
+    active: { label: "Talking", cls: "bg-warning/15 text-warning ring-1 ring-warning/25" },
+    confirmed: { label: "Demo booked", cls: "bg-primary/15 text-primary ring-1 ring-primary/25" },
+    stalled: { label: "Quiet", cls: "bg-muted text-muted-foreground ring-1 ring-border" },
     new: { label: "New", cls: "bg-sky-500/15 text-sky-400 ring-1 ring-sky-500/25" },
   };
   const s = map[(status || "new").toLowerCase()] ?? {

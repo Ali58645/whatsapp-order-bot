@@ -110,6 +110,16 @@
           }
         ]
       }
-    }
+    },
+    "faq": [
+      {
+        "question": "Timing kya hai?",
+        "answer": "Hum normally 10am–8pm open hain. Preferred slot book karein."
+      },
+      {
+        "question": "Home service milti hai?",
+        "answer": "Haan, selected areas mein home service available hai — booking mein choose karein."
+      }
+    ]
   }
 }

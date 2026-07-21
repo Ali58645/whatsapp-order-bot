@@ -343,6 +343,26 @@ async def list_users(session: AsyncSession) -> list:
     return list(result.scalars().all())
 
 
+async def list_users_for_tenant(session: AsyncSession, tenant_id: int) -> list:
+    m = _m()
+    result = await session.execute(
+        select(m.DBUser)
+        .where(m.DBUser.tenant_id == tenant_id)
+        .order_by(m.DBUser.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def update_user_password(session: AsyncSession, user_id: int, password_hash: str) -> None:
+    m = _m()
+    result = await session.execute(select(m.DBUser).where(m.DBUser.id == user_id))
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise ValueError("User not found")
+    row.password_hash = password_hash
+    await session.flush()
+
+
 async def get_db_tenant_id(session: AsyncSession, phone_number_id: str) -> Optional[int]:
     """Return the DB integer PK for a tenant by its phone_number_id."""
     m = _m()
