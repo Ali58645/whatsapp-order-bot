@@ -843,6 +843,7 @@ export function LeadOptionsEditor({
           constraints={{ maxItems: 3, maxLabelChars: 20 }}
           features={{ reorder: false }}
           addDisabledHint="WhatsApp reply-button limit: 3 (2 slots + other)"
+          disabled={readonly}
           onChange={(items) => {
             const s1 = items.find((i) => i.id === "slot_1")?.label || slots[0];
             const s2 = items.find((i) => i.id === "slot_2")?.label || slots[1];

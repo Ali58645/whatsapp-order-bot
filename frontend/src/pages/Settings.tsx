@@ -134,14 +134,18 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
   }
 
   function patchMessagesDraft(patch: Partial<MessagesDraft>) {
-    if (!cfg) return;
-    const current = messagesDraft();
-    setCfg({
-      ...cfg,
-      config: {
-        ...cfg.config,
-        messages_draft: { ...current, ...patch },
-      },
+    setCfg((prev) => {
+      if (!prev) return prev;
+      const current = (prev.config.messages_draft ||
+        prev.config.messages ||
+        {}) as MessagesDraft;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          messages_draft: { ...current, ...patch },
+        },
+      };
     });
   }
 
@@ -617,17 +621,17 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
             patchMessagesDraft({ interactive: next as Record<string, unknown> })
           }
           onDemoSlotsChange={(nextSlots) =>
-            setCfg({
-              ...cfg,
-              config: { ...cfg.config, demo_slots: nextSlots },
-            })
+            setCfg((prev) =>
+              prev
+                ? { ...prev, config: { ...prev.config, demo_slots: nextSlots } }
+                : prev
+            )
           }
           flow={(cfg.config.flow || []) as FlowStep[]}
           onFlowChange={(nextFlow) =>
-            setCfg({
-              ...cfg,
-              config: { ...cfg.config, flow: nextFlow },
-            })
+            setCfg((prev) =>
+              prev ? { ...prev, config: { ...prev.config, flow: nextFlow } } : prev
+            )
           }
           allowRemove
           allowExtras

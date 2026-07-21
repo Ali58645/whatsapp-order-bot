@@ -131,14 +131,18 @@ export default function OwnerBot() {
   }
 
   function patchMessagesDraft(patch: Partial<MessagesDraft>) {
-    if (!cfg) return;
-    const current = messagesDraft();
-    setCfg({
-      ...cfg,
-      config: {
-        ...cfg.config,
-        messages_draft: { ...current, ...patch },
-      },
+    setCfg((prev) => {
+      if (!prev) return prev;
+      const current = (prev.config.messages_draft ||
+        prev.config.messages ||
+        {}) as MessagesDraft;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          messages_draft: { ...current, ...patch },
+        },
+      };
     });
   }
 
@@ -767,7 +771,11 @@ export default function OwnerBot() {
               patchMessagesDraft({ interactive: next as Record<string, unknown> })
             }
             onDemoSlotsChange={(nextSlots) =>
-              setCfg({ ...cfg, config: { ...cfg.config, demo_slots: nextSlots } })
+              setCfg((prev) =>
+                prev
+                  ? { ...prev, config: { ...prev.config, demo_slots: nextSlots } }
+                  : prev
+              )
             }
             flow={flow}
             onFlowChange={setFlow}

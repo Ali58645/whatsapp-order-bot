@@ -62,6 +62,7 @@ type Props = {
   addDisabledHint?: string;
   emptyHint?: string;
   className?: string;
+  disabled?: boolean;
 };
 
 function newId(prefix = "opt"): string {
@@ -87,6 +88,7 @@ export function OptionListEditor({
   addDisabledHint,
   emptyHint,
   className,
+  disabled = false,
 }: Props) {
   const {
     reorder = true,
@@ -183,17 +185,18 @@ export function OptionListEditor({
               <SortableRow
                 key={item.id}
                 item={item}
-                reorder={reorder}
+                reorder={reorder && !disabled}
                 valueField={valueField}
                 valueLabel={valueLabel}
                 descriptionField={descriptionField}
                 answerField={answerField}
-                nextKeyField={nextKeyField}
+                nextKeyField={nextKeyField && !disabled}
                 nextKeyOptions={nextKeyOptions}
                 maxLabelChars={maxLabelChars}
                 maxValueChars={maxValueChars}
                 maxAnswerChars={maxAnswerChars}
                 maxDescriptionChars={maxDescriptionChars}
+                disabled={disabled}
                 isDuplicate={
                   !!item.label.trim() && dupSet.has(item.label.trim().toLowerCase())
                 }
@@ -212,7 +215,7 @@ export function OptionListEditor({
         type="button"
         variant="ghost"
         size="sm"
-        disabled={atMax}
+        disabled={atMax || disabled}
         title={atMax ? hint : undefined}
         onClick={() => addItem()}
         className="w-full justify-start text-muted-foreground"
@@ -243,6 +246,7 @@ function SortableRow({
   maxValueChars,
   maxAnswerChars,
   maxDescriptionChars,
+  disabled,
   isDuplicate,
   autofocus,
   onFocused,
@@ -262,6 +266,7 @@ function SortableRow({
   maxValueChars: number;
   maxAnswerChars: number;
   maxDescriptionChars: number;
+  disabled: boolean;
   isDuplicate: boolean;
   autofocus: boolean;
   onFocused: () => void;
@@ -316,6 +321,7 @@ function SortableRow({
               ref={inputRef}
               value={item.label}
               maxLength={maxLabelChars + 20}
+              disabled={disabled}
               className={cn(
                 item.label.length > maxLabelChars && "border-destructive",
                 item.label.length >= maxLabelChars - 3 &&
@@ -345,6 +351,7 @@ function SortableRow({
               <Input
                 value={item.value || ""}
                 maxLength={maxValueChars + 10}
+                disabled={disabled}
                 className="h-8 text-xs text-muted-foreground"
                 placeholder="Sheet / mapped value"
                 onChange={(e) => onChange({ value: e.target.value })}
@@ -361,6 +368,7 @@ function SortableRow({
               <Input
                 value={item.description || ""}
                 maxLength={maxDescriptionChars + 10}
+                disabled={disabled}
                 className="h-8 text-xs"
                 placeholder="List row description (optional)"
                 onChange={(e) => onChange({ description: e.target.value })}
@@ -378,6 +386,7 @@ function SortableRow({
                 rows={2}
                 value={item.answer || ""}
                 maxLength={maxAnswerChars + 20}
+                disabled={disabled}
                 placeholder="Answer"
                 onChange={(e) => onChange({ answer: e.target.value })}
               />
@@ -390,6 +399,7 @@ function SortableRow({
               <select
                 className="mt-1 flex h-8 w-full rounded-md border border-border bg-background px-2 text-xs"
                 value={item.next_key || ""}
+                disabled={disabled}
                 onChange={(e) => onChange({ next_key: e.target.value })}
               >
                 <option value="">Next in list (default)</option>
