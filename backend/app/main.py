@@ -381,19 +381,20 @@ async def receive_message(request: Request):
 
 
 @app.get("/")
-async def health():
-    """Legacy status probe — no tenant inventory (use /healthz, /readyz)."""
-    from app.db.engine import DB_ENABLED
-    from app.dashboard.auth import is_dashboard_enabled
-    return {
-        "status": "running",
-        "dashboard": {
-            "url": "/dashboard",
-            "built": _DASHBOARD_BUILT,
-            "auth_configured": is_dashboard_enabled(),
-            "database": DB_ENABLED,
-        },
-    }
+async def root_health():
+    """Legacy alias — same payload as GET /health."""
+    return await system_health()
+
+
+@app.get("/health")
+async def system_health():
+    """One-glance system state: DB, tenants, dashboard, migrations."""
+    from app.health_check import build_health_report
+
+    return await build_health_report(
+        dashboard_built=_DASHBOARD_BUILT,
+        dashboard_dir=str(_DASHBOARD_DIR),
+    )
 
 
 @app.get("/healthz")
@@ -1113,12 +1114,16 @@ async def send_whatsapp_message(
         graph_url = f"https://graph.facebook.com/v21.0/{phone_number_id}/messages"
 
     headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}", "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.post(graph_url, headers=headers, json=payload)
-        if r.status_code >= 400:
-            log.error(f"Send failed {r.status_code}: {r.text}")
-            return False
-    return True
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(graph_url, headers=headers, json=payload)
+            if r.status_code >= 400:
+                log.error(f"Send failed {r.status_code}: {r.text}")
+                return False
+        return True
+    except Exception as exc:
+        log.error(f"Send failed (network): {exc}")
+        return False
 
 
 # ---------------------------------------------------------------------------

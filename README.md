@@ -39,9 +39,11 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 - API + webhook: `http://127.0.0.1:8000`
-- Health check: `GET /`
+- **Health:** `GET /health` (full system state) · `GET /healthz` (liveness) · `GET /readyz` (DB readiness)
+- Legacy alias: `GET /` returns the same JSON as `/health`
 - Migrations run automatically on startup (Alembic) when `DATABASE_URL` is set.
-- Run tests: `cd backend && pytest`
+- Run tests from repo root: `python3 -m pytest backend/tests`
+- Lint: `cd backend && ruff check .`
 
 ## Frontend (`frontend/`)
 
@@ -62,27 +64,94 @@ Run both together (two terminals): start the backend, then the frontend.
 
 ## Deploy (Railway)
 
-- Create **two** services (or set the service **Root Directory**):
-  - Backend service → Root Directory = `backend` (uses `backend/railway.toml` + `requirements.txt`).
-  - Add a **PostgreSQL** plugin (sets `DATABASE_URL`).
-- Set backend env vars from `backend/.env.example` (WhatsApp, Anthropic, dashboard creds).
-- Build the dashboard once (`cd frontend && npm run build`) so the static files
-  under `backend/app/static/dashboard` are deployed with the backend, or add a
-  build step that runs it.
-- Note your public URL: `https://xxxx.up.railway.app`.
+Railway should use **Root Directory = `backend`**. The repo root is not a valid Python package root.
 
-### Meta app + webhook
-- https://developers.facebook.com/apps → Create App → Business type → add WhatsApp.
-- Copy the **temporary token** and **Phone Number ID** into backend env vars
-  (swap for a permanent System User token before real clients).
-- Webhook Callback URL: `https://xxxx.up.railway.app/webhook`
-- Verify token: whatever you set as `WHATSAPP_VERIFY_TOKEN` → Verify & Save → subscribe to **messages**.
+### 1. Create the service
+
+1. New project → **Deploy from GitHub** (this repo).
+2. Service settings → **Root Directory** = `backend`.
+3. Add **PostgreSQL** plugin → Railway injects `DATABASE_URL` (the app normalises `postgres://` → `postgresql+asyncpg://`).
+
+### 2. Required environment variables
+
+Copy from `backend/.env.example` into the Railway service:
+
+| Variable | Required |
+|----------|----------|
+| `WHATSAPP_VERIFY_TOKEN` | Yes |
+| `WHATSAPP_ACCESS_TOKEN` | Yes |
+| `WHATSAPP_PHONE_NUMBER_ID` | Yes (single-tenant fallback; multi-tenant uses DB) |
+| `ANTHROPIC_API_KEY` | Yes |
+| `DASHBOARD_USER` | Yes for dashboard |
+| `DASHBOARD_PASSWORD` | Yes for dashboard |
+| `DASHBOARD_JWT_SECRET` | Yes for dashboard |
+| `DATABASE_URL` | Yes for dashboard + persistence (from Postgres plugin) |
+| `OWNER_WHATSAPP`, `FLOW_MODE`, … | As needed per tenant / seed |
+
+Without all three `DASHBOARD_*` vars, the bot still runs; dashboard **API** routes return 404.  
+Without `DATABASE_URL`, the bot uses in-memory sessions; dashboard API returns 503.
+
+### 3. Build the dashboard static files
+
+The backend serves the React app from `backend/app/static/dashboard/`.  
+**Commit the built assets** or add a build step before deploy:
+
+```bash
+cd frontend
+npm ci
+npm run build    # writes to ../backend/app/static/dashboard
+```
+
+If `index.html` is missing, `/dashboard` returns 503 (API and webhook still work).
+
+### 4. Start command
+
+Default (from `backend/railway.toml` / `Procfile`):
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+On boot the app:
+
+1. Runs Alembic migrations to `head` (Postgres advisory lock; waits, does not skip).
+2. Seeds admin user if `DASHBOARD_*` set and no users exist.
+3. Syncs env/registry tenants into DB when `DATABASE_URL` is set.
+4. Mounts `/dashboard` when static files exist.
+
+### 5. Verify after deploy
+
+```bash
+curl -s https://YOUR-APP.up.railway.app/health | jq
+curl -s -o /dev/null -w "%{http_code}\n" https://YOUR-APP.up.railway.app/dashboard/
+curl -s https://YOUR-APP.up.railway.app/readyz
+```
+
+`/health` should show `database.connected: true`, `migrations_at_head: true`, `dashboard.mounted: true`, and your tenant list when DB is populated.
+
+### 6. Meta webhook
+
+- Callback URL: `https://YOUR-APP.up.railway.app/webhook`
+- Verify token: same as `WHATSAPP_VERIFY_TOKEN` → Verify & Save → subscribe to **messages**.
 
 ### Admin dashboard
-- URL: `https://xxxx.up.railway.app/dashboard`
-- Set `DASHBOARD_USER`, `DASHBOARD_PASSWORD`, `DASHBOARD_JWT_SECRET` (all three required).
-- Without those vars the bot still runs; dashboard API returns 404.
-- Without `DATABASE_URL` the dashboard API returns 503 (in-memory bot mode).
+
+- URL: `https://YOUR-APP.up.railway.app/dashboard`
+- Login with `DASHBOARD_USER` / `DASHBOARD_PASSWORD`.
+
+---
+
+## Deploy (local production smoke)
+
+```bash
+cd frontend && npm run build
+cd ../backend
+export WHATSAPP_VERIFY_TOKEN=... WHATSAPP_ACCESS_TOKEN=... ANTHROPIC_API_KEY=...
+# optional: export DATABASE_URL=...
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Open `http://localhost:8000/health` and `http://localhost:8000/dashboard/`.
 
 ---
 
@@ -103,3 +172,7 @@ Run both together (two terminals): start the backend, then the frontend.
 - Text messages only (images/voice get a polite redirect).
 - Order slip goes to owner via WhatsApp free-window — works only if the
   owner has messaged the bot number once (do this during setup).
+- Webhook POST is not HMAC-validated (see `STATUS.md`).
+- Single `WHATSAPP_ACCESS_TOKEN` shared across all tenants.
+
+For a full feature/test map see [STATUS.md](STATUS.md).

@@ -28,6 +28,8 @@ import {
   Overview as OverviewData,
   setTenantFilter,
   Tenant,
+  TenantConfig,
+  TenantConfigResponse,
   TenantStatusCounts,
 } from "../api";
 import { Badge } from "../components/ui/badge";
@@ -63,7 +65,7 @@ const STEPS: { id: WizardStep; label: string }[] = [
   { id: 2, label: "WhatsApp" },
   { id: 3, label: "Content" },
   { id: 4, label: "Sheet" },
-  { id: 5, label: "Go live" },
+  { id: 5, label: "Finish" },
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -173,6 +175,8 @@ export default function BusinessesPage() {
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [created, setCreated] = useState<DraftResult | null>(null);
+  /** Shown after Finish actions — not after mid-wizard Save draft. */
+  const [wizardDone, setWizardDone] = useState<"live" | "draft" | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -234,6 +238,7 @@ export default function BusinessesPage() {
     setSheetMsg("");
     setDraftId(null);
     setCreated(null);
+    setWizardDone(null);
   }
 
   function openWizard() {
@@ -244,6 +249,72 @@ export default function BusinessesPage() {
   function closeWizard() {
     setWizardOpen(false);
     if (created || draftId) load();
+  }
+
+  /** Resume a draft so WhatsApp can be verified / activated later. */
+  async function continueSetup(t: Tenant) {
+    resetWizard();
+    setDraftId(t.id);
+    setName(t.name || "");
+    setFlowMode(t.flow_mode === "order" ? "order" : "lead");
+    setPhoneNumberId(t.phone_number_id || "");
+    setOwnerWhatsapp(t.owner_whatsapp || "");
+    setBusinessWaId(t.business_wa_id || "");
+    try {
+      const res = await api<TenantConfigResponse>(
+        `/api/dashboard/tenants/${t.id}/config`,
+        { tenant: false }
+      );
+      const cfg = res.config as TenantConfig & {
+        onboarding?: {
+          waba_id?: string;
+          connection_verified?: boolean;
+          subscribed_apps?: boolean | null;
+          verified_name?: string;
+          template_id?: string;
+          sheet_tested?: boolean;
+        };
+        sheet?: { gsheet_id?: string } | null;
+        greeting_language?: string;
+      };
+      const ob = cfg.onboarding || {};
+      setWabaId(String(res.wiring?.waba_id || ob.waba_id || ""));
+      setOwnerWhatsapp(cfg.owner_whatsapp || t.owner_whatsapp || "");
+      setBusinessWaId(cfg.business_wa_id || t.business_wa_id || "");
+      setLanguage(cfg.greeting_language || "roman_urdu");
+      setTemplateId(
+        ob.template_id ||
+          (res.flow_mode === "order" ? "restaurant" : "pos_lead")
+      );
+      if (cfg.sheet?.gsheet_id) {
+        setSheetUrl(String(cfg.sheet.gsheet_id));
+        setSheetOk(Boolean(ob.sheet_tested));
+      }
+      if (ob.connection_verified) {
+        setVerifyResult({
+          ok: true,
+          verified_name: ob.verified_name || "",
+          display_phone_number: "",
+          subscribed_apps: ob.subscribed_apps ?? null,
+          subscribed_apps_fixed: false,
+        });
+      }
+      setCreated({
+        id: res.id,
+        phone_number_id: res.phone_number_id,
+        name: res.name,
+        flow_mode: res.flow_mode,
+        status: res.status || "draft",
+        template_id: ob.template_id,
+        checklist: t.checklist,
+      });
+      // Jump to WhatsApp step if not verified; else Finish to Activate
+      setStep(ob.connection_verified ? 5 : 2);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not load draft");
+      return;
+    }
+    setWizardOpen(true);
   }
 
   async function setStatus(id: number, status: string) {
@@ -405,7 +476,11 @@ export default function BusinessesPage() {
       });
       setDraftId(res.id);
       setCreated(res);
-      if (!silent) toast.success("Draft saved");
+      if (!silent) {
+        toast.success("Draft saved");
+        setFilter("draft");
+        load();
+      }
       return res;
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Save failed");
@@ -415,19 +490,26 @@ export default function BusinessesPage() {
     }
   }
 
+  /** Create/update draft and stay on Finish — verify/activate later. */
+  async function finishAsDraft() {
+    const draft = await saveDraft(true);
+    if (!draft) return;
+    setFilter("draft");
+    load();
+    setWizardDone("draft");
+    toast.success("Business created as draft — verify WhatsApp whenever you’re ready");
+  }
+
   async function activate() {
+    if (!verifyResult?.ok) {
+      toast.error("Test the WhatsApp connection before going live");
+      return;
+    }
     setActivating(true);
     try {
-      let id = draftId;
-      if (!id) {
-        const draft = await saveDraft(true);
-        if (!draft) return;
-        id = draft.id;
-      } else {
-        const draft = await saveDraft(true);
-        if (!draft) return;
-        id = draft.id;
-      }
+      const draft = await saveDraft(true);
+      if (!draft) return;
+      const id = draft.id;
       const res = await api<{
         status: string;
         test_message_sent: boolean;
@@ -443,6 +525,7 @@ export default function BusinessesPage() {
           ? { ...prev, status: "live", checklist: res.checklist }
           : prev
       );
+      setWizardDone("live");
       if (res.test_message_sent) {
         toast.success("Live — test message sent to owner");
       } else if (res.test_error) {
@@ -451,6 +534,7 @@ export default function BusinessesPage() {
       } else {
         toast.success("Business is live");
       }
+      setFilter("live");
       load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Activate failed");
@@ -464,21 +548,25 @@ export default function BusinessesPage() {
       return name.trim().length > 0 && ownerWhatsapp.trim().length >= 8;
     }
     if (step === 2) {
-      return (
-        phoneNumberId.trim().length > 0 &&
-        ownerWhatsapp.trim().length >= 8 &&
-        Boolean(verifyResult?.ok)
-      );
+      // Phone ID required; connection verify is optional until Activate
+      return phoneNumberId.trim().length > 0 && ownerWhatsapp.trim().length >= 8;
     }
     if (step === 3) return Boolean(templateId);
     if (step === 4) return true; // sheet optional
+    if (step === 5) {
+      return (
+        name.trim().length > 0 &&
+        phoneNumberId.trim().length > 0 &&
+        Boolean(templateId)
+      );
+    }
     return true;
   }
 
   async function goNext() {
     if (!canAdvance()) {
-      if (step === 2 && !verifyResult?.ok) {
-        toast.error("Test connection before continuing");
+      if (step === 2 && !phoneNumberId.trim()) {
+        toast.error("Enter the Phone number ID to continue");
       }
       return;
     }
@@ -720,6 +808,16 @@ export default function BusinessesPage() {
                       Wiring
                     </Button>
                   )}
+                  {st === "draft" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void continueSetup(t)}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                      Continue setup
+                    </Button>
+                  )}
                 </div>
               </article>
             );
@@ -911,6 +1009,10 @@ export default function BusinessesPage() {
 
             {step === 2 && (
               <>
+                <p className="text-sm text-muted-foreground">
+                  Add the Meta Phone number ID now. Testing the connection is optional —
+                  you can verify later before going live.
+                </p>
                 <div>
                   <Label htmlFor="phone-id">Phone number ID</Label>
                   <Input
@@ -970,8 +1072,14 @@ export default function BusinessesPage() {
                   ) : (
                     <CheckCircle2 className="h-4 w-4" />
                   )}
-                  Test connection
+                  Test connection (optional)
                 </Button>
+                {!verifyResult?.ok && !verifyError && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Skip for now — continue the wizard and create a draft. Verify anytime
+                    before Activate.
+                  </p>
+                )}
                 {verifyResult?.ok && (
                   <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm">
                     <p className="font-medium text-emerald-400">
@@ -1069,7 +1177,7 @@ export default function BusinessesPage() {
 
             {step === 5 && (
               <>
-                {created?.status === "live" ? (
+                {wizardDone === "live" && created ? (
                   <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
                     <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
                     <p className="mt-2 font-semibold">You’re live</p>
@@ -1085,18 +1193,48 @@ export default function BusinessesPage() {
                       className="mt-4"
                       onClick={() => {
                         closeWizard();
-                        if (created) {
+                        openSettings({
+                          id: created.id,
+                          phone_number_id: created.phone_number_id,
+                          name: created.name,
+                          flow_mode: created.flow_mode,
+                        });
+                      }}
+                    >
+                      Open Settings
+                    </Button>
+                  </div>
+                ) : wizardDone === "draft" && created ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-center">
+                    <CheckCircle2 className="mx-auto h-8 w-8 text-amber-400" />
+                    <p className="mt-2 font-semibold">Draft created</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {created.name} is saved. Verify WhatsApp and Activate whenever you’re
+                      ready — find it under the Draft filter.
+                    </p>
+                    {created.checklist && (
+                      <div className="mt-3 text-left">
+                        <ChecklistView checklist={created.checklist} />
+                      </div>
+                    )}
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <Button variant="outline" onClick={() => closeWizard()}>
+                        Done
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          closeWizard();
                           openSettings({
                             id: created.id,
                             phone_number_id: created.phone_number_id,
                             name: created.name,
                             flow_mode: created.flow_mode,
                           });
-                        }
-                      }}
-                    >
-                      Open Settings
-                    </Button>
+                        }}
+                      >
+                        Open Settings
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -1125,7 +1263,7 @@ export default function BusinessesPage() {
                         <span className="text-muted-foreground">Connection · </span>
                         {verifyResult?.ok
                           ? verifyResult.verified_name || "Verified"
-                          : "Not verified"}
+                          : "Not verified yet"}
                       </p>
                       <p>
                         <span className="text-muted-foreground">Sheet · </span>
@@ -1137,8 +1275,8 @@ export default function BusinessesPage() {
                       </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Activate creates the tenant as Live, seeds the template, and sends a
-                      test WhatsApp to the owner.
+                      Create as draft now and verify later, or Activate once the connection
+                      test passes (sends a test WhatsApp to the owner).
                     </p>
                   </>
                 )}
@@ -1146,7 +1284,7 @@ export default function BusinessesPage() {
             )}
           </div>
 
-          {!(step === 5 && created?.status === "live") && (
+          {!(step === 5 && wizardDone) && (
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3">
               <Button
                 variant="ghost"
@@ -1158,31 +1296,49 @@ export default function BusinessesPage() {
                 Back
               </Button>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={saving || activating || !name.trim() || !phoneNumberId.trim()}
-                  onClick={() => void saveDraft()}
-                >
-                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                  Save draft
-                </Button>
+                {step < 5 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={saving || activating || !name.trim() || !phoneNumberId.trim()}
+                    onClick={() => void saveDraft()}
+                  >
+                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    Save draft
+                  </Button>
+                )}
                 {step < 5 ? (
                   <Button size="sm" disabled={!canAdvance()} onClick={() => void goNext()}>
                     Next
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 ) : (
-                  <Button
-                    size="sm"
-                    disabled={activating || !canAdvance() || !verifyResult?.ok}
-                    onClick={() => void activate()}
-                  >
-                    {activating ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : null}
-                    Activate
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={saving || activating || !canAdvance()}
+                      onClick={() => void finishAsDraft()}
+                    >
+                      {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Create draft
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={activating || saving || !canAdvance() || !verifyResult?.ok}
+                      title={
+                        verifyResult?.ok
+                          ? "Go live now"
+                          : "Test connection first (or create draft and verify later)"
+                      }
+                      onClick={() => void activate()}
+                    >
+                      {activating ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      Activate
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

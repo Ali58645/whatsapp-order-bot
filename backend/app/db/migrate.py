@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 
 log = logging.getLogger("orderbot.migrate")
 
@@ -46,6 +47,44 @@ async def run_migrations() -> None:
     except Exception as exc:
         log.error(f"migrate: migration failed — {exc}")
         raise
+
+
+def check_migrations_at_head(database_url: str) -> bool | None:
+    """
+    True when alembic_version matches script head.
+    None when DB is disabled or the check cannot run.
+    """
+    if not database_url:
+        return None
+    try:
+        from alembic.config import Config
+        from alembic.runtime.migration import MigrationContext
+        from alembic.script import ScriptDirectory
+        from sqlalchemy import create_engine
+
+        sync_url = _to_sync_url(database_url)
+        backend_root = Path(__file__).resolve().parent.parent.parent
+        ini_path = backend_root / "alembic.ini"
+        script_location = backend_root / "alembic"
+
+        cfg = Config(str(ini_path))
+        cfg.set_main_option("script_location", str(script_location))
+        cfg.set_main_option("sqlalchemy.url", sync_url)
+
+        script = ScriptDirectory.from_config(cfg)
+        head = script.get_current_head()
+        engine = create_engine(sync_url)
+        try:
+            with engine.connect() as conn:
+                current = MigrationContext.configure(conn).get_current_revision()
+        finally:
+            engine.dispose()
+        if head is None:
+            return True
+        return current == head
+    except Exception as exc:
+        log.warning("migrate: head check failed — %s", exc)
+        return None
 
 
 def _run_sync_migrations(database_url: str) -> None:

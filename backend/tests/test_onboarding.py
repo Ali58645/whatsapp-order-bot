@@ -338,6 +338,95 @@ async def test_draft_then_update_and_checklist(client, ob_db):
 
 
 @pytest.mark.asyncio
+async def test_draft_without_verify_then_activate_blocked(client, ob_db):
+    """Create draft without WhatsApp verify; activate must wait until verified."""
+    token = await _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = await client.post(
+        "/api/dashboard/onboarding/draft",
+        headers=headers,
+        json={
+            "name": "Unverified Draft",
+            "flow_mode": "lead",
+            "phone_number_id": "PID_OB_UNVERIFIED",
+            "owner_whatsapp": "923001234567",
+            "template_id": "pos_lead",
+            "connection_verified": False,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "draft"
+    tid = body["id"]
+
+    act = await client.post(
+        f"/api/dashboard/onboarding/{tid}/activate",
+        headers=headers,
+        json={"send_test": False},
+    )
+    assert act.status_code == 400
+    assert "Verify" in act.json()["detail"]
+
+    # Mark verified via draft update, then activate succeeds
+    r2 = await client.post(
+        "/api/dashboard/onboarding/draft",
+        headers=headers,
+        json={
+            "tenant_id": tid,
+            "name": "Unverified Draft",
+            "flow_mode": "lead",
+            "phone_number_id": "PID_OB_UNVERIFIED",
+            "owner_whatsapp": "923001234567",
+            "template_id": "pos_lead",
+            "connection_verified": True,
+            "subscribed_apps": True,
+            "verified_name": "Later Verified",
+        },
+    )
+    assert r2.status_code == 200
+
+    with patch("app.main.send_whatsapp_message", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = True
+        act2 = await client.post(
+            f"/api/dashboard/onboarding/{tid}/activate",
+            headers=headers,
+            json={"send_test": False},
+        )
+        assert act2.status_code == 200, act2.text
+        assert act2.json()["status"] == "live"
+
+
+@pytest.mark.asyncio
+async def test_activate_requires_owner(client, ob_db):
+    token = await _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = await client.post(
+        "/api/dashboard/onboarding/draft",
+        headers=headers,
+        json={
+            "name": "No Owner",
+            "flow_mode": "lead",
+            "phone_number_id": "PID_OB_NO_OWNER",
+            "owner_whatsapp": "",
+            "template_id": "pos_lead",
+            "connection_verified": True,
+        },
+    )
+    assert r.status_code == 200
+    tid = r.json()["id"]
+
+    act = await client.post(
+        f"/api/dashboard/onboarding/{tid}/activate",
+        headers=headers,
+        json={"send_test": False},
+    )
+    assert act.status_code == 400
+    assert "owner_whatsapp" in act.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_owner_cannot_access_onboarding(client, ob_db):
     token = await _login(client, OWNER_USER, OWNER_PASS)
     r = await client.get(
