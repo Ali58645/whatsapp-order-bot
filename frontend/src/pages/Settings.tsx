@@ -14,7 +14,8 @@ import { useI18n } from "../i18n";
 import { Button } from "../components/ui/button";
 import { Input, Label, Textarea } from "../components/ui/input";
 import { Skeleton } from "../components/ui/avatar";
-import { Dialog, DialogContent } from "../components/ui/dialog";
+import { InlineError, PageHeader } from "../components/ui/page-header";
+import { Dialog, DialogContent, DialogSrTitle } from "../components/ui/dialog";
 import { MenuBuilder } from "../components/MenuBuilder";
 import { MessagesEditor } from "../components/MessagesEditor";
 import { LeadOptionsEditor } from "../components/LeadOptionsEditor";
@@ -352,12 +353,59 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
     }
   }
 
-  if (loading || !cfg) {
+  if (selectedDbId == null && !loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          kicker={ownerMode ? "Workspace" : "Wiring"}
+          title={ownerMode ? (menuOnly ? t("menu") : t("myBot")) : "Settings"}
+          description="Select a live business to edit configuration"
+        />
+        <InlineError message="No active business available for settings." />
+      </div>
+    );
+  }
+
+  if (loading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-40 w-full rounded-2xl" />
         <Skeleton className="h-40 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (!cfg) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          kicker={ownerMode ? "Workspace" : "Wiring"}
+          title={ownerMode ? (menuOnly ? t("menu") : t("myBot")) : "Settings"}
+        />
+        <InlineError
+          message={error || "Failed to load configuration"}
+          onRetry={() => {
+            if (selectedDbId == null) return;
+            setError("");
+            setLoading(true);
+            api<TenantConfigResponse>(`/api/dashboard/tenants/${selectedDbId}/config`, {
+              tenant: false,
+            })
+              .then((data) => {
+                setCfg(data);
+                setFaqRows(
+                  (data.config.faq || []).map((f, i) => ({
+                    id: `faq_${Date.now()}_${i}`,
+                    label: f.question,
+                    answer: f.answer,
+                  }))
+                );
+              })
+              .catch((e) => setError(e.message))
+              .finally(() => setLoading(false));
+          }}
+        />
       </div>
     );
   }
@@ -427,6 +475,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
 
       <Dialog open={templateOpen} onOpenChange={(o) => !o && setTemplateOpen(false)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-2xl">
+          <DialogSrTitle>Load starter template</DialogSrTitle>
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-lg font-semibold">Load starter template</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">

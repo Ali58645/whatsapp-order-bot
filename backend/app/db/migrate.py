@@ -69,12 +69,8 @@ def _run_sync_migrations(database_url: str) -> None:
     try:
         with engine.connect() as conn:
             if conn.dialect.name == "postgresql":
-                got_lock = conn.execute(
-                    text(f"SELECT pg_try_advisory_lock({_ADVISORY_LOCK_KEY})")
-                ).scalar()
-                if not got_lock:
-                    log.info("migrate: another worker holds the lock — skipping")
-                    return
+                # Block until we hold the lock — never skip migrations on contention.
+                conn.execute(text(f"SELECT pg_advisory_lock({_ADVISORY_LOCK_KEY})"))
                 try:
                     command.upgrade(cfg, "head")
                 finally:

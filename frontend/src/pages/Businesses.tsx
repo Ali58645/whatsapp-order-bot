@@ -32,7 +32,7 @@ import {
 } from "../api";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Dialog, DialogContent } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogSrTitle } from "../components/ui/dialog";
 import { Input, Label } from "../components/ui/input";
 import { Skeleton } from "../components/ui/avatar";
 import { TemplatePicker } from "../components/TemplatePicker";
@@ -73,9 +73,10 @@ const STATUS_BADGE: Record<string, string> = {
   archived: "bg-zinc-500/15 text-zinc-400 ring-1 ring-zinc-500/25",
 };
 
-const FILTER_TABS: { id: "all" | "live" | "paused" | "archived"; label: string }[] = [
+const FILTER_TABS: { id: "all" | "live" | "draft" | "paused" | "archived"; label: string }[] = [
   { id: "all", label: "All" },
   { id: "live", label: "Live" },
+  { id: "draft", label: "Draft" },
   { id: "paused", label: "Paused" },
   { id: "archived", label: "Archived" },
 ];
@@ -131,7 +132,7 @@ export default function BusinessesPage() {
     archived: 0,
     draft: 0,
   });
-  const [filter, setFilter] = useState<"all" | "live" | "paused" | "archived">("live");
+  const [filter, setFilter] = useState<"all" | "live" | "draft" | "paused" | "archived">("live");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -204,6 +205,8 @@ export default function BusinessesPage() {
         if (st !== "archived") return false;
       } else if (filter === "live") {
         if (st !== "live") return false;
+      } else if (filter === "draft") {
+        if (st !== "draft") return false;
       } else if (filter === "paused") {
         if (st !== "paused") return false;
       } else if (st === "archived") {
@@ -726,6 +729,7 @@ export default function BusinessesPage() {
 
       <Dialog open={!!archiveTarget} onOpenChange={(o) => !o && setArchiveTarget(null)}>
         <DialogContent className="max-w-md p-0">
+          <DialogSrTitle>Archive business</DialogSrTitle>
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-lg font-semibold">Archive business?</h2>
           </div>
@@ -755,6 +759,7 @@ export default function BusinessesPage() {
         }}
       >
         <DialogContent className="max-w-md p-0">
+          <DialogSrTitle>Delete permanently</DialogSrTitle>
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-lg font-semibold text-destructive">Delete permanently</h2>
           </div>
@@ -806,6 +811,7 @@ export default function BusinessesPage() {
 
       <Dialog open={wizardOpen} onOpenChange={(o) => !o && closeWizard()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-lg">
+          <DialogSrTitle>New business</DialogSrTitle>
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-lg font-semibold">Onboard business</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">

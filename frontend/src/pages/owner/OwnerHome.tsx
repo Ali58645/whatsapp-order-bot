@@ -126,7 +126,7 @@ export default function OwnerHome() {
         />
         <StatCard
           label={t("thisWeek")}
-          value={isOrder ? data?.orders_today ?? 0 : data?.leads_this_week ?? 0}
+          value={isOrder ? data?.orders_this_week ?? 0 : data?.leads_this_week ?? 0}
           series={series}
           loading={loading}
         />

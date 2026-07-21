@@ -2,7 +2,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bell,
   Bot,
   Building2,
   CreditCard,
@@ -132,6 +131,17 @@ export default function Layout() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const activeTenant = useMemo(
@@ -352,20 +362,6 @@ export default function Layout() {
             aria-label="Search"
           >
             <Search className="h-4 w-4" />
-          </Button>
-
-          <div className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/40 px-2.5 py-1">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-40" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-            </span>
-            <span className="hidden text-[11px] font-medium text-muted-foreground sm:inline">
-              Online
-            </span>
-          </div>
-
-          <Button variant="ghost" size="icon" aria-label="Notifications">
-            <Bell className="h-4 w-4" />
           </Button>
 
           <Button

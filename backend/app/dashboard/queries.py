@@ -160,7 +160,7 @@ async def overview(db: AsyncSession, tenant_phone_id: str | None = None) -> dict
     stmt = _apply_tenant(stmt, DBLead.tenant_id, tids)
     demos_scheduled = int((await db.execute(stmt)).scalar_one())
 
-    # Orders today + revenue
+    # Orders today + this week + revenue
     stmt = select(func.count(DBOrder.id), func.coalesce(func.sum(DBOrder.total), 0)).where(
         DBOrder.created_at >= today
     )
@@ -168,6 +168,10 @@ async def overview(db: AsyncSession, tenant_phone_id: str | None = None) -> dict
     order_row = (await db.execute(stmt)).one()
     orders_today = int(order_row[0])
     revenue_today = int(order_row[1])
+
+    stmt = select(func.count(DBOrder.id)).where(DBOrder.created_at >= week)
+    stmt = _apply_tenant(stmt, DBOrder.tenant_id, tids)
+    orders_week = int((await db.execute(stmt)).scalar_one())
 
     # Active conversations
     stmt = select(func.count(DBSession.id)).where(DBSession.status == "active")
@@ -183,6 +187,7 @@ async def overview(db: AsyncSession, tenant_phone_id: str | None = None) -> dict
         "leads_by_status": leads_by_status,
         "demos_scheduled": demos_scheduled,
         "orders_today": orders_today,
+        "orders_this_week": orders_week,
         "revenue_today": revenue_today,
         "active_conversations": active_conversations,
         "recent_events": events["items"],

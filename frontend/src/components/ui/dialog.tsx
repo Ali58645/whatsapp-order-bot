@@ -3,6 +3,8 @@ import { cn } from "../../lib/utils";
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
+export const DialogTitle = DialogPrimitive.Title;
+export const DialogDescription = DialogPrimitive.Description;
 
 export function DialogContent({
   className,
@@ -22,5 +24,12 @@ export function DialogContent({
         {children}
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
+  );
+}
+
+/** Visually hidden title for dialogs that already show a visible heading. */
+export function DialogSrTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <DialogPrimitive.Title className="sr-only">{children}</DialogPrimitive.Title>
   );
 }

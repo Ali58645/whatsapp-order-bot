@@ -382,12 +382,11 @@ async def receive_message(request: Request):
 
 @app.get("/")
 async def health():
-    from app.tenants import get_all_tenants
+    """Legacy status probe — no tenant inventory (use /healthz, /readyz)."""
     from app.db.engine import DB_ENABLED
     from app.dashboard.auth import is_dashboard_enabled
     return {
         "status": "running",
-        "tenants": [t.phone_number_id for t in get_all_tenants()],
         "dashboard": {
             "url": "/dashboard",
             "built": _DASHBOARD_BUILT,
@@ -395,6 +394,29 @@ async def health():
             "database": DB_ENABLED,
         },
     }
+
+
+@app.get("/healthz")
+async def healthz():
+    """Liveness — process is up."""
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz():
+    """Readiness — DB reachable when enabled."""
+    from app.db.engine import DB_ENABLED, get_db
+    from sqlalchemy import text
+
+    if not DB_ENABLED:
+        return {"status": "ready", "database": False}
+    try:
+        async with get_db() as db:
+            await db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": True}
+    except Exception as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail=f"database unavailable: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------

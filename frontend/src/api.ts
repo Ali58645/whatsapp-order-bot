@@ -276,6 +276,7 @@ export type Overview = {
   leads_by_status: Record<string, number>;
   demos_scheduled: number;
   orders_today: number;
+  orders_this_week?: number;
   revenue_today: number;
   active_conversations: number;
   recent_events: EventItem[];
