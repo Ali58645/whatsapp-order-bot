@@ -147,12 +147,14 @@ export default function OwnerHome() {
             loading={loading}
           />
         )}
-        <StatCard
-          label={t("recentActivity")}
-          value={data?.active_conversations ?? 0}
-          series={series}
-          loading={loading}
-        />
+        <Link to="/conversations" className="block transition hover:opacity-90">
+          <StatCard
+            label={t("conversations")}
+            value={data?.active_conversations ?? 0}
+            series={series}
+            loading={loading}
+          />
+        </Link>
       </div>
 
       <section>

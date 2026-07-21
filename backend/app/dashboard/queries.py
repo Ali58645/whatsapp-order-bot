@@ -198,6 +198,10 @@ async def overview(db: AsyncSession, tenant_phone_id: str | None = None) -> dict
 
 def _lead_dict(lead: DBLead, contact: DBContact | None = None) -> dict:
     c = contact or lead.contact
+    sess = getattr(lead, "session", None)
+    last_preview = ""
+    if sess and sess.history:
+        last_preview = (sess.history[-1].get("content") or "")[:140]
     return {
         "id": lead.id,
         "tenant_id": lead.tenant_id,
@@ -214,6 +218,7 @@ def _lead_dict(lead: DBLead, contact: DBContact | None = None) -> dict:
         "created_at": _iso(lead.created_at),
         "updated_at": _iso(lead.updated_at),
         "last_activity": _iso(lead.updated_at or lead.created_at),
+        "last_message_preview": last_preview,
         "contact": {
             "id": c.id if c else None,
             "wa_id": c.wa_id if c else "",
@@ -238,7 +243,7 @@ async def list_leads(
     tids = await _tenant_ids(db, tenant_phone_id)
     stmt = (
         select(DBLead)
-        .options(selectinload(DBLead.contact))
+        .options(selectinload(DBLead.contact), selectinload(DBLead.session))
         .order_by(DBLead.updated_at.desc())
     )
     stmt = _apply_tenant(stmt, DBLead.tenant_id, tids)
@@ -470,8 +475,10 @@ async def send_agent_reply(
 
 
 async def conversation_for_contact(
-    db: AsyncSession, contact_id: int
+    db: AsyncSession, contact_id: int, *, session_id_hint: int | None = None
 ) -> dict | None:
+    from app.dashboard.transcript_display import synthetic_lead_history
+
     contact = (
         await db.execute(select(DBContact).where(DBContact.id == contact_id))
     ).scalar_one_or_none()
@@ -481,23 +488,62 @@ async def conversation_for_contact(
     result = await db.execute(
         select(DBSession)
         .where(DBSession.contact_id == contact_id)
-        .order_by(DBSession.updated_at.desc())
+        .order_by(DBSession.created_at.asc())
     )
     sessions = result.scalars().all()
 
+    if session_id_hint and not any(s.id == session_id_hint for s in sessions):
+        extra = await db.get(DBSession, session_id_hint)
+        if extra is not None and extra.contact_id == contact_id:
+            sessions = sorted([*sessions, extra], key=lambda s: s.created_at or s.updated_at)
+
     # Prefer active, else most recent
-    active = next((s for s in sessions if s.status == "active"), None)
-    primary = active or (sessions[0] if sessions else None)
+    active = next((s for s in reversed(sessions) if s.status == "active"), None)
+    primary = active or (sessions[-1] if sessions else None)
 
     timeline: list[dict] = []
     for s in sessions:
         for msg in s.history or []:
+            content = msg.get("content") or msg.get("text") or ""
+            if not str(content).strip():
+                continue
             timeline.append({
                 "session_id": s.id,
                 "session_status": s.status,
                 "role": msg.get("role", "user"),
-                "content": msg.get("content", ""),
+                "content": str(content),
+                "sender": msg.get("sender"),
             })
+
+    if not timeline and session_id_hint:
+        hinted = await db.get(DBSession, session_id_hint)
+        if hinted and hinted.history:
+            for msg in hinted.history or []:
+                content = msg.get("content") or msg.get("text") or ""
+                if not str(content).strip():
+                    continue
+                timeline.append({
+                    "session_id": hinted.id,
+                    "session_status": hinted.status,
+                    "role": msg.get("role", "user"),
+                    "content": str(content),
+                    "sender": msg.get("sender"),
+                })
+            if not primary:
+                primary = hinted
+
+    if not timeline:
+        lead_row = (
+            await db.execute(
+                select(DBLead)
+                .where(DBLead.contact_id == contact_id)
+                .order_by(DBLead.updated_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if lead_row is not None:
+            meta = (primary.meta if primary else None) or {}
+            timeline = synthetic_lead_history(lead_row, meta)
 
     muted_until = None
     mute_row = (
@@ -527,7 +573,7 @@ async def conversation_for_contact(
         "last_inbound_at": _iso(contact.last_seen),
         "active_session_id": primary.id if primary else None,
         "phase": primary.phase if primary else None,
-        "history": list(primary.history or []) if primary else [],
+        "history": timeline if timeline else (list(primary.history or []) if primary else []),
         "timeline": timeline,
     }
 

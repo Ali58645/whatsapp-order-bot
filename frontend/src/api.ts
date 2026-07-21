@@ -305,6 +305,7 @@ export type Lead = {
   created_at: string | null;
   updated_at: string | null;
   last_activity: string | null;
+  last_message_preview?: string;
   contact: ContactBrief;
   history?: { role: string; content: string; sender?: string }[];
   phase?: string | null;
@@ -317,6 +318,7 @@ export type Conversation = {
   window_open: boolean;
   last_inbound_at: string | null;
   history: { role: string; content: string; sender?: string }[];
+  timeline?: { role: string; content: string; sender?: string }[];
   phase?: string | null;
 };
 

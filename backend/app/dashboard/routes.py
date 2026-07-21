@@ -1157,11 +1157,14 @@ async def get_orders(
 @router.get("/api/dashboard/conversations/{contact_id}")
 async def get_conversation(
     contact_id: int,
+    session_id: Optional[int] = None,
     user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
 ):
     _require_db()
     async with _get_db() as db:
-        data = await queries.conversation_for_contact(db, contact_id)
+        data = await queries.conversation_for_contact(
+            db, contact_id, session_id_hint=session_id
+        )
     if data is None:
         raise HTTPException(status_code=404, detail="Contact not found")
     await _assert_resource_tenant(user, data["contact"]["tenant_id"])

@@ -16,6 +16,7 @@ import {
   ScrollText,
   Search,
   Settings,
+  MessageCircle,
   Sun,
   Users,
   X,
@@ -53,6 +54,7 @@ type NavItem = {
     | "team"
     | "accessLog"
     | "channels"
+    | "conversations"
     | "settings";
   icon: typeof Home;
   end?: boolean;
@@ -62,6 +64,7 @@ type NavItem = {
 
 const OWNER_NAV: NavItem[] = [
   { to: "/", labelKey: "home", icon: Home, end: true },
+  { to: "/conversations", labelKey: "conversations", icon: MessageCircle },
   { to: "/customers", labelKey: "customers", icon: Users },
   { to: "/my-bot", labelKey: "myBot", icon: Bot },
   { to: "/channels", labelKey: "channels", icon: Radio },

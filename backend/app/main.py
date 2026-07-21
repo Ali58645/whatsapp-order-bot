@@ -408,6 +408,21 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
     async with get_sender_lock(sender, tenant_id=tid):
         meta = get_lead_meta(sender, tenant_id=tid)
 
+        if gate.text and not gate.is_status_event:
+            from app.transcript import record_user
+
+            record_user(sender, tid, gate.text)
+        elif gate.message_type == "interactive" and not gate.is_status_event:
+            try:
+                from app.interactive import parse_interactive_reply
+                from app.transcript import record_user
+
+                _msg = entry["messages"][0]
+                _rid, _title = parse_interactive_reply(_msg)
+                record_user(sender, tid, _title or _rid or "")
+            except Exception:
+                pass
+
         is_new_activation = gate.lead_source and "lead_source" not in meta
         if is_new_activation:
             meta["lead_source"] = gate.lead_source
@@ -1071,6 +1086,12 @@ async def send_whatsapp_message(
             if r.status_code >= 400:
                 log.error(f"Send failed {r.status_code}: {r.text}")
                 return False
+        if tenant is not None and tenant.flow_mode == "lead":
+            owner = (tenant.owner_whatsapp or "").strip()
+            if to != owner:
+                from app.transcript import record_bot
+
+                record_bot(to, tenant.phone_number_id, text=text, interactive_payload=interactive_payload)
         return True
     except Exception as exc:
         log.error(f"Send failed (network): {exc}")

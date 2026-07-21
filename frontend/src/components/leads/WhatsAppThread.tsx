@@ -1,16 +1,24 @@
 import { useMemo } from "react";
+import { Lock } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 type Msg = { role: string; content: string; sender?: string };
 
+type Props = {
+  messages: Msg[];
+  /** Owner inbox: customer left, bot right */
+  view?: "owner" | "customer";
+  embedded?: boolean;
+};
+
 function parseContent(content: string): { text: string; chips: string[] } {
   const chips: string[] = [];
   const text = content;
-  const chipLines = content.match(/^[•\-\d]+[\.)]?\s*.+$/gm);
-  if (chipLines && chipLines.length <= 6) {
+  const chipLines = content.match(/^[•▢\-\d]+[\.)]?\s*.+$/gm);
+  if (chipLines && chipLines.length <= 8) {
     for (const line of chipLines) {
-      const cleaned = line.replace(/^[•\-\d]+[\.)]?\s*/, "").trim();
-      if (cleaned.length < 40) chips.push(cleaned);
+      const cleaned = line.replace(/^[•▢\-\d]+[\.)]?\s*/, "").trim();
+      if (cleaned.length < 48) chips.push(cleaned);
     }
   }
   const bracket = [...content.matchAll(/\[([^\]]{1,32})\]/g)].map((m) => m[1]);
@@ -18,87 +26,123 @@ function parseContent(content: string): { text: string; chips: string[] } {
   return { text, chips: [...new Set(chips)] };
 }
 
-function isOutgoing(role: string): boolean {
+function isOutgoing(role: string, view: "owner" | "customer"): boolean {
+  if (view === "owner") {
+    return role === "assistant" || role === "human_agent";
+  }
   return role === "user" || role === "human_agent";
 }
 
-function Bubble({ mine, content, agent }: { mine: boolean; content: string; agent?: boolean }) {
+function Bubble({
+  mine,
+  content,
+  agent,
+  time,
+}: {
+  mine: boolean;
+  content: string;
+  agent?: boolean;
+  time: string;
+}) {
   const { text, chips } = parseContent(content);
   return (
-    <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
+    <div className={cn("flex px-2", mine ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "relative max-w-[85%] px-3 py-2 text-[13.5px] leading-relaxed shadow-sm",
+          "relative max-w-[82%] px-2.5 pb-1.5 pt-1.5 text-[14px] leading-[1.35] shadow-sm",
           mine
-            ? "rounded-2xl rounded-br-sm bg-[var(--wa-out)] text-white"
-            : "rounded-2xl rounded-bl-sm bg-[var(--wa-in)] text-zinc-100"
+            ? "rounded-[18px] rounded-br-[4px] bg-[#005c4b] text-[#e9edef]"
+            : "rounded-[18px] rounded-bl-[4px] bg-[#202c33] text-[#e9edef]"
         )}
       >
-        <span
-          className={cn(
-            "absolute bottom-0 h-3 w-3",
-            mine ? "-right-1 bg-[var(--wa-out)]" : "-left-1 bg-[var(--wa-in)]"
-          )}
-          style={{
-            clipPath: mine
-              ? "polygon(0 0, 0 100%, 100% 100%)"
-              : "polygon(100% 0, 0 100%, 100% 100%)",
-          }}
-          aria-hidden
-        />
         {agent && (
-          <span className="relative mb-1 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/90">
-            agent
+          <span className="mb-1 inline-block rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/80">
+            You
           </span>
         )}
-        <p className="transcript-text relative whitespace-pre-wrap">{text}</p>
+        <p className="transcript-text whitespace-pre-wrap break-words">{text}</p>
         {chips.length > 0 && (
-          <div className="relative mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-2 flex flex-col gap-1 border-t border-white/10 pt-2">
             {chips.map((c) => (
               <span
                 key={c}
-                className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/90"
+                className="rounded-lg border border-[#00a884]/40 bg-[#0b141a]/40 px-2.5 py-1.5 text-center text-[12px] font-medium text-[#00d4aa]"
               >
                 {c}
               </span>
             ))}
           </div>
         )}
-      </div>
+        <p
+          className={cn(
+            "mt-0.5 text-right text-[10px] tabular leading-none",
+            mine ? "text-emerald-200/50" : "text-zinc-500"
+          )}
+        >
+          {time}
+        </p>
+        </div>
     </div>
   );
 }
 
-export function WhatsAppThread({ messages }: { messages: Msg[] }) {
-  const items = useMemo(() => messages, [messages]);
+const WALLPAPER = `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.025'%3E%3Cpath d='M0 0h40v40H0V0zm40 40h40v40H40V40z'/%3E%3C/g%3E%3C/svg%3E")`;
+
+export function WhatsAppThread({ messages, view = "owner", embedded = true }: Props) {
+  const items = useMemo(() => messages.filter((m) => (m.content || "").trim()), [messages]);
+  const now = useMemo(
+    () =>
+      new Date().toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+    []
+  );
 
   if (!items.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-muted/40 px-4 py-10 text-center text-sm text-muted-foreground">
-        No messages in session history yet
+      <div
+        className={cn(
+          "flex h-full min-h-[280px] flex-col items-center justify-center px-6 text-center",
+          embedded ? "bg-[#0b141a]" : "rounded-xl border border-dashed border-border bg-muted/40"
+        )}
+        style={embedded ? { backgroundImage: WALLPAPER } : undefined}
+      >
+        <div className="rounded-full bg-[#202c33] p-3">
+          <Lock className="h-5 w-5 text-[#8696a0]" />
+        </div>
+        <p className="mt-3 text-sm font-medium text-[#e9edef]">No messages yet</p>
+        <p className="mt-1 max-w-[200px] text-xs text-[#8696a0]">
+          Messages with your bot will appear here end-to-end encrypted style.
+        </p>
       </div>
     );
   }
 
   return (
     <div
-      className="relative space-y-2.5 overflow-hidden rounded-xl p-3 sm:p-4"
+      className={cn(
+        "relative min-h-full space-y-1 py-3",
+        embedded ? "bg-[#0b141a]" : "rounded-xl p-3 sm:p-4"
+      )}
       style={{
-        backgroundColor: "var(--wa-bg)",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        backgroundColor: embedded ? "#0b141a" : "var(--wa-bg)",
+        backgroundImage: WALLPAPER,
       }}
     >
-      <div className="mb-3 flex justify-center">
-        <span className="rounded-full bg-black/40 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+      <div className="mb-2 flex justify-center px-2">
+        <span className="rounded-lg bg-[#182229]/90 px-3 py-1 text-[11px] font-medium text-[#8696a0] shadow-sm">
           Today
         </span>
       </div>
       {items.map((m, i) => (
         <Bubble
-          key={i}
-          mine={isOutgoing(m.role)}
+          key={`${i}-${m.content.slice(0, 24)}`}
+          mine={isOutgoing(m.role, view)}
           content={m.content}
           agent={m.role === "human_agent" || m.sender === "human_agent"}
+          time={now}
         />
       ))}
     </div>
