@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Check, LayoutTemplate, Loader2, Save } from "lucide-react";
+import { Check, LayoutTemplate, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -151,16 +151,23 @@ export default function OwnerBot() {
         }
       }
 
+      const greetingBoxes = [
+        cfg.config.greeting_text || "",
+        ...(cfg.config.greeting_variants || []),
+      ]
+        .map((s) => s.trim())
+        .filter(Boolean);
+
       const updated = await api<TenantConfigResponse>(
         `/api/dashboard/tenants/${tenantId}/config`,
         {
           method: "POST",
           body: JSON.stringify({
             name: cfg.name,
-            greeting_text: cfg.config.greeting_text,
+            greeting_text: greetingBoxes[0] || "",
             greeting_language: cfg.config.greeting_language,
             greeting_image_url: cfg.config.greeting_image_url || "",
-            greeting_variants: cfg.config.greeting_variants || [],
+            greeting_variants: greetingBoxes.slice(1),
             business_hours: cfg.config.business_hours || { enabled: false },
             owner_whatsapp: cfg.config.owner_whatsapp || "",
             campaign_phrase: cfg.config.campaign_phrase,
@@ -398,49 +405,99 @@ export default function OwnerBot() {
               disabled={readonly}
             />
           </div>
-          <div>
-            <Label>Greeting (first message)</Label>
-            <Textarea
-              className="mt-1.5"
-              rows={3}
-              value={cfg.config.greeting_text}
-              onChange={(e) =>
-                setCfg({
-                  ...cfg,
-                  config: { ...cfg.config, greeting_text: e.target.value },
-                })
-              }
-              disabled={readonly}
-              placeholder="e.g. Assalam o Alaikum — thanks for messaging us."
-            />
-          </div>
-          {isLead && (
-            <div>
-              <Label>More greeting messages (optional)</Label>
-              <Textarea
-                className="mt-1.5"
-                rows={4}
-                placeholder={"One message per line — each is sent as its own WhatsApp bubble"}
-                value={(cfg.config.greeting_variants || []).join("\n")}
-                onChange={(e) =>
-                  setCfg({
-                    ...cfg,
-                    config: {
-                      ...cfg.config,
-                      greeting_variants: e.target.value
-                        .split("\n")
-                        .map((l) => l.trim())
-                        .filter(Boolean),
-                    },
-                  })
-                }
-                disabled={readonly}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Sent after the first greeting, in order. No limit — add as many lines as you want.
-              </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label>Greeting messages</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Each box is sent as its own WhatsApp bubble, in order. Add as many as you need.
+                </p>
+              </div>
+              {!readonly && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const boxes = [
+                      cfg.config.greeting_text || "",
+                      ...(cfg.config.greeting_variants || []),
+                      "",
+                    ];
+                    setCfg({
+                      ...cfg,
+                      config: {
+                        ...cfg.config,
+                        greeting_text: boxes[0] || "",
+                        greeting_variants: boxes.slice(1),
+                      },
+                    });
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add greeting
+                </Button>
+              )}
             </div>
-          )}
+            {(
+              [cfg.config.greeting_text || "", ...(cfg.config.greeting_variants || [])].length
+                ? [cfg.config.greeting_text || "", ...(cfg.config.greeting_variants || [])]
+                : [""]
+            ).map((text, idx, boxes) => (
+              <div
+                key={`greet-${idx}`}
+                className="rounded-xl border border-border bg-muted/15 p-3"
+              >
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Message {idx + 1}
+                    {idx === 0 ? " · first" : ""}
+                  </p>
+                  {!readonly && boxes.length > 1 && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+                      onClick={() => {
+                        const next = boxes.filter((_, i) => i !== idx);
+                        setCfg({
+                          ...cfg,
+                          config: {
+                            ...cfg.config,
+                            greeting_text: next[0] || "",
+                            greeting_variants: next.slice(1),
+                          },
+                        });
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <Textarea
+                  rows={3}
+                  value={text}
+                  onChange={(e) => {
+                    const next = boxes.map((b, i) => (i === idx ? e.target.value : b));
+                    setCfg({
+                      ...cfg,
+                      config: {
+                        ...cfg.config,
+                        greeting_text: next[0] || "",
+                        greeting_variants: next.slice(1),
+                      },
+                    });
+                  }}
+                  disabled={readonly}
+                  placeholder={
+                    idx === 0
+                      ? "e.g. Assalam o Alaikum — thanks for messaging us."
+                      : "Next greeting message…"
+                  }
+                />
+              </div>
+            ))}
+          </div>
           {isLead && (
             <div>
               <Label>Opening question (asks for business name)</Label>
@@ -472,7 +529,9 @@ export default function OwnerBot() {
                 ...(cfg.config.greeting_text || "").trim()
                   ? [(cfg.config.greeting_text || "").trim()]
                   : [],
-                ...(cfg.config.greeting_variants || []),
+                ...(cfg.config.greeting_variants || [])
+                  .map((g) => g.trim())
+                  .filter(Boolean),
                 isLead
                   ? (
                       leadMsgs.q_business_name ||
@@ -490,7 +549,7 @@ export default function OwnerBot() {
                   </div>
                 ))}
               {!(cfg.config.greeting_text || "").trim() &&
-                !(cfg.config.greeting_variants || []).length && (
+                !(cfg.config.greeting_variants || []).some((g) => g.trim()) && (
                   <div className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
                     …
                   </div>
