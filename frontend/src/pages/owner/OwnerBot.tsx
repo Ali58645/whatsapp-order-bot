@@ -9,7 +9,6 @@ import {
   MeResponse,
   TenantConfigResponse,
 } from "../../api";
-import { ExtraQuestionsEditor } from "../../components/ExtraQuestionsEditor";
 import { LeadOptionsEditor } from "../../components/LeadOptionsEditor";
 import { MessagesEditor } from "../../components/MessagesEditor";
 import { OptionListEditor, OptionListItem, stripEmptyOptionRows } from "../../components/OptionListEditor";
@@ -755,8 +754,8 @@ export default function OwnerBot() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold">Questions & buttons</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Rename sections, edit questions, or remove any step (including demo scheduling). Use Extra
-              questions to add new ones.
+              Drag to fully rearrange the WhatsApp order — including Extra questions. Rename, edit,
+              or remove any step (including demo scheduling).
             </p>
           </div>
           <LeadOptionsEditor
@@ -773,11 +772,7 @@ export default function OwnerBot() {
             flow={flow}
             onFlowChange={setFlow}
             allowRemove
-            readonly={readonly}
-          />
-          <ExtraQuestionsEditor
-            flow={flow}
-            onChange={setFlow}
+            allowExtras
             readonly={readonly}
           />
           <Button type="button" variant="outline" onClick={() => setStep("faq")}>

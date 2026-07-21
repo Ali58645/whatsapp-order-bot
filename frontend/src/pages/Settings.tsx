@@ -630,6 +630,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
             })
           }
           allowRemove
+          allowExtras
           readonly={readonly}
         />
       )}

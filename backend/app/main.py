@@ -616,6 +616,12 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
+        # Extra / custom text questions (dashboard "Extra questions")
+        if step and _is_free_text_flow_step(step):
+            result = await _handle_free_text_capture_step(sender, meta, user_text, lang, step, tenant)
+            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
+            return result
+
         if step and step.get("type") in ("button_options", "list_options") and phase != "SCHEDULING":
             result = await _handle_text_at_flow_step(sender, meta, user_text, lang, step, tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
@@ -635,11 +641,6 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
         if phase == "CURRENT_SYSTEM":
             result = await _handle_text_at_interactive_phase(
                 sender, meta, user_text, lang, _match_current_system, "SCHEDULING", "current_system", tenant)
-            asyncio.create_task(_db_persist_lead(sender, meta, tenant))
-            return result
-
-        if step and step.get("type") == "free_text_capture":
-            result = await _handle_free_text_capture_step(sender, meta, user_text, lang, step, tenant)
             asyncio.create_task(_db_persist_lead(sender, meta, tenant))
             return result
 
@@ -742,12 +743,46 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict, tenant
     return {"status": "ok"}
 
 
-async def _maybe_send_interactive(sender: str, meta: dict, tenant: Tenant) -> None:
-    phase = meta.get("phase", "GREETING")
+def _is_free_text_flow_step(step: dict | None) -> bool:
+    """True for dashboard Extra questions / free-text capture (not business name)."""
+    if not step:
+        return False
+    field = step.get("capture_field")
+    if not field or field == "business_name":
+        return False
+    return step.get("type") in ("free_text_capture", "text_question")
+
+
+async def _maybe_send_interactive(
+    sender: str,
+    meta: dict,
+    tenant: Tenant,
+    *,
+    phase: str | None = None,
+    fallback_text: str | None = None,
+) -> bool:
+    """
+    Send the current (or given) phase prompt: interactive buttons/list, or plain
+    text for Extra / free-text steps. Returns True if something was sent.
+    """
+    from app.flow import find_step, get_tenant_flow, step_question_text
+
+    target = phase or meta.get("phase", "GREETING")
     lang = meta.get("lang", "ur")
-    payload = get_phase_interactive(phase, sender, lang, meta=meta, tenant=tenant)
+    step = find_step(get_tenant_flow(tenant), target)
+    payload = get_phase_interactive(target, sender, lang, meta=meta, tenant=tenant)
     if payload:
         await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
+        return True
+    if step and step.get("type") in ("free_text_capture", "text_question"):
+        q = step_question_text(step, lang, tenant)
+        if q:
+            await send_whatsapp_message(sender, q, tenant=tenant)
+            return True
+    if fallback_text:
+        await send_whatsapp_message(sender, fallback_text, tenant=tenant)
+        return True
+    return False
 
 
 async def _handle_business_name_phase(
@@ -768,11 +803,9 @@ async def _handle_business_name_phase(
     if accepted:
         _sheet_field_update(sender, meta, tenant)
         next_phase = meta.get("phase", "BUSINESS_TYPE")
-        payload = get_phase_interactive(next_phase, sender, lang, meta=meta, tenant=tenant)
-        if payload:
-            await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
-        else:
-            await send_whatsapp_message(sender, ack_text, tenant=tenant)
+        await _maybe_send_interactive(
+            sender, meta, tenant, phase=next_phase, fallback_text=ack_text
+        )
     else:
         await send_whatsapp_message(sender, ack_text, tenant=tenant)
     return {"status": "ok"}
@@ -817,15 +850,7 @@ async def _handle_text_at_flow_step(
         meta["phase"] = next_phase_key(tenant, phase)
         reset_reprompts(meta)
         _sheet_field_update(sender, meta, tenant)
-        advance_to = meta["phase"]
-        payload = get_phase_interactive(advance_to, sender, lang, meta=meta, tenant=tenant)
-        if payload:
-            await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
-        else:
-            from app.lead import lead_text
-            await send_whatsapp_message(
-                sender, lead_text("q_business_name", lang, tenant), tenant=tenant
-            )
+        await _maybe_send_interactive(sender, meta, tenant, phase=meta["phase"])
         return {"status": "ok"}
 
     if _is_detour_question(user_text):
@@ -858,7 +883,7 @@ async def _handle_free_text_capture_step(
     sender: str, meta: dict, user_text: str, lang: str, step: dict, tenant: Tenant
 ) -> dict:
     from app.flow import next_phase_key, step_question_text
-    from app.lead import reset_reprompts, lead_text
+    from app.lead import reset_reprompts
 
     stripped = user_text.strip()
     if not stripped:
@@ -872,13 +897,7 @@ async def _handle_free_text_capture_step(
     meta["phase"] = next_phase_key(tenant, step.get("key", ""))
     reset_reprompts(meta)
     _sheet_field_update(sender, meta, tenant)
-    payload = get_phase_interactive(meta["phase"], sender, lang, meta=meta, tenant=tenant)
-    if payload:
-        await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
-    else:
-        await send_whatsapp_message(
-            sender, lead_text("ack_business_name", lang, tenant, name=stripped), tenant=tenant
-        )
+    await _maybe_send_interactive(sender, meta, tenant, phase=meta["phase"])
     return {"status": "ok"}
 
 
@@ -939,11 +958,7 @@ async def _handle_text_at_interactive_phase(
         meta["phase"] = advance_to
         reset_reprompts(meta)
         _sheet_field_update(sender, meta, tenant)
-        payload = get_phase_interactive(advance_to, sender, lang, meta=meta, tenant=tenant)
-        if payload:
-            await send_whatsapp_message(sender, interactive_payload=payload, tenant=tenant)
-        else:
-            await send_whatsapp_message(sender, lead_text("q_business_name", lang, tenant), tenant=tenant)
+        await _maybe_send_interactive(sender, meta, tenant, phase=advance_to)
         return {"status": "ok"}
 
     if _is_detour_question(user_text):
@@ -1026,10 +1041,8 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
 
     _sheet_field_update(sender, meta, tenant)
     new_phase = meta.get("phase", "")
-    interactive_payload = get_phase_interactive(new_phase, sender, lang, meta=meta, tenant=tenant)
-    if interactive_payload:
-        await send_whatsapp_message(sender, interactive_payload=interactive_payload, tenant=tenant)
-    else:
+    sent = await _maybe_send_interactive(sender, meta, tenant, phase=new_phase)
+    if not sent:
         await send_whatsapp_message(sender, clean_reply, tenant=tenant)
     return {"status": "ok"}
 

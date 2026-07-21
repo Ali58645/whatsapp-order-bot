@@ -1,5 +1,23 @@
-import { Trash2 } from "lucide-react";
-import { FlowStep } from "../api";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Plus, Trash2 } from "lucide-react";
+import { type ReactNode } from "react";
+import { toast } from "sonner";
+import { FlowStep, FlowStepOption } from "../api";
+import { cn } from "../lib/utils";
 import { Input, Label, Textarea } from "./ui/input";
 import { AccordionSection } from "./ui/accordion-section";
 import { OptionListEditor, OptionListItem } from "./OptionListEditor";
@@ -39,6 +57,14 @@ const REMOVABLE: RemovableLeadStep[] = [
   "CURRENT_SYSTEM",
   "SCHEDULING",
 ];
+
+const REMOVABLE_SET = new Set<string>(REMOVABLE);
+
+/** Always first / last — not shown in the arrangeable Questions list. */
+const ANCHOR_KEYS = new Set(["GREETING", "BUSINESS_NAME", "CONFIRMED", "STALLED"]);
+
+const FLOW_MAX = 12;
+const CUSTOM_FIELDS = ["custom_1", "custom_2", "custom_3", "custom_4", "custom_5"] as const;
 
 const STEP_META: Record<RemovableLeadStep, { title: string; restoreLabel: string }> = {
   BUSINESS_TYPE: { title: "Business type", restoreLabel: "Business type" },
@@ -151,8 +177,65 @@ const DEFAULT_LEAD_FLOW: FlowStep[] = [
   },
 ];
 
+function nid(prefix: string) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function resolveFlow(flow: FlowStep[] | undefined): FlowStep[] {
   return flow && flow.length ? flow : DEFAULT_LEAD_FLOW;
+}
+
+function cloneFlow(flow: FlowStep[]): FlowStep[] {
+  return flow.map((s) => ({ ...s, options: [...(s.options || [])] }));
+}
+
+/**
+ * Ensure a full lead flow exists before mutating (e.g. adding Extra questions).
+ * Salvages orphan extras if greeting/confirm were never seeded.
+ */
+export function ensureLeadFlow(flow: FlowStep[] | undefined): FlowStep[] {
+  if (!flow || !flow.length) return cloneFlow(DEFAULT_LEAD_FLOW);
+  const keys = new Set(flow.map((s) => (s.key || "").toUpperCase()));
+  if (keys.has("GREETING") && keys.has("CONFIRMED")) return cloneFlow(flow);
+
+  const reserved = new Set([
+    "GREETING",
+    "BUSINESS_NAME",
+    "BUSINESS_TYPE",
+    "LOCATIONS",
+    "CURRENT_SYSTEM",
+    "SCHEDULING",
+    "CONFIRMED",
+    "STALLED",
+  ]);
+  const extras = flow.filter((s) => !reserved.has((s.key || "").toUpperCase()));
+  const base = cloneFlow(DEFAULT_LEAD_FLOW);
+  const insertAt = (() => {
+    const sched = base.findIndex((s) => (s.key || "").toUpperCase() === "SCHEDULING");
+    if (sched >= 0) return sched;
+    const conf = base.findIndex((s) => (s.key || "").toUpperCase() === "CONFIRMED");
+    return conf >= 0 ? conf : base.length;
+  })();
+  return [...base.slice(0, insertAt), ...extras.map((s) => ({ ...s })), ...base.slice(insertAt)];
+}
+
+function isRemovableKey(key: string | undefined): key is RemovableLeadStep {
+  return Boolean(key && REMOVABLE_SET.has(key.toUpperCase()));
+}
+
+function isExtraStep(step: FlowStep): boolean {
+  const key = (step.key || "").toUpperCase();
+  if (ANCHOR_KEYS.has(key) || REMOVABLE_SET.has(key)) return false;
+  if (step.reserved || step.system) return false;
+  return true;
+}
+
+/** Built-ins + extras owners can drag (excludes greeting / business name / confirm). */
+function arrangableSteps(flow: FlowStep[] | undefined): FlowStep[] {
+  return ensureLeadFlow(flow).filter((s) => {
+    const key = (s.key || "").toUpperCase();
+    return !ANCHOR_KEYS.has(key);
+  });
 }
 
 type Props = {
@@ -162,10 +245,12 @@ type Props = {
   onLeadChange: (lead: LeadDraft) => void;
   onInteractiveChange: (interactive: Interactive) => void;
   onDemoSlotsChange: (slots: string[]) => void;
-  /** When set with onFlowChange, owners can remove/restore/rename built-in steps */
+  /** When set with onFlowChange, owners can remove/restore/rename/reorder steps */
   flow?: FlowStep[];
   onFlowChange?: (flow: FlowStep[]) => void;
   allowRemove?: boolean;
+  /** Show + Text / + Buttons to add custom steps into the same list */
+  allowExtras?: boolean;
   readonly?: boolean;
 };
 
@@ -234,6 +319,70 @@ function insertBuiltin(flow: FlowStep[], key: RemovableLeadStep): FlowStep[] {
   return next;
 }
 
+function nextCustomField(flow: FlowStep[]): (typeof CUSTOM_FIELDS)[number] | null {
+  const used = new Set(
+    flow.map((s) => s.capture_field).filter((f): f is string => Boolean(f))
+  );
+  return CUSTOM_FIELDS.find((f) => !used.has(f)) ?? null;
+}
+
+function insertBeforeScheduling(flow: FlowStep[], step: FlowStep): FlowStep[] {
+  const idx = flow.findIndex((s) => (s.key || "").toUpperCase() === "SCHEDULING");
+  if (idx < 0) {
+    const confirmIdx = flow.findIndex((s) => (s.key || "").toUpperCase() === "CONFIRMED");
+    if (confirmIdx >= 0) {
+      const next = [...flow];
+      next.splice(confirmIdx, 0, step);
+      return next;
+    }
+    return [...flow, step];
+  }
+  const next = [...flow];
+  next.splice(idx, 0, step);
+  return next;
+}
+
+function SortableStepShell({
+  id,
+  canDrag,
+  children,
+}: {
+  id: string;
+  canDrag: boolean;
+  children: (leading: ReactNode | undefined) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !canDrag,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  const leading = canDrag ? (
+    <button
+      type="button"
+      className="flex cursor-grab items-center px-3 text-muted-foreground touch-none active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
+      aria-label="Drag to reorder"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <GripVertical className="h-4 w-4" />
+    </button>
+  ) : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(isDragging && "relative z-10 opacity-90 shadow-elevated")}
+    >
+      {children(leading)}
+    </div>
+  );
+}
+
 export function LeadOptionsEditor({
   lead,
   interactive,
@@ -244,6 +393,7 @@ export function LeadOptionsEditor({
   flow,
   onFlowChange,
   allowRemove = false,
+  allowExtras = true,
   readonly = false,
 }: Props) {
   const slots = demoSlots.length >= 2 ? demoSlots : [demoSlots[0] || "", demoSlots[0] || ""];
@@ -259,28 +409,39 @@ export function LeadOptionsEditor({
     { id: "slot_other", label: slotOther.slice(0, 20), locked: true },
   ];
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const steps = arrangableSteps(flow);
+  const sortableIds = steps.map((s) => s.id);
+  const canReorder = Boolean(onFlowChange) && !readonly && steps.length > 1;
+  const showExtras = Boolean(onFlowChange) && allowExtras;
+
   function setLeadQ(key: keyof LeadDraft, value: string) {
     onLeadChange({ ...lead, [key]: value });
   }
 
   function removeStep(key: RemovableLeadStep) {
     if (!onFlowChange) return;
-    onFlowChange(resolveFlow(flow).filter((s) => (s.key || "").toUpperCase() !== key));
+    onFlowChange(ensureLeadFlow(flow).filter((s) => (s.key || "").toUpperCase() !== key));
   }
 
   function restoreStep(key: RemovableLeadStep) {
     if (!onFlowChange) return;
-    onFlowChange(insertBuiltin(flow, key));
+    onFlowChange(insertBuiltin(ensureLeadFlow(flow), key));
   }
 
   function renameStep(key: RemovableLeadStep, label: string) {
     if (!onFlowChange) return;
     const nextLabel = label.slice(0, 40);
-    const base = resolveFlow(flow);
+    const base = ensureLeadFlow(flow);
     if (!base.some((s) => (s.key || "").toUpperCase() === key)) {
-      onFlowChange(insertBuiltin(flow, key).map((s) =>
-        (s.key || "").toUpperCase() === key ? { ...s, label: nextLabel } : s
-      ));
+      onFlowChange(
+        insertBuiltin(base, key).map((s) =>
+          (s.key || "").toUpperCase() === key ? { ...s, label: nextLabel } : s
+        )
+      );
       return;
     }
     onFlowChange(
@@ -290,17 +451,67 @@ export function LeadOptionsEditor({
     );
   }
 
-  const showBt = hasStep(flow, "BUSINESS_TYPE");
-  const showLoc = hasStep(flow, "LOCATIONS");
-  const showSys = hasStep(flow, "CURRENT_SYSTEM");
-  const showSched = hasStep(flow, "SCHEDULING");
+  function patchExtra(id: string, patch: Partial<FlowStep>) {
+    if (!onFlowChange) return;
+    onFlowChange(ensureLeadFlow(flow).map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+
+  function removeExtra(id: string) {
+    if (!onFlowChange) return;
+    onFlowChange(ensureLeadFlow(flow).filter((s) => s.id !== id));
+  }
+
+  function addExtra(kind: "text" | "buttons") {
+    if (!onFlowChange || readonly) return;
+    const current = ensureLeadFlow(flow);
+    if (current.length >= FLOW_MAX) {
+      toast.error(`Max ${FLOW_MAX} steps in the conversation`);
+      return;
+    }
+    const field = nextCustomField(current);
+    if (!field) {
+      toast.error("You can add up to 5 extra questions");
+      return;
+    }
+    const n = current.filter(isExtraStep).length + 1;
+    const options: FlowStepOption[] =
+      kind === "buttons"
+        ? [
+            { id: nid("opt"), title: "Option 1", value: "Option 1" },
+            { id: nid("opt"), title: "Option 2", value: "Option 2" },
+          ]
+        : [];
+    const step: FlowStep = {
+      id: nid("step"),
+      key: `EXTRA_${n}_${Date.now().toString(36).toUpperCase()}`.slice(0, 32),
+      type: kind === "buttons" ? "list_options" : "free_text_capture",
+      label: kind === "buttons" ? "Buttons question" : "Text question",
+      question_text:
+        kind === "buttons"
+          ? "Neeche se muntakhib karein."
+          : "Aapka sawaal yahan likhein…",
+      options,
+      capture_field: field,
+      required: true,
+      skip_if_declined: false,
+      reserved: false,
+      system: false,
+    };
+    onFlowChange(insertBeforeScheduling(current, step));
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    if (!onFlowChange || !canReorder) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const base = ensureLeadFlow(flow);
+    const oldIndex = base.findIndex((s) => s.id === active.id);
+    const newIndex = base.findIndex((s) => s.id === over.id);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+    onFlowChange(arrayMove(base, oldIndex, newIndex));
+  }
 
   const missing = REMOVABLE.filter((k) => !hasStep(flow, k));
-  let n = 0;
-  const num = () => {
-    n += 1;
-    return n;
-  };
 
   function RemoveBtn({ stepKey }: { stepKey: RemovableLeadStep }) {
     if (!allowRemove || readonly || !onFlowChange) return null;
@@ -341,33 +552,17 @@ export function LeadOptionsEditor({
     );
   }
 
-  return (
-    <div className="space-y-3">
-      {allowRemove && missing.length > 0 && onFlowChange && !readonly && (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-3 py-3">
-          <p className="text-xs font-medium text-muted-foreground">Removed — tap to restore</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {missing.map((k) => (
-              <Button
-                key={k}
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => restoreStep(k)}
-              >
-                + {STEP_META[k].restoreLabel}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
+  function renderBuiltin(stepKey: RemovableLeadStep, index: number, leading?: ReactNode) {
+    const title = `${index + 1}. ${stepTitle(flow, stepKey)}`;
 
-      {showBt && (
+    if (stepKey === "BUSINESS_TYPE") {
+      return (
         <AccordionSection
-          title={`${num()}. ${stepTitle(flow, "BUSINESS_TYPE")}`}
+          title={title}
           count={btItems.length}
           countLabel={btItems.length === 1 ? "row" : "rows"}
-          defaultOpen
+          defaultOpen={index === 0}
+          leading={leading}
         >
           <SectionNameField stepKey="BUSINESS_TYPE" />
           <div>
@@ -427,13 +622,16 @@ export function LeadOptionsEditor({
           />
           <RemoveBtn stepKey="BUSINESS_TYPE" />
         </AccordionSection>
-      )}
+      );
+    }
 
-      {showLoc && (
+    if (stepKey === "LOCATIONS") {
+      return (
         <AccordionSection
-          title={`${num()}. ${stepTitle(flow, "LOCATIONS")}`}
+          title={title}
           count={locItems.length}
           countLabel={locItems.length === 1 ? "row" : "rows"}
+          leading={leading}
         >
           <SectionNameField stepKey="LOCATIONS" />
           <div>
@@ -465,13 +663,16 @@ export function LeadOptionsEditor({
           />
           <RemoveBtn stepKey="LOCATIONS" />
         </AccordionSection>
-      )}
+      );
+    }
 
-      {showSys && (
+    if (stepKey === "CURRENT_SYSTEM") {
+      return (
         <AccordionSection
-          title={`${num()}. ${stepTitle(flow, "CURRENT_SYSTEM")}`}
+          title={title}
           count={sysItems.length}
           countLabel={sysItems.length === 1 ? "row" : "rows"}
+          leading={leading}
         >
           <SectionNameField stepKey="CURRENT_SYSTEM" />
           <div>
@@ -503,49 +704,199 @@ export function LeadOptionsEditor({
           />
           <RemoveBtn stepKey="CURRENT_SYSTEM" />
         </AccordionSection>
-      )}
+      );
+    }
 
-      {showSched && (
-        <AccordionSection
-          title={`${num()}. ${stepTitle(flow, "SCHEDULING")}`}
-          count={schedulingItems.length}
-          countLabel="slot buttons"
-        >
-          <SectionNameField stepKey="SCHEDULING" />
+    return (
+      <AccordionSection
+        title={title}
+        count={schedulingItems.length}
+        countLabel="slot buttons"
+        leading={leading}
+      >
+        <SectionNameField stepKey="SCHEDULING" />
+        <div>
+          <Label>Question text</Label>
+          <Textarea
+            rows={3}
+            className="mt-1.5"
+            value={lead.q_scheduling || ""}
+            disabled={readonly}
+            onChange={(e) => setLeadQ("q_scheduling", e.target.value)}
+          />
+        </div>
+        <OptionListEditor
+          title="Slot buttons"
+          items={schedulingItems}
+          constraints={{ maxItems: 3, maxLabelChars: 20 }}
+          features={{ reorder: false }}
+          addDisabledHint="WhatsApp reply-button limit: 3 (2 slots + other)"
+          onChange={(items) => {
+            const s1 = items.find((i) => i.id === "slot_1")?.label || slots[0];
+            const s2 = items.find((i) => i.id === "slot_2")?.label || slots[1];
+            const other = items.find((i) => i.id === "slot_other")?.label || slotOther;
+            onDemoSlotsChange([s1.slice(0, 64), s2.slice(0, 64)]);
+            onInteractiveChange({
+              ...interactive,
+              slot_other_label: other.slice(0, 20),
+            });
+          }}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          WhatsApp allows 3 reply buttons max — 2 time slots + “another time”. You can remove this
+          whole step if you don’t book demos.
+        </p>
+        <RemoveBtn stepKey="SCHEDULING" />
+      </AccordionSection>
+    );
+  }
+
+  function renderExtra(step: FlowStep, index: number, leading?: ReactNode) {
+    const isButtons =
+      step.type === "button_options" || step.type === "list_options";
+    const items: OptionListItem[] = (step.options || []).map((o) => ({
+      id: o.id,
+      label: o.title,
+      value: o.value || o.sheet_value || o.title,
+    }));
+    const label =
+      (step.label || "").trim() ||
+      (isButtons ? "Buttons question" : "Text question");
+
+    return (
+      <AccordionSection
+        title={`${index + 1}. ${label}`}
+        count={isButtons ? items.length : undefined}
+        countLabel={isButtons ? (items.length === 1 ? "button" : "buttons") : undefined}
+        defaultOpen
+        leading={leading}
+        className="border-dashed"
+      >
+        <div className="space-y-3">
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <Label>Section name</Label>
+              <CharHint len={label.length} max={40} />
+            </div>
+            <Input
+              className="mt-1"
+              maxLength={40}
+              value={label}
+              disabled={readonly}
+              onChange={(e) => patchExtra(step.id, { label: e.target.value.slice(0, 40) })}
+            />
+          </div>
           <div>
             <Label>Question text</Label>
             <Textarea
-              rows={3}
               className="mt-1.5"
-              value={lead.q_scheduling || ""}
+              rows={2}
+              value={step.question_text || ""}
               disabled={readonly}
-              onChange={(e) => setLeadQ("q_scheduling", e.target.value)}
+              onChange={(e) =>
+                patchExtra(step.id, { question_text: e.target.value.slice(0, 1024) })
+              }
             />
           </div>
-          <OptionListEditor
-            title="Slot buttons"
-            items={schedulingItems}
-            constraints={{ maxItems: 3, maxLabelChars: 20 }}
-            features={{ reorder: false }}
-            addDisabledHint="WhatsApp reply-button limit: 3 (2 slots + other)"
-            onChange={(items) => {
-              const s1 = items.find((i) => i.id === "slot_1")?.label || slots[0];
-              const s2 = items.find((i) => i.id === "slot_2")?.label || slots[1];
-              const other = items.find((i) => i.id === "slot_other")?.label || slotOther;
-              onDemoSlotsChange([s1.slice(0, 64), s2.slice(0, 64)]);
-              onInteractiveChange({
-                ...interactive,
-                slot_other_label: other.slice(0, 20),
-              });
-            }}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            WhatsApp allows 3 reply buttons max — 2 time slots + “another time”. You can remove this
-            whole step if you don’t book demos.
-          </p>
-          <RemoveBtn stepKey="SCHEDULING" />
-        </AccordionSection>
+          {isButtons && (
+            <OptionListEditor
+              title="Buttons"
+              items={items}
+              constraints={{ maxItems: 10, maxLabelChars: 50, maxValueChars: 64 }}
+              features={{ reorder: true, valueField: true, valueLabel: "Saved as" }}
+              addDisabledHint="WhatsApp list limit: 10 rows"
+              onChange={(next) =>
+                patchExtra(step.id, {
+                  type: "list_options",
+                  options: next.slice(0, 10).map((it) => ({
+                    id: it.id,
+                    title: it.label.slice(0, 50),
+                    value: (it.value || it.label).trim() || it.label,
+                  })),
+                })
+              }
+            />
+          )}
+          {!readonly && onFlowChange && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-destructive"
+              onClick={() => removeExtra(step.id)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Remove this question
+            </Button>
+          )}
+        </div>
+      </AccordionSection>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {allowRemove && missing.length > 0 && onFlowChange && !readonly && (
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-3 py-3">
+          <p className="text-xs font-medium text-muted-foreground">Removed — tap to restore</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {missing.map((k) => (
+              <Button
+                key={k}
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => restoreStep(k)}
+              >
+                + {STEP_META[k].restoreLabel}
+              </Button>
+            ))}
+          </div>
+        </div>
       )}
+
+      {showExtras && !readonly && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Drag any step to set WhatsApp order. Add extras anytime — they join this same list.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => addExtra("text")}>
+              <Plus className="h-3.5 w-3.5" />
+              Text question
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => addExtra("buttons")}>
+              <Plus className="h-3.5 w-3.5" />
+              Buttons question
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!showExtras && canReorder && (
+        <p className="text-xs text-muted-foreground">
+          Drag the handle to change the order WhatsApp asks these questions.
+        </p>
+      )}
+
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+          <div className="space-y-3">
+            {steps.map((step, index) => {
+              const key = (step.key || "").toUpperCase();
+              return (
+                <SortableStepShell key={step.id} id={step.id} canDrag={canReorder}>
+                  {(leading) =>
+                    isRemovableKey(key)
+                      ? renderBuiltin(key, index, leading)
+                      : renderExtra(step, index, leading)
+                  }
+                </SortableStepShell>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }

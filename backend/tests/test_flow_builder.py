@@ -410,3 +410,67 @@ async def test_add_custom_step_reflected_in_live_advance(client, flow_db):
     _, ok = handle_business_name(meta, "Shop X", lang="ur", tenant=tenant)
     assert ok
     assert meta["phase"] == "EXTRA_Q"
+
+
+def test_dashboard_extra_text_question_types_are_recognized():
+    """Extra questions saved as text_question or free_text_capture both count."""
+    from app.main import _is_free_text_flow_step
+
+    assert _is_free_text_flow_step(
+        {"type": "text_question", "capture_field": "custom_1", "key": "EXTRA_1"}
+    )
+    assert _is_free_text_flow_step(
+        {"type": "free_text_capture", "capture_field": "custom_1", "key": "EXTRA_1"}
+    )
+    assert not _is_free_text_flow_step(
+        {"type": "text_question", "capture_field": "business_name", "key": "BUSINESS_NAME"}
+    )
+    assert not _is_free_text_flow_step(
+        {"type": "list_options", "capture_field": "custom_1", "key": "EXTRA_BTNS"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_advance_to_extra_sends_question_text(monkeypatch):
+    """When next phase is an Extra text question, WhatsApp must receive the body."""
+    from app.flow import default_bahi_pos_flow
+    from app.tenants import Tenant
+    import app.main as main
+
+    flow = default_bahi_pos_flow()
+    flow.insert(
+        next(i for i, s in enumerate(flow) if s["key"] == "BUSINESS_NAME") + 1,
+        {
+            "id": "step_tools",
+            "key": "EXTRA_TOOLS",
+            "type": "text_question",
+            "question_text": "Which software/tools do you currently use?",
+            "options": [],
+            "capture_field": "custom_1",
+            "required": True,
+            "reserved": False,
+            "system": False,
+        },
+    )
+    tenant = Tenant(
+        phone_number_id="x",
+        name="T",
+        flow_mode="lead",
+        campaign_phrase="Bahi",
+        demo_slots=["A", "B"],
+    )
+    tenant._raw_config = {"flow": flow}
+
+    sent: list[str] = []
+
+    async def fake_send(to, text=None, interactive_payload=None, tenant=None):
+        if text:
+            sent.append(text)
+        return {"messages": [{"id": "wamid.x"}]}
+
+    monkeypatch.setattr(main, "send_whatsapp_message", fake_send)
+
+    meta = {"phase": "EXTRA_TOOLS", "lang": "en"}
+    ok = await main._maybe_send_interactive("92001", meta, tenant)
+    assert ok is True
+    assert sent and "software/tools" in sent[0].lower()
