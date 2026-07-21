@@ -338,9 +338,26 @@ def _greeting_text(lang: str, tenant=None) -> str:
 
 
 def _media_first_text(lang: str, tenant=None) -> str:
+    """
+    First inbound is an image/voice/etc. Ask them to reply in text and continue
+    into the lead flow — use the owner's greeting, not Bahi POS catalog defaults.
+    """
+    greet = ""
+    if tenant is not None:
+        try:
+            from app.owner_tools import pick_greeting_text
+            greet = (pick_greeting_text(tenant) or "").strip()
+        except Exception:
+            greet = ""
+        if not greet:
+            greet = (getattr(tenant, "greeting_text", "") or "").strip()
+    if not greet:
+        greet = (
+            f"{lead_text('greeting_line', lang, tenant)}\n"
+            f"{lead_text('value_line', lang, tenant)}"
+        )
     return (
-        f"{lead_text('greeting_line', lang, tenant)}\n"
-        f"{lead_text('value_line', lang, tenant)}\n"
+        f"{greet}\n\n"
         f"{lead_text('q_business_name', lang, tenant)}\n"
         f"{lead_text('media_redirect_suffix', lang, tenant)}"
     )

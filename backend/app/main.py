@@ -556,17 +556,22 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
                 asyncio.create_task(_db_persist_lead(sender, meta, tenant))
                 return {"status": "ok"}
 
-        # Non-text
+        # Non-text (image / audio / sticker / etc.)
         if gate.message_type not in ("text",):
             lang = meta.get("lang", "ur")
             phase = meta.get("phase", "GREETING")
-            if phase == "GREETING":
+            from app.lead import lead_text, build_reprompt, _media_first_text
+
+            if phase in ("GREETING", "", None):
+                # New / reset session — ask for text; use owner greeting (not Bahi POS defaults)
                 meta["phase"] = "BUSINESS_NAME"
                 meta["entry_intent"] = "GENERIC_INFO"
-                from app.lead import _media_first_text
                 reply_text = _media_first_text(lang, tenant)
+            elif phase in ("CONFIRMED", "STALLED"):
+                # Lead already closed — don't restart the full pitch on an image
+                reply_text = lead_text("unsupported_media", lang, tenant)
             else:
-                from app.lead import lead_text, build_reprompt
+                # Mid-flow: keep them on the same question
                 reply_text = (
                     f"{lead_text('unsupported_media', lang, tenant)}\n\n"
                     f"{build_reprompt(phase, lang, tenant)}"
