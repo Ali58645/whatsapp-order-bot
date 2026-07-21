@@ -16,6 +16,7 @@ const AccessLog = lazy(() => import("./pages/AccessLog"));
 const OwnerHome = lazy(() => import("./pages/owner/OwnerHome"));
 const Customers = lazy(() => import("./pages/owner/Customers"));
 const Billing = lazy(() => import("./pages/owner/Billing"));
+const Channels = lazy(() => import("./pages/Channels"));
 
 function Private({ children }: { children: React.ReactNode }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -118,6 +119,15 @@ export default function App() {
           element={
             <SuspensePage>
               <Billing />
+            </SuspensePage>
+          }
+        />
+
+        <Route
+          path="channels"
+          element={
+            <SuspensePage>
+              <Channels />
             </SuspensePage>
           }
         />

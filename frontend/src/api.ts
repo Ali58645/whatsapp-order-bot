@@ -286,6 +286,7 @@ export type ContactBrief = {
   id: number | null;
   wa_id: string;
   profile_name: string;
+  channel?: string;
 };
 
 export type Lead = {

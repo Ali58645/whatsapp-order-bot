@@ -8,7 +8,7 @@
 
 | Check | Result |
 |-------|--------|
-| **pytest** (`python3 -m pytest backend/tests` from repo root) | **214 passed**, 0 failed, 0 skipped |
+| **pytest** (`python3 -m pytest backend/tests` from repo root) | **224 passed**, 0 failed, 0 skipped |
 | **ruff** (`cd backend && ruff check .`) | **All checks passed** |
 | **Frontend tests** | None (no Jest/Vitest suite) |
 
@@ -34,6 +34,7 @@
 | Templates | `test_templates.py` | |
 | Persistence / DB store | `test_persistence.py` | |
 | Conversations send | `test_conversation_send.py` | |
+| Multi-channel adapters | `test_channels.py` | |
 | Config validation | `test_tenant_config.py`, `test_flow_builder.py` | |
 | Regression bugs | `test_bugs.py`, `test_business_name_and_bidi.py` | |
 
@@ -68,6 +69,21 @@ When `DATABASE_URL` is set but unreachable, `/health` reports `status: degraded`
 | Tenant status gating (draft/paused/archived → no reply) | **Works** | `test_tenant_mgmt.py` |
 | Webhook **HMAC signature** validation | **Incomplete** | Not implemented — any POST to `/webhook` is accepted |
 | Per-tenant Graph API tokens | **Incomplete** | Single `WHATSAPP_ACCESS_TOKEN` for all tenants |
+
+### Multi-channel (WhatsApp / Instagram / Messenger)
+
+| Feature | Status | Tests |
+|---------|--------|-------|
+| Channel adapters (`app/channels/`) + normalized model | **Works** | `test_channels.py` |
+| Webhook routing by payload shape | **Works** | `test_channels.py` |
+| Gate / flow on normalized model (WA byte-identical) | **Works** | `test_gate_normalized_matches_legacy`, full suite |
+| IG quick replies (≤13, title trim) | **Works** | `test_channels.py` |
+| Per-tenant channel config + `is_channel_live` | **Works** | Tenant helpers; IG/FB stub connect API |
+| Instagram / Messenger live traffic | **Stub** | OAuth scaffold; pending Meta App Review |
+| Dashboard channel badge + filter (Leads/Orders) | **Works** | API `channel` param; frontend badges |
+| Reply-from-dashboard routes by contact channel | **Works** | WA uses `send_whatsapp_message`; IG/FB via adapter |
+
+Migration `0005_channels` adds `channel` column (default `whatsapp`) on contacts, sessions, leads, orders, events, mutes.
 
 ### Persistence
 

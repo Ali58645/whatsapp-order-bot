@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, Lead } from "../api";
+import { ChannelBadge } from "../components/ChannelBadge";
 import LeadDrawer from "../components/leads/LeadDrawer";
 import { Avatar, Skeleton } from "../components/ui/avatar";
 import { StatusPill } from "../components/ui/badge";
@@ -79,7 +80,10 @@ export default function Conversations() {
                   <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-medium">{name}</p>
+                    <ChannelBadge channel={lead.contact.channel} />
+                  </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {lead.phase ? `Phase: ${lead.phase}` : lead.contact.wa_id}
                   </p>

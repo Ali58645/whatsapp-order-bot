@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpDown, Search } from "lucide-react";
 import { api, Lead } from "../api";
+import { ChannelBadge } from "../components/ChannelBadge";
 import LeadDrawer from "../components/leads/LeadDrawer";
 import { Avatar, Skeleton } from "../components/ui/avatar";
 import { StatusPill } from "../components/ui/badge";
@@ -19,6 +20,13 @@ const STATUS_FILTERS = [
   { id: "new", label: "New" },
 ];
 
+const CHANNEL_FILTERS = [
+  { id: "", label: "All channels" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "instagram", label: "Instagram" },
+  { id: "messenger", label: "Messenger" },
+];
+
 type SortKey = "business" | "status" | "activity";
 
 export default function Leads() {
@@ -26,6 +34,7 @@ export default function Leads() {
   const [items, setItems] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("");
+  const [channel, setChannel] = useState("");
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -38,7 +47,7 @@ export default function Leads() {
   const load = useCallback(() => {
     setLoading(true);
     api<{ items: Lead[]; total: number }>(
-      `/api/dashboard/leads?status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`
+      `/api/dashboard/leads?status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}&channel=${encodeURIComponent(channel)}`
     )
       .then((r) => {
         setItems(r.items);
@@ -49,7 +58,7 @@ export default function Leads() {
         setTotal(0);
       })
       .finally(() => setLoading(false));
-  }, [status, search]);
+  }, [status, search, channel]);
 
   useEffect(() => {
     load();
@@ -129,6 +138,24 @@ export default function Leads() {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        {CHANNEL_FILTERS.map((f) => (
+          <button
+            key={f.id || "all-ch"}
+            type="button"
+            onClick={() => setChannel(f.id)}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+              channel === f.id
+                ? "bg-primary/20 text-primary ring-1 ring-primary/40"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         {STATUS_FILTERS.map((f) => (
           <button
             key={f.id || "all"}
@@ -205,7 +232,10 @@ export default function Leads() {
                         <div className="flex items-center gap-3">
                           <Avatar name={name} seed={lead.contact.wa_id} />
                           <div className="min-w-0">
-                            <p className="truncate font-medium">{name}</p>
+                            <p className="flex items-center gap-2 truncate font-medium">
+                              {name}
+                              <ChannelBadge channel={lead.contact.channel} />
+                            </p>
                             <p className="truncate text-xs text-muted-foreground">
                               {lead.contact.wa_id}
                               {lead.business_type ? ` · ${lead.business_type}` : ""}

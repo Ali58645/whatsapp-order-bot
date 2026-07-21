@@ -130,11 +130,12 @@ class DBConfigHistory(Base):
 class DBContact(Base):
     __tablename__ = "contacts"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "wa_id", name="uq_contacts_tenant_wa"),
+        UniqueConstraint("tenant_id", "channel", "wa_id", name="uq_contacts_tenant_channel_wa"),
     )
 
     id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False, default="whatsapp", server_default="whatsapp")
     wa_id: Mapped[str] = mapped_column(String(32), nullable=False)
     profile_name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     first_seen: Mapped[datetime] = mapped_column(
@@ -163,6 +164,7 @@ class DBSession(Base):
     id: Mapped[int] = mapped_column(_PK, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     contact_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contacts.id"), nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False, default="whatsapp", server_default="whatsapp")
     flow_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     phase: Mapped[str] = mapped_column(String(32), nullable=False, default="GREETING")
     meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
@@ -205,6 +207,7 @@ class DBLead(Base):
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     contact_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contacts.id"), nullable=False)
     session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("sessions.id"), nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False, default="whatsapp", server_default="whatsapp")
     business_name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     business_type: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     locations: Mapped[str] = mapped_column(String(16), nullable=False, default="")
@@ -234,6 +237,7 @@ class DBOrder(Base):
     tenant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tenants.id"), nullable=False)
     contact_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contacts.id"), nullable=False)
     session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("sessions.id"), nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False, default="whatsapp", server_default="whatsapp")
     items: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     delivery_address: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -254,12 +258,13 @@ class DBOrder(Base):
 class DBMute(Base):
     __tablename__ = "mutes"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "wa_id", name="uq_mutes_tenant_wa"),
+        UniqueConstraint("tenant_id", "channel", "wa_id", name="uq_mutes_tenant_channel_wa"),
     )
 
     tenant_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("tenants.id"), primary_key=True, nullable=False
     )
+    channel: Mapped[str] = mapped_column(String(16), primary_key=True, nullable=False, default="whatsapp", server_default="whatsapp")
     wa_id: Mapped[str] = mapped_column(String(32), primary_key=True, nullable=False)
     muted_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -278,6 +283,7 @@ class DBEvent(Base):
     contact_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("contacts.id"), nullable=True
     )
+    channel: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # activation | phase_change | confirmed | stalled | mute | human_takeover | error
     type: Mapped[str] = mapped_column(String(32), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

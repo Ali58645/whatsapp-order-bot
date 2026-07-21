@@ -137,6 +137,41 @@ class Tenant(BaseModel):
             return "en"
         return "ur"
 
+    def _raw_channels(self) -> dict:
+        cfg = self._raw_config if self._raw_config is not None else {}
+        return dict(cfg.get("channels") or {})
+
+    def channel_config(self, channel: str) -> dict:
+        ch = self._raw_channels().get(channel) or {}
+        if channel == "whatsapp":
+            return {
+                "account_id": ch.get("account_id") or self.phone_number_id,
+                "status": ch.get("status") or self.status or "live",
+                "access_token": ch.get("access_token"),
+                "connected": (ch.get("status") or self.status or "live") == "live",
+            }
+        return {
+            "account_id": ch.get("account_id") or ch.get("ig_user_id") or ch.get("page_id") or "",
+            "status": ch.get("status") or "disconnected",
+            "access_token": ch.get("access_token"),
+            "connected": ch.get("status") == "live",
+            "oauth_pending": ch.get("oauth_pending", True),
+            "page_id": ch.get("page_id"),
+            "ig_user_id": ch.get("ig_user_id"),
+        }
+
+    def channel_status(self, channel: str) -> str:
+        return self.channel_config(channel).get("status") or "disconnected"
+
+    def is_channel_live(self, channel: str) -> bool:
+        if (self.status or "live") == "archived":
+            return False
+        if channel == "whatsapp":
+            ch = self._raw_channels().get("whatsapp") or {}
+            st = ch.get("status") or self.status or "live"
+            return st == "live"
+        return self.channel_config(channel).get("status") == "live"
+
     @classmethod
     def from_db_row(cls, row) -> "Tenant":
         """Build Tenant from DBTenant ORM row."""
@@ -166,6 +201,12 @@ class Tenant(BaseModel):
         t = cls.model_validate(data)
         t._raw_config = cfg
         return t
+
+
+# ── Module-level helpers (used by channels.send) ─────────────────────────────
+
+def channel_config(tenant: Tenant, channel: str) -> dict:
+    return tenant.channel_config(channel)
 
 
 # ── Registry ────────────────────────────────────────────────────────────────

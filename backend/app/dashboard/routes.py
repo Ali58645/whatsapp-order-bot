@@ -1090,6 +1090,7 @@ async def get_overview(
 async def get_leads(
     tenant_id: str = Query("all"),
     status: Optional[str] = None,
+    channel: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     search: Optional[str] = None,
@@ -1104,6 +1105,7 @@ async def get_leads(
             db,
             tenant_phone_id=tenant_id,
             status=status,
+            channel=channel,
             date_from=_parse_dt(date_from),
             date_to=_parse_dt(date_to),
             search=search,
@@ -1130,6 +1132,7 @@ async def get_lead_detail(
 async def get_orders(
     tenant_id: str = Query("all"),
     status: Optional[str] = None,
+    channel: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
@@ -1143,6 +1146,7 @@ async def get_orders(
             db,
             tenant_phone_id=tenant_id,
             status=status,
+            channel=channel,
             date_from=_parse_dt(date_from),
             date_to=_parse_dt(date_to),
             limit=limit,
@@ -1311,3 +1315,87 @@ async def post_mute(
             wa_id=body.wa_id,
         )
         return {"ok": True, "muted": False, "wa_id": body.wa_id}
+
+
+# ── Multi-channel connect (OAuth scaffold — pending Meta App Review) ─────────
+
+_CHANNEL_META = {
+    "whatsapp": {
+        "label": "WhatsApp",
+        "connect_type": "manual",
+        "note": "Configured via Phone number ID in Wiring / onboarding.",
+    },
+    "instagram": {
+        "label": "Instagram",
+        "connect_type": "facebook_login",
+        "note": "Pending Meta approval — Facebook Login will connect your IG professional account.",
+    },
+    "messenger": {
+        "label": "Messenger",
+        "connect_type": "facebook_login",
+        "note": "Pending Meta approval — Facebook Login will connect your Facebook Page.",
+    },
+}
+
+
+@router.get("/api/dashboard/tenants/{tenant_db_id}/channels")
+async def list_tenant_channels(
+    tenant_db_id: int,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """Per-tenant channel connection status."""
+    _require_db()
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    from app.db.repo import get_tenant_row
+    from app.tenants import Tenant
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    tenant = Tenant.from_db_row(row)
+    items = []
+    for ch, meta in _CHANNEL_META.items():
+        cfg = tenant.channel_config(ch)
+        items.append({
+            "channel": ch,
+            "label": meta["label"],
+            "status": cfg.get("status") or "disconnected",
+            "connected": tenant.is_channel_live(ch) if ch == "whatsapp" else cfg.get("status") == "live",
+            "account_id": cfg.get("account_id") or "",
+            "oauth_pending": cfg.get("oauth_pending", ch != "whatsapp"),
+            "connect_type": meta["connect_type"],
+            "note": meta["note"],
+        })
+    return {"tenant_id": tenant_db_id, "channels": items}
+
+
+@router.post("/api/dashboard/tenants/{tenant_db_id}/channels/{channel}/connect")
+async def connect_tenant_channel(
+    tenant_db_id: int,
+    channel: str,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """
+    OAuth connect scaffold for IG/FB. Returns auth URL placeholder until App Review.
+    WhatsApp remains manual (onboarding / wiring).
+    """
+    _require_db()
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    dash_auth.assert_writable(user)
+    if channel not in _CHANNEL_META:
+        raise HTTPException(status_code=400, detail="Unknown channel")
+    if channel == "whatsapp":
+        raise HTTPException(
+            status_code=400,
+            detail="WhatsApp is connected via Phone number ID in Settings → Wiring",
+        )
+    return {
+        "channel": channel,
+        "status": "pending_meta_approval",
+        "oauth_url": None,
+        "message": (
+            "Facebook Login connect flow is scaffolded. "
+            "Complete Meta App Review to enable Instagram/Messenger OAuth."
+        ),
+    }

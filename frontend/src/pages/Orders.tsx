@@ -2,24 +2,35 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { api, Order } from "../api";
+import { ChannelBadge } from "../components/ChannelBadge";
 import { Avatar, Skeleton } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { EmptyState } from "../components/ui/empty-state";
-import { formatRs, relativeTime } from "../lib/utils";
+import { cn, formatRs, relativeTime } from "../lib/utils";
+
+const CHANNEL_FILTERS = [
+  { id: "", label: "All channels" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "instagram", label: "Instagram" },
+  { id: "messenger", label: "Messenger" },
+];
 
 export default function Orders() {
   const [items, setItems] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Order | null>(null);
+  const [channel, setChannel] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
-    api<{ items: Order[]; total: number }>("/api/dashboard/orders")
+    api<{ items: Order[]; total: number }>(
+      `/api/dashboard/orders?channel=${encodeURIComponent(channel)}`
+    )
       .then((r) => setItems(r.items))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [channel]);
 
   useEffect(() => {
     load();
@@ -34,6 +45,28 @@ export default function Orders() {
         <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
         <p className="mt-1 text-sm text-muted-foreground">Confirmed food orders from the bot</p>
       </div>
+
+      <motion.div
+        className="flex flex-wrap gap-2"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        {CHANNEL_FILTERS.map((f) => (
+          <button
+            key={f.id || "all"}
+            type="button"
+            onClick={() => setChannel(f.id)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition",
+              channel === f.id
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:bg-muted/40"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </motion.div>
 
       {loading ? (
         <div className="space-y-2">
@@ -60,7 +93,10 @@ export default function Orders() {
                   >
                     <Avatar name={name} seed={o.contact.wa_id} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{name}</p>
+                        <ChannelBadge channel={o.contact.channel} />
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         #{o.id} · {relativeTime(o.created_at)}
                       </p>

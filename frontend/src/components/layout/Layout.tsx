@@ -12,6 +12,7 @@ import {
   Package,
   PanelLeftClose,
   PanelLeft,
+  Radio,
   ScrollText,
   Search,
   Settings,
@@ -51,6 +52,7 @@ type NavItem = {
     | "businesses"
     | "team"
     | "accessLog"
+    | "channels"
     | "settings";
   icon: typeof Home;
   end?: boolean;
@@ -62,6 +64,7 @@ const OWNER_NAV: NavItem[] = [
   { to: "/", labelKey: "home", icon: Home, end: true },
   { to: "/customers", labelKey: "customers", icon: Users },
   { to: "/my-bot", labelKey: "myBot", icon: Bot },
+  { to: "/channels", labelKey: "channels", icon: Radio },
   { to: "/menu", labelKey: "menu", icon: Package, orderOnly: true },
   { to: "/billing", labelKey: "billing", icon: CreditCard },
 ];
@@ -71,6 +74,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/", labelKey: "businesses", icon: Building2, end: true },
   { to: "/team", labelKey: "team", icon: Users },
   { to: "/access-log", labelKey: "accessLog", icon: ScrollText },
+  { to: "/channels", labelKey: "channels", icon: Radio },
   { to: "/billing", labelKey: "billing", icon: CreditCard },
   { to: "/settings", labelKey: "settings", icon: Settings },
 ];

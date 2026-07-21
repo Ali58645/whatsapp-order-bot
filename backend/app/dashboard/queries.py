@@ -218,6 +218,7 @@ def _lead_dict(lead: DBLead, contact: DBContact | None = None) -> dict:
             "id": c.id if c else None,
             "wa_id": c.wa_id if c else "",
             "profile_name": c.profile_name if c else "",
+            "channel": getattr(c, "channel", "whatsapp") if c else "whatsapp",
         },
     }
 
@@ -227,6 +228,7 @@ async def list_leads(
     *,
     tenant_phone_id: str | None = None,
     status: str | None = None,
+    channel: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     search: str | None = None,
@@ -243,6 +245,8 @@ async def list_leads(
 
     if status:
         stmt = stmt.where(DBLead.status == status)
+    if channel:
+        stmt = stmt.where(DBLead.channel == channel)
     if date_from:
         stmt = stmt.where(DBLead.created_at >= date_from)
     if date_to:
@@ -310,6 +314,7 @@ def _order_dict(order: DBOrder) -> dict:
             "id": c.id if c else None,
             "wa_id": c.wa_id if c else "",
             "profile_name": c.profile_name if c else "",
+            "channel": getattr(c, "channel", "whatsapp") if c else "whatsapp",
         },
     }
 
@@ -319,6 +324,7 @@ async def list_orders(
     *,
     tenant_phone_id: str | None = None,
     status: str | None = None,
+    channel: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     limit: int = 50,
@@ -333,6 +339,8 @@ async def list_orders(
     stmt = _apply_tenant(stmt, DBOrder.tenant_id, tids)
     if status:
         stmt = stmt.where(DBOrder.status == status)
+    if channel:
+        stmt = stmt.where(DBOrder.channel == channel)
     if date_from:
         stmt = stmt.where(DBOrder.created_at >= date_from)
     if date_to:
@@ -378,7 +386,6 @@ async def send_agent_reply(
 ) -> dict:
     """Send dashboard agent reply; persist history, mute, and human_takeover event."""
     from app.gate import MUTE_DURATION_S, mute_contact
-    from app.main import send_whatsapp_message
     from app.db.repo import (
         append_event,
         create_session,
@@ -408,7 +415,16 @@ async def send_agent_reply(
     if tenant is None:
         tenant = Tenant.from_db_row(tenant_row)
 
-    ok = await send_whatsapp_message(contact.wa_id, text, tenant=tenant)
+    ch = getattr(contact, "channel", "whatsapp") or "whatsapp"
+
+    if ch == "whatsapp":
+        from app.main import send_whatsapp_message
+
+        ok = await send_whatsapp_message(contact.wa_id, text, tenant=tenant)
+    else:
+        from app.channels.send import send_channel_message
+
+        ok = await send_channel_message(tenant, ch, contact.wa_id, text=text)
     if not ok:
         raise RuntimeError("send_failed")
 
@@ -422,6 +438,7 @@ async def send_agent_reply(
             flow_mode=tenant.flow_mode,
             phase="GREETING",
             meta={},
+            channel=ch,
         )
         history = [agent_msg]
     else:
@@ -433,17 +450,19 @@ async def send_agent_reply(
 
     mute_contact(contact.wa_id, tenant.phone_number_id, MUTE_DURATION_S)
     muted_until = _utc_now() + timedelta(seconds=MUTE_DURATION_S)
-    await set_mute(db, contact.tenant_id, contact.wa_id, muted_until)
+    await set_mute(db, contact.tenant_id, contact.wa_id, muted_until, channel=ch)
     await append_event(
         db,
         contact.tenant_id,
         "human_takeover",
         {
             "wa_id": contact.wa_id,
+            "channel": ch,
             "source": "dashboard_send",
             "agent": agent_username,
         },
         contact_id=contact.id,
+        channel=ch,
     )
     await db.flush()
 
@@ -485,6 +504,7 @@ async def conversation_for_contact(
         await db.execute(
             select(DBMute).where(
                 DBMute.tenant_id == contact.tenant_id,
+                DBMute.channel == getattr(contact, "channel", "whatsapp"),
                 DBMute.wa_id == contact.wa_id,
             )
         )
@@ -498,6 +518,7 @@ async def conversation_for_contact(
             "wa_id": contact.wa_id,
             "profile_name": contact.profile_name,
             "tenant_id": contact.tenant_id,
+            "channel": getattr(contact, "channel", "whatsapp"),
             "first_seen": _iso(contact.first_seen),
             "last_seen": _iso(contact.last_seen),
         },

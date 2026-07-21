@@ -70,3 +70,41 @@ async def resolve_tenant(phone_number_id: str) -> Optional[Tenant]:
         log.error(f"tenant_resolver: DB load failed for {phone_number_id} — {exc}")
         # Soft fallback only on hard DB failure (keeps bot up during outages)
         return _registry_get(phone_number_id)
+
+
+async def resolve_tenant_for_channel(
+    channel: str,
+    account_id: str,
+) -> Optional[Tenant]:
+    """Resolve tenant by channel account id (WA phone_number_id, IG id, Page id)."""
+    if channel == "whatsapp":
+        return await resolve_tenant(account_id)
+
+    from app.db.engine import DB_ENABLED
+
+    if not DB_ENABLED:
+        return None
+
+    try:
+        from app.db.engine import get_db
+        from app.db.models import DBTenant
+        from sqlalchemy import select
+
+        async with get_db() as db:
+            result = await db.execute(select(DBTenant))
+            rows = result.scalars().all()
+        for row in rows:
+            t = Tenant.from_db_row(row)
+            cfg = t.channel_config(channel)
+            if str(cfg.get("account_id") or "") == str(account_id):
+                if getattr(row, "status", "live") == "archived":
+                    return None
+                return t
+    except Exception as exc:
+        log.error(
+            "tenant_resolver: channel lookup failed %s/%s — %s",
+            channel,
+            account_id,
+            exc,
+        )
+    return None

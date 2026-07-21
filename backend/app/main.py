@@ -28,7 +28,6 @@ from app.menu import load_menu, menu_as_text
 from app.sessions import get_session, save_session, clear_session, get_sender_lock
 from app.orders import detect_confirmed_order, forward_order_to_owner  # noqa: F401
 from app.tenants import Tenant
-from app.tenant_resolver import resolve_tenant
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("orderbot")
@@ -327,57 +326,9 @@ async def verify_webhook(request: Request):
 @app.post("/webhook")
 async def receive_message(request: Request):
     body = await request.json()
+    from app.channels.pipeline import process_webhook_body
 
-    try:
-        entry = body["entry"][0]["changes"][0]["value"]
-    except (KeyError, IndexError):
-        return {"status": "ignored"}
-
-    # ── Tenant routing ────────────────────────────────────────────────────
-    phone_number_id = (
-        body.get("entry", [{}])[0]
-        .get("changes", [{}])[0]
-        .get("value", {})
-        .get("metadata", {})
-        .get("phone_number_id", "")
-    )
-    # Fallback: some test fixtures omit metadata — use the configured default
-    if not phone_number_id:
-        phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "default")
-
-    tenant = await resolve_tenant(phone_number_id)
-    if tenant is None:
-        return {"status": "ignored"}
-
-    # Draft / paused: webhook still accepted & logged, but bot does not reply
-    if not tenant.is_live:
-        log.info(
-            f"tenant {tenant.phone_number_id!r} status={tenant.status!r} — "
-            "inbound logged, no reply"
-        )
-        try:
-            from app.db.store import EventStore
-            wa_id = ""
-            try:
-                wa_id = entry["messages"][0]["from"]
-            except (KeyError, IndexError, TypeError):
-                pass
-            asyncio.create_task(
-                EventStore.append(
-                    tenant,
-                    "inbound_paused",
-                    {"status": tenant.status, "phone_number_id": phone_number_id},
-                    wa_id=wa_id or None,
-                )
-            )
-        except Exception:
-            pass
-        return {"status": "ok", "bot": "paused"}
-
-    if tenant.flow_mode == "lead":
-        return await _handle_lead_flow(entry, tenant)
-    else:
-        return await _handle_order_flow(entry, tenant)
+    return await process_webhook_body(body)
 
 
 @app.get("/")

@@ -359,12 +359,14 @@ async def get_or_create_contact(
     tenant_db_id: int,
     wa_id: str,
     profile_name: str = "",
+    channel: str = "whatsapp",
 ) -> "Any":  # DBContact
     """Upsert contact; return the DBContact row."""
     m = _m()
     result = await session.execute(
         select(m.DBContact).where(
             m.DBContact.tenant_id == tenant_db_id,
+            m.DBContact.channel == channel,
             m.DBContact.wa_id == wa_id,
         )
     )
@@ -373,6 +375,7 @@ async def get_or_create_contact(
     if contact is None:
         contact = m.DBContact(
             tenant_id=tenant_db_id,
+            channel=channel,
             wa_id=wa_id,
             profile_name=profile_name or "",
             first_seen=now,
@@ -413,6 +416,7 @@ async def create_session(
     flow_mode: str,
     phase: str = "GREETING",
     meta: dict | None = None,
+    channel: str = "whatsapp",
 ) -> "Any":  # DBSession
     """Create a new active session row."""
     m = _m()
@@ -420,6 +424,7 @@ async def create_session(
     db_session = m.DBSession(
         tenant_id=tenant_db_id,
         contact_id=contact_id,
+        channel=channel,
         flow_mode=flow_mode,
         phase=phase,
         meta=meta or {},
@@ -470,18 +475,25 @@ async def set_mute(
     tenant_db_id: int,
     wa_id: str,
     muted_until: datetime,
+    channel: str = "whatsapp",
 ) -> None:
     """Upsert a mute record."""
     m = _m()
     result = await session.execute(
         select(m.DBMute).where(
             m.DBMute.tenant_id == tenant_db_id,
+            m.DBMute.channel == channel,
             m.DBMute.wa_id == wa_id,
         )
     )
     row = result.scalar_one_or_none()
     if row is None:
-        row = m.DBMute(tenant_id=tenant_db_id, wa_id=wa_id, muted_until=muted_until)
+        row = m.DBMute(
+            tenant_id=tenant_db_id,
+            channel=channel,
+            wa_id=wa_id,
+            muted_until=muted_until,
+        )
         session.add(row)
     else:
         row.muted_until = muted_until
@@ -529,6 +541,8 @@ async def upsert_lead_record(
 ) -> None:
     """Create or update the leads row for this session."""
     m = _m()
+    contact = await session.get(m.DBContact, contact_id)
+    channel = getattr(contact, "channel", "whatsapp") if contact else "whatsapp"
     result = await session.execute(
         select(m.DBLead).where(m.DBLead.session_id == session_id)
     )
@@ -550,6 +564,7 @@ async def upsert_lead_record(
             tenant_id=tenant_db_id,
             contact_id=contact_id,
             session_id=session_id,
+            channel=channel,
             **fields,
             status="active",
             created_at=now,
@@ -580,10 +595,13 @@ async def create_order_record(
 ) -> None:
     """Insert a confirmed order row."""
     m = _m()
+    contact = await session.get(m.DBContact, contact_id)
+    channel = getattr(contact, "channel", "whatsapp") if contact else "whatsapp"
     row = m.DBOrder(
         tenant_id=tenant_db_id,
         contact_id=contact_id,
         session_id=session_id,
+        channel=channel,
         items=order.get("items", []),
         total=int(order.get("total", 0)),
         delivery_address=order.get("address", ""),
@@ -601,12 +619,14 @@ async def append_event(
     event_type: str,
     payload: dict,
     contact_id: int | None = None,
+    channel: str | None = None,
 ) -> None:
     """Append one audit event row."""
     m = _m()
     row = m.DBEvent(
         tenant_id=tenant_db_id,
         contact_id=contact_id,
+        channel=channel,
         type=event_type,
         payload=payload,
         created_at=datetime.now(timezone.utc),
