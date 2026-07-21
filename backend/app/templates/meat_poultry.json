@@ -32,37 +32,112 @@
           "id": "c_ch",
           "name": "Chicken",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_ch_whole",
+          "name": "Whole/Kg",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_ch"
+        },
+        {
+          "id": "c_ch_cut",
+          "name": "Cuts",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_ch"
         },
         {
           "id": "c_mut",
           "name": "Mutton",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_mut_kg",
+          "name": "Per Kg",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_mut"
+        },
+        {
+          "id": "c_mut_more",
+          "name": "More",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_mut"
         },
         {
           "id": "c_beef",
           "name": "Beef",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_beef_kg",
+          "name": "Per Kg",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_beef"
+        },
+        {
+          "id": "c_beef_more",
+          "name": "More",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_beef"
         },
         {
           "id": "c_fish",
           "name": "Fish",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_fish_loc",
+          "name": "Local",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_fish"
+        },
+        {
+          "id": "c_fish_prem",
+          "name": "Premium",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_fish"
         },
         {
           "id": "c_cut",
           "name": "Ready Cuts",
           "sort": 4,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_cut_cook",
+          "name": "Cooking Cuts",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_cut"
+        },
+        {
+          "id": "c_cut_ready",
+          "name": "Ready",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_cut"
         }
       ],
       "items": [
         {
           "id": "i_chkg",
-          "category_id": "c_ch",
+          "category_id": "c_ch_whole",
           "name": "Chicken (per kg)",
           "description": "",
           "price": 550,
@@ -72,7 +147,7 @@
         },
         {
           "id": "i_chbon",
-          "category_id": "c_ch",
+          "category_id": "c_ch_whole",
           "name": "Boneless (kg)",
           "description": "",
           "price": 850,
@@ -81,8 +156,68 @@
           "modifiers": []
         },
         {
+          "id": "i_chleg",
+          "category_id": "c_ch_whole",
+          "name": "Legs (kg)",
+          "description": "",
+          "price": 600,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_chbr",
+          "category_id": "c_ch_whole",
+          "name": "Breast (kg)",
+          "description": "",
+          "price": 750,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_chwing",
+          "category_id": "c_ch_cut",
+          "name": "Wings (kg)",
+          "description": "",
+          "price": 500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_chmince",
+          "category_id": "c_ch_cut",
+          "name": "Chicken Mince",
+          "description": "",
+          "price": 700,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_chliver",
+          "category_id": "c_ch_cut",
+          "name": "Liver (kg)",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_chfull",
+          "category_id": "c_ch_cut",
+          "name": "Full Chicken",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_mutkg",
-          "category_id": "c_mut",
+          "category_id": "c_mut_kg",
           "name": "Mutton (per kg)",
           "description": "",
           "price": 2200,
@@ -92,7 +227,7 @@
         },
         {
           "id": "i_mutk",
-          "category_id": "c_mut",
+          "category_id": "c_mut_kg",
           "name": "Mutton Karahi Cut",
           "description": "",
           "price": 2300,
@@ -101,8 +236,68 @@
           "modifiers": []
         },
         {
+          "id": "i_mutch",
+          "category_id": "c_mut_kg",
+          "name": "Mutton Chops (kg)",
+          "description": "",
+          "price": 2400,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_mutleg",
+          "category_id": "c_mut_kg",
+          "name": "Leg Piece (kg)",
+          "description": "",
+          "price": 2350,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_mutrib",
+          "category_id": "c_mut_more",
+          "name": "Ribs (kg)",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_mutmin",
+          "category_id": "c_mut_more",
+          "name": "Mutton Mince",
+          "description": "",
+          "price": 2100,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_mutbot",
+          "category_id": "c_mut_more",
+          "name": "Boti Cut",
+          "description": "",
+          "price": 2300,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_mutneck",
+          "category_id": "c_mut_more",
+          "name": "Neck (kg)",
+          "description": "",
+          "price": 2000,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_beefkg",
-          "category_id": "c_beef",
+          "category_id": "c_beef_kg",
           "name": "Beef (per kg)",
           "description": "",
           "price": 1600,
@@ -112,7 +307,7 @@
         },
         {
           "id": "i_keema",
-          "category_id": "c_beef",
+          "category_id": "c_beef_kg",
           "name": "Beef Keema (kg)",
           "description": "",
           "price": 1700,
@@ -121,8 +316,68 @@
           "modifiers": []
         },
         {
+          "id": "i_steak",
+          "category_id": "c_beef_kg",
+          "name": "Beef Steak (kg)",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_ribs",
+          "category_id": "c_beef_kg",
+          "name": "Beef Ribs (kg)",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_beeff",
+          "category_id": "c_beef_more",
+          "name": "Undercut",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_pasand",
+          "category_id": "c_beef_more",
+          "name": "Pasanday",
+          "description": "",
+          "price": 1900,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_qormab",
+          "category_id": "c_beef_more",
+          "name": "Qorma Cut",
+          "description": "",
+          "price": 1700,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_bone",
+          "category_id": "c_beef_more",
+          "name": "With Bone",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_fishkg",
-          "category_id": "c_fish",
+          "category_id": "c_fish_loc",
           "name": "Rohu (per kg)",
           "description": "",
           "price": 900,
@@ -131,18 +386,78 @@
           "modifiers": []
         },
         {
-          "id": "i_prawn",
-          "category_id": "c_fish",
-          "name": "Prawns (kg)",
+          "id": "i_til",
+          "category_id": "c_fish_loc",
+          "name": "Tilapia (kg)",
           "description": "",
-          "price": 1800,
+          "price": 750,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
+          "id": "i_sing",
+          "category_id": "c_fish_loc",
+          "name": "Singhara",
+          "description": "",
+          "price": 850,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_rahi",
+          "category_id": "c_fish_loc",
+          "name": "Rahu Cutlets",
+          "description": "",
+          "price": 950,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_prawn",
+          "category_id": "c_fish_prem",
+          "name": "Prawns (kg)",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_surmai",
+          "category_id": "c_fish_prem",
+          "name": "Surmai (kg)",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_pomf",
+          "category_id": "c_fish_prem",
+          "name": "Pomfret",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_salmon",
+          "category_id": "c_fish_prem",
+          "name": "Salmon (kg)",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_qorma",
-          "category_id": "c_cut",
+          "category_id": "c_cut_cook",
           "name": "Qorma Cut (kg)",
           "description": "",
           "price": 600,
@@ -152,12 +467,72 @@
         },
         {
           "id": "i_boticut",
-          "category_id": "c_cut",
+          "category_id": "c_cut_cook",
           "name": "Boti Cut (kg)",
           "description": "",
           "price": 650,
           "available": true,
           "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_handi",
+          "category_id": "c_cut_cook",
+          "name": "Handi Cut (kg)",
+          "description": "",
+          "price": 620,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_biryani",
+          "category_id": "c_cut_cook",
+          "name": "Biryani Cut (kg)",
+          "description": "",
+          "price": 580,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_tikka_c",
+          "category_id": "c_cut_ready",
+          "name": "Tikka Pieces",
+          "description": "",
+          "price": 700,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_karahi_c",
+          "category_id": "c_cut_ready",
+          "name": "Karahi Cut",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_fry",
+          "category_id": "c_cut_ready",
+          "name": "Fry Cut",
+          "description": "",
+          "price": 600,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_soup_c",
+          "category_id": "c_cut_ready",
+          "name": "Soup Bones",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

@@ -63,6 +63,30 @@
             "value": "Check"
           },
           {
+            "id": "s_brake",
+            "title": "Brakes",
+            "description": "Brake service",
+            "value": "Brakes"
+          },
+          {
+            "id": "s_tyre",
+            "title": "Tyres",
+            "description": "Tyre change",
+            "value": "Tyres"
+          },
+          {
+            "id": "s_batt",
+            "title": "Battery",
+            "description": "Battery replace",
+            "value": "Battery"
+          },
+          {
+            "id": "s_detail",
+            "title": "Detailing",
+            "description": "Wash + polish",
+            "value": "Detailing"
+          },
+          {
             "id": "s_oth",
             "title": "Other",
             "description": "Other job",

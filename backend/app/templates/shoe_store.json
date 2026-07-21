@@ -1,0 +1,980 @@
+{
+  "id": "shoe_store",
+  "name": "Shoe Store",
+  "vertical": "shoes",
+  "flow_mode": "order",
+  "blurb": "Men/Women/Kids footwear + accessories — size modifier, ask for other sizes.",
+  "icon": "footprints",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "Shoe Store",
+    "greeting_text": "Assalam o Alaikum! [Business] — shoes dekhein aur order karein. Size choose karein; aur sizes chat mein pooch sakte hain.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "Common sizes on buttons; other sizes confirmed in chat before delivery.",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "Modifier shows 40/42/44 — customer can request other sizes in chat.",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business]! Browse shoes below. Pick a size — ask in chat for other sizes."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_men",
+          "name": "Men",
+          "sort": 0,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_men_cas",
+          "name": "Casual",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_men"
+        },
+        {
+          "id": "c_men_form",
+          "name": "Formal",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_men"
+        },
+        {
+          "id": "c_wom",
+          "name": "Women",
+          "sort": 1,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_wom_heel",
+          "name": "Heels/Flats",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_wom"
+        },
+        {
+          "id": "c_wom_cas",
+          "name": "Casual",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_wom"
+        },
+        {
+          "id": "c_kid",
+          "name": "Kids",
+          "sort": 2,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_kid_cas",
+          "name": "Casual",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_kid"
+        },
+        {
+          "id": "c_kid_sch",
+          "name": "School",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_kid"
+        },
+        {
+          "id": "c_acc",
+          "name": "Accessories",
+          "sort": 3,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_acc_care",
+          "name": "Care",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_acc"
+        },
+        {
+          "id": "c_acc_parts",
+          "name": "Parts",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_acc"
+        }
+      ],
+      "items": [
+        {
+          "id": "i_sneak",
+          "category_id": "c_men_cas",
+          "name": "Sneakers",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_loaf",
+          "category_id": "c_men_cas",
+          "name": "Loafers",
+          "description": "",
+          "price": 4800,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_sandal",
+          "category_id": "c_men_cas",
+          "name": "Sandals",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_slip",
+          "category_id": "c_men_cas",
+          "name": "Slip-ons",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_formal",
+          "category_id": "c_men_form",
+          "name": "Formal Shoes",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_oxford",
+          "category_id": "c_men_form",
+          "name": "Oxford",
+          "description": "",
+          "price": 6500,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_derby",
+          "category_id": "c_men_form",
+          "name": "Derby",
+          "description": "",
+          "price": 5800,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_boot_m",
+          "category_id": "c_men_form",
+          "name": "Boots",
+          "description": "",
+          "price": 7200,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_heels",
+          "category_id": "c_wom_heel",
+          "name": "Heels",
+          "description": "",
+          "price": 4200,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_flats",
+          "category_id": "c_wom_heel",
+          "name": "Flat Sandals",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_wedge",
+          "category_id": "c_wom_heel",
+          "name": "Wedges",
+          "description": "",
+          "price": 3800,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_khussa",
+          "category_id": "c_wom_heel",
+          "name": "Khussa / Jutti",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_wsneak",
+          "category_id": "c_wom_cas",
+          "name": "Women Sneakers",
+          "description": "",
+          "price": 4000,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_baller",
+          "category_id": "c_wom_cas",
+          "name": "Ballerinas",
+          "description": "",
+          "price": 3200,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_mules",
+          "category_id": "c_wom_cas",
+          "name": "Mules",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_boot_w",
+          "category_id": "c_wom_cas",
+          "name": "Ankle Boots",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_ksneak",
+          "category_id": "c_kid_cas",
+          "name": "Kids Sneakers",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_ksand",
+          "category_id": "c_kid_cas",
+          "name": "Kids Sandals",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kvel",
+          "category_id": "c_kid_cas",
+          "name": "Velcro Shoes",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_klight",
+          "category_id": "c_kid_cas",
+          "name": "Light-up",
+          "description": "",
+          "price": 2500,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kschool",
+          "category_id": "c_kid_sch",
+          "name": "School Shoes",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kboot",
+          "category_id": "c_kid_sch",
+          "name": "Kids Boots",
+          "description": "",
+          "price": 3200,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kpt",
+          "category_id": "c_kid_sch",
+          "name": "PT Shoes",
+          "description": "",
+          "price": 2000,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kform",
+          "category_id": "c_kid_sch",
+          "name": "Formal Kids",
+          "description": "",
+          "price": 2600,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_40",
+                  "label": "Size 40",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_42",
+                  "label": "Size 42",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_44",
+                  "label": "Size 44",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_socks",
+          "category_id": "c_acc_care",
+          "name": "Socks (3-pack)",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_polish",
+          "category_id": "c_acc_care",
+          "name": "Shoe Polish",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_brush",
+          "category_id": "c_acc_care",
+          "name": "Shoe Brush",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_spray",
+          "category_id": "c_acc_care",
+          "name": "Protect Spray",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_lace",
+          "category_id": "c_acc_parts",
+          "name": "Shoe Laces",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_insole",
+          "category_id": "c_acc_parts",
+          "name": "Insoles",
+          "description": "",
+          "price": 600,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_heel",
+          "category_id": "c_acc_parts",
+          "name": "Heel Tips",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_bag",
+          "category_id": "c_acc_parts",
+          "name": "Shoe Bag",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] shoes — size choose karein. Aur sizes chat mein pooch sakte hain.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 150,
+          "free_above": 5000,
+          "area_note": "City delivery — confirm size before dispatch"
+        },
+        "order_confirm_note": "Confirm? Size theek hai? Aur size chahiye to likhein.",
+        "currency": "PKR"
+      }
+    }
+  }
+}

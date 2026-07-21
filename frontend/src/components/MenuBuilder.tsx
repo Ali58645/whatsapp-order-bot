@@ -29,12 +29,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, MenuV2, MenuV2Item } from "../api";
-import { emptyMenuV2, nid, validateMenuClient, LIMITS } from "../lib/menu-v2";
+import { emptyMenuV2, nid, validateMenuClient, LIMITS, rootCategories, childCategories, isLeafCategory } from "../lib/menu-v2";
 import { Button } from "./ui/button";
 import { Input, Label, Textarea } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { cn } from "../lib/utils";
 import { WhatsAppMenuPreview } from "./menu/WhatsAppMenuPreview";
+import type { MenuV2Category } from "../api";
 
 type Props = {
   tenantDbId: number;
@@ -65,19 +66,35 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  const sortedCats = useMemo(
-    () => [...menu.categories].sort((a, b) => a.sort - b.sort),
-    [menu.categories]
-  );
+  const sortedRoots = useMemo(() => rootCategories(menu), [menu]);
 
   function updateMenu(next: MenuV2) {
     setMenu(next);
   }
 
   function addCategory() {
-    const cat = { id: nid("cat"), name: "New category", sort: menu.categories.length, visible: true };
+    const cat: MenuV2Category = {
+      id: nid("cat"),
+      name: "New category",
+      sort: sortedRoots.length,
+      visible: true,
+      parent_id: null,
+    };
     updateMenu({ ...menu, categories: [...menu.categories, cat] });
     setOpenCats((o) => ({ ...o, [cat.id]: true }));
+  }
+
+  function addSubCategory(parentId: string) {
+    const siblings = childCategories(menu, parentId);
+    const cat: MenuV2Category = {
+      id: nid("cat"),
+      name: "New sub-category",
+      sort: siblings.length,
+      visible: true,
+      parent_id: parentId,
+    };
+    updateMenu({ ...menu, categories: [...menu.categories, cat] });
+    setOpenCats((o) => ({ ...o, [parentId]: true, [cat.id]: true }));
   }
 
   function addItem(categoryId: string) {
@@ -100,11 +117,27 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
     updateMenu({ ...menu, items: [...menu.items, copy] });
   }
 
+  function deleteCategory(catId: string) {
+    const childIds = new Set(
+      menu.categories.filter((c) => (c.parent_id || "") === catId).map((c) => c.id)
+    );
+    childIds.add(catId);
+    updateMenu({
+      ...menu,
+      categories: menu.categories.filter((c) => !childIds.has(c.id)),
+      items: menu.items.filter((i) => !childIds.has(i.category_id)),
+    });
+  }
+
   function markCategoryUnavailable(catId: string) {
+    const childIds = menu.categories
+      .filter((c) => (c.parent_id || "") === catId)
+      .map((c) => c.id);
+    const ids = new Set([catId, ...childIds]);
     updateMenu({
       ...menu,
       items: menu.items.map((i) =>
-        i.category_id === catId ? { ...i, available: false } : i
+        ids.has(i.category_id) ? { ...i, available: false } : i
       ),
     });
     toast.message("Category marked unavailable for today");
@@ -117,10 +150,20 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
     const overId = String(over.id);
 
     if (activeId.startsWith("cat:") && overId.startsWith("cat:")) {
-      const oldIndex = sortedCats.findIndex((c) => `cat:${c.id}` === activeId);
-      const newIndex = sortedCats.findIndex((c) => `cat:${c.id}` === overId);
-      const moved = arrayMove(sortedCats, oldIndex, newIndex).map((c, i) => ({ ...c, sort: i }));
-      updateMenu({ ...menu, categories: moved });
+      const a = menu.categories.find((c) => `cat:${c.id}` === activeId);
+      const b = menu.categories.find((c) => `cat:${c.id}` === overId);
+      if (!a || !b) return;
+      // Only reorder within same parent level
+      if ((a.parent_id || "") !== (b.parent_id || "")) return;
+      const siblings = menu.categories
+        .filter((c) => (c.parent_id || "") === (a.parent_id || ""))
+        .sort((x, y) => x.sort - y.sort);
+      const oldIndex = siblings.findIndex((c) => c.id === a.id);
+      const newIndex = siblings.findIndex((c) => c.id === b.id);
+      const moved = arrayMove(siblings, oldIndex, newIndex).map((c, i) => ({ ...c, sort: i }));
+      const movedIds = new Set(moved.map((c) => c.id));
+      const others = menu.categories.filter((c) => !movedIds.has(c.id));
+      updateMenu({ ...menu, categories: [...others, ...moved] });
       return;
     }
 
@@ -132,7 +175,6 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
       const oldIndex = sameCat.findIndex((i) => i.id === a.id);
       const newIndex = sameCat.findIndex((i) => i.id === b.id);
       if (a.category_id !== b.category_id) {
-        // Move across categories
         const updated = menu.items.map((i) =>
           i.id === a.id ? { ...i, category_id: b.category_id } : i
         );
@@ -338,10 +380,12 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
 
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext
-              items={sortedCats.map((c) => `cat:${c.id}`)}
+              items={sortedRoots.map((c) => `cat:${c.id}`)}
               strategy={verticalListSortingStrategy}
             >
-              {sortedCats.map((cat) => {
+              {sortedRoots.map((cat) => {
+                const subs = childCategories(menu, cat.id);
+                const leaf = isLeafCategory(menu, cat.id);
                 const items = menu.items
                   .filter((i) => i.category_id === cat.id)
                   .sort((a, b) => a.sort - b.sort);
@@ -409,13 +453,7 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
                           type="button"
                           size="icon"
                           variant="ghost"
-                          onClick={() =>
-                            updateMenu({
-                              ...menu,
-                              categories: menu.categories.filter((c) => c.id !== cat.id),
-                              items: menu.items.filter((i) => i.category_id !== cat.id),
-                            })
-                          }
+                          onClick={() => deleteCategory(cat.id)}
                         >
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
@@ -427,53 +465,126 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
                       )}
                       {open && (
                         <div className="space-y-1.5 border-t border-border px-2 py-2">
+                          {/* Sub-categories */}
                           <SortableContext
-                            items={items.map((i) => `item:${i.id}`)}
+                            items={subs.map((s) => `cat:${s.id}`)}
                             strategy={verticalListSortingStrategy}
                           >
-                            {items.map((item) => (
-                              <SortableItem key={item.id} id={`item:${item.id}`}>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingItem(item)}
-                                  className={cn(
-                                    "flex w-full items-center gap-2 rounded-lg border border-transparent bg-card px-2 py-2 text-left text-sm transition hover:border-primary/30",
-                                    (errorMap[`item:${item.id}:name`] ||
-                                      errorMap[`item:${item.id}:desc`]) &&
-                                      "border-destructive/50"
-                                  )}
-                                >
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate font-medium">{item.name}</p>
-                                    <p className="truncate text-[11px] text-muted-foreground">
-                                      {item.description || "No description"} · Rs {item.price}
-                                      {!item.available && " · unavailable"}
-                                    </p>
+                            {subs.map((sub) => {
+                              const subItems = menu.items
+                                .filter((i) => i.category_id === sub.id)
+                                .sort((a, b) => a.sort - b.sort);
+                              const subOpen = openCats[sub.id] ?? true;
+                              return (
+                                <SortableCat key={sub.id} id={`cat:${sub.id}`}>
+                                  <div className="ml-3 rounded-lg border border-border/80 bg-card/60">
+                                    <div className="flex items-center gap-2 px-2 py-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setOpenCats((o) => ({ ...o, [sub.id]: !subOpen }))
+                                        }
+                                        className="text-muted-foreground"
+                                      >
+                                        {subOpen ? (
+                                          <ChevronDown className="h-3.5 w-3.5" />
+                                        ) : (
+                                          <ChevronRight className="h-3.5 w-3.5" />
+                                        )}
+                                      </button>
+                                      <Input
+                                        value={sub.name}
+                                        className="h-7 border-0 bg-transparent px-1 text-sm font-medium shadow-none focus-visible:ring-0"
+                                        maxLength={LIMITS.categoryName + 5}
+                                        onChange={(e) =>
+                                          updateMenu({
+                                            ...menu,
+                                            categories: menu.categories.map((c) =>
+                                              c.id === sub.id ? { ...c, name: e.target.value } : c
+                                            ),
+                                          })
+                                        }
+                                      />
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => deleteCategory(sub.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                      </Button>
+                                    </div>
+                                    {subOpen && (
+                                      <div className="space-y-1 border-t border-border/60 px-2 py-1.5">
+                                        <SortableContext
+                                          items={subItems.map((i) => `item:${i.id}`)}
+                                          strategy={verticalListSortingStrategy}
+                                        >
+                                          {subItems.map((item) => (
+                                            <ItemRow
+                                              key={item.id}
+                                              item={item}
+                                              errorMap={errorMap}
+                                              onEdit={() => setEditingItem(item)}
+                                              onDuplicate={() => duplicateItem(item)}
+                                            />
+                                          ))}
+                                        </SortableContext>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full"
+                                          onClick={() => addItem(sub.id)}
+                                        >
+                                          <Plus className="h-3.5 w-3.5" /> Add item
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      duplicateItem(item);
-                                    }}
-                                  >
-                                    <Copy className="h-3.5 w-3.5" />
-                                  </Button>
-                                </button>
-                              </SortableItem>
-                            ))}
+                                </SortableCat>
+                              );
+                            })}
                           </SortableContext>
+
                           <Button
                             type="button"
                             size="sm"
                             variant="ghost"
                             className="w-full"
-                            onClick={() => addItem(cat.id)}
+                            onClick={() => addSubCategory(cat.id)}
                           >
-                            <Plus className="h-3.5 w-3.5" /> Add item
+                            <Plus className="h-3.5 w-3.5" /> Add sub-category
                           </Button>
+
+                          {/* Items directly on root only when no sub-categories */}
+                          {leaf && (
+                            <>
+                              <SortableContext
+                                items={items.map((i) => `item:${i.id}`)}
+                                strategy={verticalListSortingStrategy}
+                              >
+                                {items.map((item) => (
+                                  <ItemRow
+                                    key={item.id}
+                                    item={item}
+                                    errorMap={errorMap}
+                                    onEdit={() => setEditingItem(item)}
+                                    onDuplicate={() => duplicateItem(item)}
+                                  />
+                                ))}
+                              </SortableContext>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="w-full"
+                                onClick={() => addItem(cat.id)}
+                              >
+                                <Plus className="h-3.5 w-3.5" /> Add item
+                              </Button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -482,7 +593,7 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
               })}
             </SortableContext>
           </DndContext>
-          {!sortedCats.length && (
+          {!sortedRoots.length && (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Add a category to start building your WhatsApp menu.
             </p>
@@ -517,6 +628,51 @@ export function MenuBuilder({ tenantDbId, initial, published, onSaved, simple = 
         />
       )}
     </div>
+  );
+}
+
+function ItemRow({
+  item,
+  errorMap,
+  onEdit,
+  onDuplicate,
+}: {
+  item: MenuV2Item;
+  errorMap: Record<string, string>;
+  onEdit: () => void;
+  onDuplicate: () => void;
+}) {
+  return (
+    <SortableItem id={`item:${item.id}`}>
+      <button
+        type="button"
+        onClick={onEdit}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-lg border border-transparent bg-card px-2 py-2 text-left text-sm transition hover:border-primary/30",
+          (errorMap[`item:${item.id}:name`] || errorMap[`item:${item.id}:desc`]) &&
+            "border-destructive/50"
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{item.name}</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {item.description || "No description"} · Rs {item.price}
+            {!item.available && " · unavailable"}
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDuplicate();
+          }}
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </Button>
+      </button>
+    </SortableItem>
   );
 }
 

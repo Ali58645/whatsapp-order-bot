@@ -1,0 +1,452 @@
+{
+  "id": "general_store",
+  "name": "General Store",
+  "vertical": "general_store",
+  "flow_mode": "order",
+  "blurb": "Variety shop — snacks, household, personal care, stationery.",
+  "icon": "store",
+  "languages": [
+    "roman_urdu",
+    "english"
+  ],
+  "config": {
+    "greeting_language": "roman_urdu",
+    "campaign_phrase": "General Store",
+    "greeting_text": "Assalam o Alaikum! [Business] general store — zarooriyat order karein. Menu neeche hai.",
+    "demo_slots": [
+      "Kal 11am",
+      "Kal 4pm"
+    ],
+    "facts_features": "",
+    "facts_pricing_note": "",
+    "facts_claims_note": "",
+    "template_notes": "",
+    "i18n": {
+      "english": {
+        "greeting_text": "Welcome to [Business] general store — browse and order below."
+      }
+    },
+    "menu_v2": {
+      "categories": [
+        {
+          "id": "c_snack",
+          "name": "Snacks",
+          "sort": 0,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_snack_pack",
+          "name": "Packaged",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_snack"
+        },
+        {
+          "id": "c_snack_more",
+          "name": "More",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_snack"
+        },
+        {
+          "id": "c_house",
+          "name": "Household",
+          "sort": 1,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_house_clean",
+          "name": "Cleaning",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_house"
+        },
+        {
+          "id": "c_house_kit",
+          "name": "Kitchen",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_house"
+        },
+        {
+          "id": "c_pcare",
+          "name": "Personal Care",
+          "sort": 2,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_pcare_bath",
+          "name": "Bath",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_pcare"
+        },
+        {
+          "id": "c_pcare_oral",
+          "name": "Oral",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_pcare"
+        },
+        {
+          "id": "c_stat",
+          "name": "Stationery",
+          "sort": 3,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_stat_write",
+          "name": "Writing",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_stat"
+        },
+        {
+          "id": "c_stat_paper",
+          "name": "Paper",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_stat"
+        }
+      ],
+      "items": [
+        {
+          "id": "i_chips",
+          "category_id": "c_snack_pack",
+          "name": "Chips Pack",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_biscuits",
+          "category_id": "c_snack_pack",
+          "name": "Biscuits Pack",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_choc",
+          "category_id": "c_snack_pack",
+          "name": "Chocolate Bar",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_nuts",
+          "category_id": "c_snack_pack",
+          "name": "Mixed Nuts 250g",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_nimko",
+          "category_id": "c_snack_more",
+          "name": "Nimko Pack",
+          "description": "",
+          "price": 100,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_candy",
+          "category_id": "c_snack_more",
+          "name": "Candy Pack",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_gum",
+          "category_id": "c_snack_more",
+          "name": "Chewing Gum",
+          "description": "",
+          "price": 40,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_wafer",
+          "category_id": "c_snack_more",
+          "name": "Wafer Pack",
+          "description": "",
+          "price": 90,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_det",
+          "category_id": "c_house_clean",
+          "name": "Detergent 1kg",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_tissue",
+          "category_id": "c_house_clean",
+          "name": "Tissue Pack",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_bag",
+          "category_id": "c_house_clean",
+          "name": "Garbage Bags",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_match",
+          "category_id": "c_house_clean",
+          "name": "Match Box Pack",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_foil",
+          "category_id": "c_house_kit",
+          "name": "Foil Roll",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_wrap",
+          "category_id": "c_house_kit",
+          "name": "Cling Wrap",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_sponge",
+          "category_id": "c_house_kit",
+          "name": "Sponge Pack",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_lighter",
+          "category_id": "c_house_kit",
+          "name": "Lighter",
+          "description": "",
+          "price": 50,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_soap",
+          "category_id": "c_pcare_bath",
+          "name": "Bath Soap",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_shamp",
+          "category_id": "c_pcare_bath",
+          "name": "Shampoo Sachet",
+          "description": "",
+          "price": 40,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_cream",
+          "category_id": "c_pcare_bath",
+          "name": "Face Cream",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_lotion",
+          "category_id": "c_pcare_bath",
+          "name": "Hand Lotion",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_tooth",
+          "category_id": "c_pcare_oral",
+          "name": "Toothpaste",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_brush",
+          "category_id": "c_pcare_oral",
+          "name": "Toothbrush",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_floss",
+          "category_id": "c_pcare_oral",
+          "name": "Dental Floss",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_mouth",
+          "category_id": "c_pcare_oral",
+          "name": "Mouthwash Mini",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_pen",
+          "category_id": "c_stat_write",
+          "name": "Pen Pack (10)",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_pencil",
+          "category_id": "c_stat_write",
+          "name": "Pencil Pack",
+          "description": "",
+          "price": 100,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_marker",
+          "category_id": "c_stat_write",
+          "name": "Markers (4)",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_high",
+          "category_id": "c_stat_write",
+          "name": "Highlighter",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_note",
+          "category_id": "c_stat_paper",
+          "name": "Notebook",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_glue",
+          "category_id": "c_stat_paper",
+          "name": "Glue Stick",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_tape",
+          "category_id": "c_stat_paper",
+          "name": "Scotch Tape",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_a4",
+          "category_id": "c_stat_paper",
+          "name": "A4 Pack",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        }
+      ],
+      "settings": {
+        "greeting_text": "Assalam o Alaikum! [Business] general store — zarooriyat order karein.",
+        "menu_button_label": "Menu dekhein",
+        "delivery": {
+          "enabled": true,
+          "charge": 50,
+          "free_above": 1500,
+          "area_note": "Local delivery"
+        },
+        "order_confirm_note": "Confirm karein?",
+        "currency": "PKR"
+      }
+    }
+  }
+}

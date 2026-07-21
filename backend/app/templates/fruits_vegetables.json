@@ -32,25 +32,70 @@
           "id": "c_veg",
           "name": "Vegetables",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_veg_basic",
+          "name": "Basics",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_veg"
+        },
+        {
+          "id": "c_veg_seas",
+          "name": "Seasonal",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_veg"
         },
         {
           "id": "c_fru",
           "name": "Fruits",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_fru_com",
+          "name": "Common",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_fru"
+        },
+        {
+          "id": "c_fru_more",
+          "name": "More",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_fru"
         },
         {
           "id": "c_herb",
           "name": "Herbs",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_herb_leaf",
+          "name": "Leaves",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_herb"
+        },
+        {
+          "id": "c_herb_spice",
+          "name": "Fresh Spice",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_herb"
         }
       ],
       "items": [
         {
           "id": "i_tam",
-          "category_id": "c_veg",
+          "category_id": "c_veg_basic",
           "name": "Tamatar (kg)",
           "description": "",
           "price": 120,
@@ -60,7 +105,7 @@
         },
         {
           "id": "i_alu",
-          "category_id": "c_veg",
+          "category_id": "c_veg_basic",
           "name": "Aalu (kg)",
           "description": "",
           "price": 80,
@@ -70,7 +115,7 @@
         },
         {
           "id": "i_pyaz",
-          "category_id": "c_veg",
+          "category_id": "c_veg_basic",
           "name": "Pyaz (kg)",
           "description": "",
           "price": 100,
@@ -79,28 +124,58 @@
           "modifiers": []
         },
         {
-          "id": "i_bhindi",
-          "category_id": "c_veg",
-          "name": "Bhindi (kg)",
+          "id": "i_adrak_v",
+          "category_id": "c_veg_basic",
+          "name": "Adrak (kg)",
           "description": "",
-          "price": 160,
+          "price": 500,
           "available": true,
           "sort": 3,
           "modifiers": []
         },
         {
+          "id": "i_bhindi",
+          "category_id": "c_veg_seas",
+          "name": "Bhindi (kg)",
+          "description": "",
+          "price": 160,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
           "id": "i_matar",
-          "category_id": "c_veg",
+          "category_id": "c_veg_seas",
           "name": "Matar (kg)",
           "description": "",
           "price": 200,
           "available": true,
-          "sort": 4,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_gobi",
+          "category_id": "c_veg_seas",
+          "name": "Gobi (kg)",
+          "description": "",
+          "price": 90,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_baigan",
+          "category_id": "c_veg_seas",
+          "name": "Baigan (kg)",
+          "description": "",
+          "price": 110,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         },
         {
           "id": "i_kela",
-          "category_id": "c_fru",
+          "category_id": "c_fru_com",
           "name": "Kela (dozen)",
           "description": "",
           "price": 180,
@@ -110,7 +185,7 @@
         },
         {
           "id": "i_saib",
-          "category_id": "c_fru",
+          "category_id": "c_fru_com",
           "name": "Saib (kg)",
           "description": "",
           "price": 350,
@@ -120,7 +195,7 @@
         },
         {
           "id": "i_ambo",
-          "category_id": "c_fru",
+          "category_id": "c_fru_com",
           "name": "Aam (kg)",
           "description": "",
           "price": 400,
@@ -130,7 +205,7 @@
         },
         {
           "id": "i_angur",
-          "category_id": "c_fru",
+          "category_id": "c_fru_com",
           "name": "Angoor (kg)",
           "description": "",
           "price": 450,
@@ -139,8 +214,48 @@
           "modifiers": []
         },
         {
+          "id": "i_santra",
+          "category_id": "c_fru_more",
+          "name": "Santra (kg)",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_anar",
+          "category_id": "c_fru_more",
+          "name": "Anar (kg)",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_peach",
+          "category_id": "c_fru_more",
+          "name": "Aaru (kg)",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_pear",
+          "category_id": "c_fru_more",
+          "name": "Nashpati (kg)",
+          "description": "",
+          "price": 320,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_dhani",
-          "category_id": "c_herb",
+          "category_id": "c_herb_leaf",
           "name": "Dhania bunch",
           "description": "",
           "price": 40,
@@ -150,7 +265,7 @@
         },
         {
           "id": "i_podi",
-          "category_id": "c_herb",
+          "category_id": "c_herb_leaf",
           "name": "Podina bunch",
           "description": "",
           "price": 40,
@@ -159,13 +274,63 @@
           "modifiers": []
         },
         {
+          "id": "i_methi",
+          "category_id": "c_herb_leaf",
+          "name": "Methi bunch",
+          "description": "",
+          "price": 50,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_palak",
+          "category_id": "c_herb_leaf",
+          "name": "Palak bunch",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_adrak",
-          "category_id": "c_herb",
+          "category_id": "c_herb_spice",
           "name": "Adrak (kg)",
           "description": "",
           "price": 500,
           "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_lehsun",
+          "category_id": "c_herb_spice",
+          "name": "Lehsun (kg)",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_hari",
+          "category_id": "c_herb_spice",
+          "name": "Hari Mirch (kg)",
+          "description": "",
+          "price": 200,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_haldi",
+          "category_id": "c_herb_spice",
+          "name": "Haldi Fresh",
+          "description": "",
+          "price": 300,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

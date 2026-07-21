@@ -63,10 +63,34 @@
             "value": "Manicure"
           },
           {
+            "id": "svc_ped",
+            "title": "Pedicure",
+            "description": "Feet care",
+            "value": "Pedicure"
+          },
+          {
             "id": "svc_col",
             "title": "Hair Color",
             "description": "Coloring",
             "value": "Color"
+          },
+          {
+            "id": "svc_wax",
+            "title": "Waxing",
+            "description": "Body wax",
+            "value": "Waxing"
+          },
+          {
+            "id": "svc_meh",
+            "title": "Mehndi",
+            "description": "Henna",
+            "value": "Mehndi"
+          },
+          {
+            "id": "svc_mak",
+            "title": "Makeup",
+            "description": "Party/bridal",
+            "value": "Makeup"
           },
           {
             "id": "svc_oth",
@@ -90,6 +114,11 @@
             "id": "loc_home",
             "title": "Home service",
             "value": "Home"
+          },
+          {
+            "id": "loc_ladies",
+            "title": "Ladies only",
+            "value": "Ladies"
           }
         ],
         "current_system": [
@@ -107,19 +136,14 @@
             "id": "vis_ref",
             "title": "Referral",
             "sheet_value": "Referral"
+          },
+          {
+            "id": "vis_pkg",
+            "title": "Package member",
+            "sheet_value": "Package"
           }
         ]
       }
-    },
-    "faq": [
-      {
-        "question": "Timing kya hai?",
-        "answer": "Hum normally 10am–8pm open hain. Preferred slot book karein."
-      },
-      {
-        "question": "Home service milti hai?",
-        "answer": "Haan, selected areas mein home service available hai — booking mein choose karein."
-      }
-    ]
+    }
   }
 }

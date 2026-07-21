@@ -32,31 +32,91 @@
           "id": "c_skin",
           "name": "Skincare",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_skin_clean",
+          "name": "Cleanse",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_skin"
+        },
+        {
+          "id": "c_skin_care",
+          "name": "Care",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_skin"
         },
         {
           "id": "c_make",
           "name": "Makeup",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_make_base",
+          "name": "Base",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_make"
+        },
+        {
+          "id": "c_make_color",
+          "name": "Color",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_make"
         },
         {
           "id": "c_hair",
           "name": "Haircare",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_hair_wash",
+          "name": "Wash",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_hair"
+        },
+        {
+          "id": "c_hair_treat",
+          "name": "Treat",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_hair"
         },
         {
           "id": "c_frag",
           "name": "Fragrances",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_frag_body",
+          "name": "Body",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_frag"
+        },
+        {
+          "id": "c_frag_prem",
+          "name": "Perfume",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_frag"
         }
       ],
       "items": [
         {
           "id": "i_clean",
-          "category_id": "c_skin",
+          "category_id": "c_skin_clean",
           "name": "Face Cleanser",
           "description": "",
           "price": 1200,
@@ -65,28 +125,78 @@
           "modifiers": []
         },
         {
-          "id": "i_moist",
-          "category_id": "c_skin",
-          "name": "Moisturizer",
+          "id": "i_toner",
+          "category_id": "c_skin_clean",
+          "name": "Face Toner",
           "description": "",
-          "price": 1500,
+          "price": 1100,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_sun",
-          "category_id": "c_skin",
-          "name": "Sunscreen SPF50",
+          "id": "i_scrub",
+          "category_id": "c_skin_clean",
+          "name": "Face Scrub",
           "description": "",
-          "price": 1800,
+          "price": 900,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_mask",
+          "category_id": "c_skin_clean",
+          "name": "Face Mask",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_moist",
+          "category_id": "c_skin_care",
+          "name": "Moisturizer",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_sun",
+          "category_id": "c_skin_care",
+          "name": "Sunscreen SPF50",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_serum_s",
+          "category_id": "c_skin_care",
+          "name": "Vitamin Serum",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_night",
+          "category_id": "c_skin_care",
+          "name": "Night Cream",
+          "description": "",
+          "price": 1600,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_found",
-          "category_id": "c_make",
+          "category_id": "c_make_base",
           "name": "Foundation",
           "description": "",
           "price": 2500,
@@ -117,11 +227,11 @@
           ]
         },
         {
-          "id": "i_lip",
-          "category_id": "c_make",
-          "name": "Lipstick",
+          "id": "i_concealer",
+          "category_id": "c_make_base",
+          "name": "Concealer",
           "description": "",
-          "price": 900,
+          "price": 1800,
           "available": true,
           "sort": 1,
           "modifiers": [
@@ -149,18 +259,112 @@
           ]
         },
         {
-          "id": "i_mascara",
-          "category_id": "c_make",
-          "name": "Mascara",
+          "id": "i_powder",
+          "category_id": "c_make_base",
+          "name": "Compact",
           "description": "",
-          "price": 1100,
+          "price": 1200,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_primer",
+          "category_id": "c_make_base",
+          "name": "Primer",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_lip",
+          "category_id": "c_make_color",
+          "name": "Lipstick",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_shade",
+              "name": "Shade",
+              "options": [
+                {
+                  "id": "sh_f",
+                  "label": "Fair",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_m",
+                  "label": "Medium",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_d",
+                  "label": "Deep",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_mascara",
+          "category_id": "c_make_color",
+          "name": "Mascara",
+          "description": "",
+          "price": 1100,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_blush",
+          "category_id": "c_make_color",
+          "name": "Blush",
+          "description": "",
+          "price": 1300,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_shade",
+              "name": "Shade",
+              "options": [
+                {
+                  "id": "sh_f",
+                  "label": "Fair",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_m",
+                  "label": "Medium",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sh_d",
+                  "label": "Deep",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_eyeliner",
+          "category_id": "c_make_color",
+          "name": "Eyeliner",
+          "description": "",
+          "price": 850,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_shamp",
-          "category_id": "c_hair",
+          "category_id": "c_hair_wash",
           "name": "Shampoo",
           "description": "",
           "price": 850,
@@ -170,7 +374,7 @@
         },
         {
           "id": "i_cond",
-          "category_id": "c_hair",
+          "category_id": "c_hair_wash",
           "name": "Conditioner",
           "description": "",
           "price": 850,
@@ -179,18 +383,68 @@
           "modifiers": []
         },
         {
-          "id": "i_serum",
-          "category_id": "c_hair",
-          "name": "Hair Serum",
+          "id": "i_mask_h",
+          "category_id": "c_hair_wash",
+          "name": "Hair Mask",
           "description": "",
-          "price": 1400,
+          "price": 1200,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_dry",
+          "category_id": "c_hair_wash",
+          "name": "Dry Shampoo",
+          "description": "",
+          "price": 950,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_serum",
+          "category_id": "c_hair_treat",
+          "name": "Hair Serum",
+          "description": "",
+          "price": 1400,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_oil",
+          "category_id": "c_hair_treat",
+          "name": "Hair Oil",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_henna",
+          "category_id": "c_hair_treat",
+          "name": "Mehndi Cone",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_color",
+          "category_id": "c_hair_treat",
+          "name": "Hair Color",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_attar",
-          "category_id": "c_frag",
+          "category_id": "c_frag_body",
           "name": "Attar 12ml",
           "description": "",
           "price": 800,
@@ -200,7 +454,7 @@
         },
         {
           "id": "i_edt",
-          "category_id": "c_frag",
+          "category_id": "c_frag_body",
           "name": "Body Mist",
           "description": "",
           "price": 1200,
@@ -209,13 +463,63 @@
           "modifiers": []
         },
         {
+          "id": "i_deo",
+          "category_id": "c_frag_body",
+          "name": "Deodorant",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_roll",
+          "category_id": "c_frag_body",
+          "name": "Roll-on",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_perfume",
-          "category_id": "c_frag",
+          "category_id": "c_frag_prem",
           "name": "Perfume 50ml",
           "description": "",
           "price": 4500,
           "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_edt100",
+          "category_id": "c_frag_prem",
+          "name": "EDT 100ml",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_set",
+          "category_id": "c_frag_prem",
+          "name": "Gift Set",
+          "description": "",
+          "price": 5500,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_tester",
+          "category_id": "c_frag_prem",
+          "name": "Tester 10ml",
+          "description": "",
+          "price": 800,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

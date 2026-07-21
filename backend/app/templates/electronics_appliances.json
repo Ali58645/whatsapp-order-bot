@@ -32,31 +32,91 @@
           "id": "c_home",
           "name": "Home Appliances",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_home_big",
+          "name": "Large",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_home"
+        },
+        {
+          "id": "c_home_small",
+          "name": "Small",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_home"
         },
         {
           "id": "c_kit",
           "name": "Kitchen",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_kit_cook",
+          "name": "Cooking",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_kit"
+        },
+        {
+          "id": "c_kit_prep",
+          "name": "Prep",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_kit"
         },
         {
           "id": "c_fan",
           "name": "Fans/Cooling",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_fan_air",
+          "name": "Fans",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_fan"
+        },
+        {
+          "id": "c_fan_cool",
+          "name": "AC/Cooler",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_fan"
         },
         {
           "id": "c_sm",
           "name": "Small Electronics",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_sm_groom",
+          "name": "Grooming",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_sm"
+        },
+        {
+          "id": "c_sm_util",
+          "name": "Utility",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_sm"
         }
       ],
       "items": [
         {
           "id": "i_wash",
-          "category_id": "c_home",
+          "category_id": "c_home_big",
           "name": "Washing Machine",
           "description": "Auto 7kg",
           "price": 45000,
@@ -66,7 +126,7 @@
         },
         {
           "id": "i_fridge",
-          "category_id": "c_home",
+          "category_id": "c_home_big",
           "name": "Refrigerator",
           "description": "Inverter",
           "price": 85000,
@@ -75,18 +135,68 @@
           "modifiers": []
         },
         {
-          "id": "i_iron",
-          "category_id": "c_home",
-          "name": "Dry Iron",
+          "id": "i_tv",
+          "category_id": "c_home_big",
+          "name": "LED TV 43",
           "description": "",
-          "price": 3500,
+          "price": 65000,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_vac",
+          "category_id": "c_home_big",
+          "name": "Vacuum Cleaner",
+          "description": "",
+          "price": 18000,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_iron",
+          "category_id": "c_home_small",
+          "name": "Dry Iron",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_steam",
+          "category_id": "c_home_small",
+          "name": "Steam Iron",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_heater",
+          "category_id": "c_home_small",
+          "name": "Room Heater",
+          "description": "",
+          "price": 8500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_humid",
+          "category_id": "c_home_small",
+          "name": "Humidifier",
+          "description": "",
+          "price": 6500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_micro",
-          "category_id": "c_kit",
+          "category_id": "c_kit_cook",
           "name": "Microwave",
           "description": "",
           "price": 22000,
@@ -95,28 +205,78 @@
           "modifiers": []
         },
         {
-          "id": "i_blend",
-          "category_id": "c_kit",
-          "name": "Blender",
+          "id": "i_oven",
+          "category_id": "c_kit_cook",
+          "name": "Oven Toaster",
           "description": "",
-          "price": 6500,
+          "price": 12000,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_kettle",
-          "category_id": "c_kit",
-          "name": "Electric Kettle",
+          "id": "i_stove",
+          "category_id": "c_kit_cook",
+          "name": "Electric Stove",
           "description": "",
-          "price": 4200,
+          "price": 8500,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_airfry",
+          "category_id": "c_kit_cook",
+          "name": "Air Fryer",
+          "description": "",
+          "price": 15000,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_blend",
+          "category_id": "c_kit_prep",
+          "name": "Blender",
+          "description": "",
+          "price": 6500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_kettle",
+          "category_id": "c_kit_prep",
+          "name": "Electric Kettle",
+          "description": "",
+          "price": 4200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_toast",
+          "category_id": "c_kit_prep",
+          "name": "Toaster",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_mixer",
+          "category_id": "c_kit_prep",
+          "name": "Hand Mixer",
+          "description": "",
+          "price": 3800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_fan",
-          "category_id": "c_fan",
+          "category_id": "c_fan_air",
           "name": "Pedestal Fan",
           "description": "",
           "price": 8500,
@@ -125,28 +285,78 @@
           "modifiers": []
         },
         {
-          "id": "i_ac",
-          "category_id": "c_fan",
-          "name": "AC 1.5 Ton",
-          "description": "Inverter",
-          "price": 145000,
+          "id": "i_cfan",
+          "category_id": "c_fan_air",
+          "name": "Ceiling Fan",
+          "description": "",
+          "price": 6500,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_cooler",
-          "category_id": "c_fan",
-          "name": "Room Cooler",
+          "id": "i_tfan",
+          "category_id": "c_fan_air",
+          "name": "Table Fan",
           "description": "",
-          "price": 18000,
+          "price": 3500,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_exh",
+          "category_id": "c_fan_air",
+          "name": "Exhaust Fan",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_ac",
+          "category_id": "c_fan_cool",
+          "name": "AC 1.5 Ton",
+          "description": "Inverter",
+          "price": 145000,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_cooler",
+          "category_id": "c_fan_cool",
+          "name": "Room Cooler",
+          "description": "",
+          "price": 18000,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_ac1",
+          "category_id": "c_fan_cool",
+          "name": "AC 1 Ton",
+          "description": "",
+          "price": 125000,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_port",
+          "category_id": "c_fan_cool",
+          "name": "Portable AC",
+          "description": "",
+          "price": 55000,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_trim",
-          "category_id": "c_sm",
+          "category_id": "c_sm_groom",
           "name": "Trimmer",
           "description": "",
           "price": 2800,
@@ -155,23 +365,73 @@
           "modifiers": []
         },
         {
-          "id": "i_scale",
-          "category_id": "c_sm",
-          "name": "Kitchen Scale",
+          "id": "i_hair",
+          "category_id": "c_sm_groom",
+          "name": "Hair Dryer",
           "description": "",
-          "price": 1500,
+          "price": 3200,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
+          "id": "i_shave",
+          "category_id": "c_sm_groom",
+          "name": "Shaver",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_strait",
+          "category_id": "c_sm_groom",
+          "name": "Straightener",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_scale",
+          "category_id": "c_sm_util",
+          "name": "Kitchen Scale",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
           "id": "i_ext",
-          "category_id": "c_sm",
+          "category_id": "c_sm_util",
           "name": "Extension Board",
           "description": "",
           "price": 900,
           "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_torch",
+          "category_id": "c_sm_util",
+          "name": "Recharge Torch",
+          "description": "",
+          "price": 650,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_clock",
+          "category_id": "c_sm_util",
+          "name": "Alarm Clock",
+          "description": "",
+          "price": 800,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

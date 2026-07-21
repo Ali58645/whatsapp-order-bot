@@ -31,6 +31,20 @@ export function emptyMenuV2() {
 
 export type FieldError = { path: string; message: string };
 
+export function rootCategories(menu: ReturnType<typeof emptyMenuV2>) {
+  return menu.categories.filter((c) => !c.parent_id).sort((a, b) => a.sort - b.sort);
+}
+
+export function childCategories(menu: ReturnType<typeof emptyMenuV2>, parentId: string) {
+  return menu.categories
+    .filter((c) => (c.parent_id || "") === parentId)
+    .sort((a, b) => a.sort - b.sort);
+}
+
+export function isLeafCategory(menu: ReturnType<typeof emptyMenuV2>, catId: string) {
+  return childCategories(menu, catId).length === 0;
+}
+
 export function validateMenuClient(menu: ReturnType<typeof emptyMenuV2>): FieldError[] {
   const errs: FieldError[] = [];
   if (menu.settings.menu_button_label.length > LIMITS.buttonLabel) {
@@ -39,6 +53,7 @@ export function validateMenuClient(menu: ReturnType<typeof emptyMenuV2>): FieldE
       message: `Button label max ${LIMITS.buttonLabel} chars`,
     });
   }
+  const byId = new Map(menu.categories.map((c) => [c.id, c]));
   for (const c of menu.categories) {
     if (c.name.length > LIMITS.categoryName) {
       errs.push({ path: `cat:${c.id}`, message: `Category name max ${LIMITS.categoryName}` });
@@ -46,15 +61,43 @@ export function validateMenuClient(menu: ReturnType<typeof emptyMenuV2>): FieldE
     if (!c.name.trim()) {
       errs.push({ path: `cat:${c.id}`, message: "Category name required" });
     }
-    const avail = menu.items.filter(
-      (i) => i.category_id === c.id && i.available && c.visible
-    );
-    if (avail.length > LIMITS.rowsMax) {
+    if (c.parent_id) {
+      if (c.parent_id === c.id) {
+        errs.push({ path: `cat:${c.id}`, message: "Sub-category cannot parent itself" });
+      } else if (!byId.has(c.parent_id)) {
+        errs.push({ path: `cat:${c.id}`, message: "Unknown parent category" });
+      } else if (byId.get(c.parent_id)?.parent_id) {
+        errs.push({
+          path: `cat:${c.id}`,
+          message: "Max depth 2 — cannot nest under a sub-category",
+        });
+      }
+    }
+    const kids = childCategories(menu, c.id);
+    if (kids.length > LIMITS.rowsMax) {
       errs.push({
         path: `cat:${c.id}:rows`,
-        message: `${avail.length} items — runtime will paginate (row 10 = Aur dekhein →)`,
+        message: `${kids.length} sub-categories — WhatsApp list max ${LIMITS.rowsMax}`,
       });
     }
+    if (kids.length === 0) {
+      const avail = menu.items.filter(
+        (i) => i.category_id === c.id && i.available && c.visible
+      );
+      if (avail.length > LIMITS.rowsMax) {
+        errs.push({
+          path: `cat:${c.id}:rows`,
+          message: `${avail.length} items — runtime will paginate (row 10 = Aur dekhein →)`,
+        });
+      }
+    }
+  }
+  const roots = rootCategories(menu).filter((c) => c.visible);
+  if (roots.length > LIMITS.rowsMax) {
+    errs.push({
+      path: "cats:roots",
+      message: `${roots.length} root categories — WhatsApp list max ${LIMITS.rowsMax}`,
+    });
   }
   for (const it of menu.items) {
     if (it.name.length > LIMITS.itemName) {
@@ -79,7 +122,7 @@ export function validateMenuClient(menu: ReturnType<typeof emptyMenuV2>): FieldE
       for (const opt of mod.options || []) {
         if (opt.label.length > LIMITS.optionLabel) {
           errs.push({
-            path: `item:${it.id}:opt:${opt.id}`,
+            path: `item:${it.id}:mods`,
             message: `Option label max ${LIMITS.optionLabel}`,
           });
         }

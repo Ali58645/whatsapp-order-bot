@@ -32,37 +32,112 @@
           "id": "c_tools",
           "name": "Tools",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_tools_hand",
+          "name": "Hand Tools",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_tools"
+        },
+        {
+          "id": "c_tools_more",
+          "name": "More Tools",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_tools"
         },
         {
           "id": "c_paint",
           "name": "Paint/Chemicals",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_paint_em",
+          "name": "Emulsion",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_paint"
+        },
+        {
+          "id": "c_paint_chem",
+          "name": "Chemicals",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_paint"
         },
         {
           "id": "c_plumb",
           "name": "Plumbing",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_plumb_pipe",
+          "name": "Pipes/Joints",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_plumb"
+        },
+        {
+          "id": "c_plumb_fix",
+          "name": "Fixtures",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_plumb"
         },
         {
           "id": "c_elec",
           "name": "Electrical",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_elec_wire",
+          "name": "Wiring",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_elec"
+        },
+        {
+          "id": "c_elec_fix",
+          "name": "Fixtures",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_elec"
         },
         {
           "id": "c_fast",
           "name": "Fasteners",
           "sort": 4,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_fast_scr",
+          "name": "Screws/Nails",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_fast"
+        },
+        {
+          "id": "c_fast_bolt",
+          "name": "Bolts",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_fast"
         }
       ],
       "items": [
         {
           "id": "i_ham",
-          "category_id": "c_tools",
+          "category_id": "c_tools_hand",
           "name": "Hammer",
           "description": "",
           "price": 650,
@@ -72,7 +147,7 @@
         },
         {
           "id": "i_screw",
-          "category_id": "c_tools",
+          "category_id": "c_tools_hand",
           "name": "Screwdriver Set",
           "description": "",
           "price": 850,
@@ -82,7 +157,7 @@
         },
         {
           "id": "i_plier",
-          "category_id": "c_tools",
+          "category_id": "c_tools_hand",
           "name": "Pliers",
           "description": "",
           "price": 450,
@@ -92,7 +167,7 @@
         },
         {
           "id": "i_tape",
-          "category_id": "c_tools",
+          "category_id": "c_tools_hand",
           "name": "Measuring Tape",
           "description": "",
           "price": 280,
@@ -101,8 +176,48 @@
           "modifiers": []
         },
         {
+          "id": "i_wrench",
+          "category_id": "c_tools_more",
+          "name": "Wrench Set",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_saw",
+          "category_id": "c_tools_more",
+          "name": "Hand Saw",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_level",
+          "category_id": "c_tools_more",
+          "name": "Spirit Level",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_cutter",
+          "category_id": "c_tools_more",
+          "name": "Utility Knife",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_paint1",
-          "category_id": "c_paint",
+          "category_id": "c_paint_em",
           "name": "Emulsion 1L",
           "description": "",
           "price": 1200,
@@ -112,7 +227,7 @@
         },
         {
           "id": "i_paint4",
-          "category_id": "c_paint",
+          "category_id": "c_paint_em",
           "name": "Emulsion 4L",
           "description": "",
           "price": 4200,
@@ -121,18 +236,68 @@
           "modifiers": []
         },
         {
-          "id": "i_thinner",
-          "category_id": "c_paint",
-          "name": "Thinner 1L",
+          "id": "i_primer",
+          "category_id": "c_paint_em",
+          "name": "Primer 1L",
           "description": "",
-          "price": 350,
+          "price": 900,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_enamel",
+          "category_id": "c_paint_em",
+          "name": "Enamel 1L",
+          "description": "",
+          "price": 1100,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_thinner",
+          "category_id": "c_paint_chem",
+          "name": "Thinner 1L",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_brush",
+          "category_id": "c_paint_chem",
+          "name": "Paint Brush Set",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_roller",
+          "category_id": "c_paint_chem",
+          "name": "Roller Set",
+          "description": "",
+          "price": 380,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_putty",
+          "category_id": "c_paint_chem",
+          "name": "Wall Putty 5kg",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_pipe",
-          "category_id": "c_plumb",
+          "category_id": "c_plumb_pipe",
           "name": "PVC Pipe 1in",
           "description": "Per length",
           "price": 180,
@@ -141,28 +306,118 @@
           "modifiers": []
         },
         {
-          "id": "i_tap",
-          "category_id": "c_plumb",
-          "name": "Basin Mixer",
+          "id": "i_elbow",
+          "category_id": "c_plumb_pipe",
+          "name": "Elbow Joint",
           "description": "",
-          "price": 2200,
+          "price": 60,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_elbow",
-          "category_id": "c_plumb",
-          "name": "Elbow Joint",
+          "id": "i_valve",
+          "category_id": "c_plumb_pipe",
+          "name": "Ball Valve",
           "description": "",
-          "price": 60,
+          "price": 350,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_tee",
+          "category_id": "c_plumb_pipe",
+          "name": "Tee Joint",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_tap",
+          "category_id": "c_plumb_fix",
+          "name": "Basin Mixer",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_shower",
+          "category_id": "c_plumb_fix",
+          "name": "Shower Set",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_flush",
+          "category_id": "c_plumb_fix",
+          "name": "Flush Tank",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_sink",
+          "category_id": "c_plumb_fix",
+          "name": "Sink Waste",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_wire",
+          "category_id": "c_elec_wire",
+          "name": "Wire 1.5mm (coil)",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_wire25",
+          "category_id": "c_elec_wire",
+          "name": "Wire 2.5mm",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_tape_e",
+          "category_id": "c_elec_wire",
+          "name": "Insulation Tape",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_duct",
+          "category_id": "c_elec_wire",
+          "name": "Cable Duct",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_switch",
-          "category_id": "c_elec",
+          "category_id": "c_elec_fix",
           "name": "Switch Board",
           "description": "",
           "price": 450,
@@ -171,28 +426,38 @@
           "modifiers": []
         },
         {
-          "id": "i_wire",
-          "category_id": "c_elec",
-          "name": "Wire 1.5mm (coil)",
+          "id": "i_bulb",
+          "category_id": "c_elec_fix",
+          "name": "LED Bulb 12W",
           "description": "",
-          "price": 2800,
+          "price": 350,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_bulb",
-          "category_id": "c_elec",
-          "name": "LED Bulb 12W",
+          "id": "i_socket",
+          "category_id": "c_elec_fix",
+          "name": "Wall Socket",
           "description": "",
-          "price": 350,
+          "price": 280,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_holder",
+          "category_id": "c_elec_fix",
+          "name": "Bulb Holder",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_screw2",
-          "category_id": "c_fast",
+          "category_id": "c_fast_scr",
           "name": "Screw Pack",
           "description": "",
           "price": 150,
@@ -202,7 +467,7 @@
         },
         {
           "id": "i_nail",
-          "category_id": "c_fast",
+          "category_id": "c_fast_scr",
           "name": "Nail Pack",
           "description": "",
           "price": 120,
@@ -211,13 +476,63 @@
           "modifiers": []
         },
         {
+          "id": "i_washer",
+          "category_id": "c_fast_scr",
+          "name": "Washer Pack",
+          "description": "",
+          "price": 100,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_anchor",
+          "category_id": "c_fast_scr",
+          "name": "Wall Anchors",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_nut",
-          "category_id": "c_fast",
+          "category_id": "c_fast_bolt",
           "name": "Nut Bolt Assort",
           "description": "",
           "price": 200,
           "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_bolt",
+          "category_id": "c_fast_bolt",
+          "name": "Bolt Pack",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_rivet",
+          "category_id": "c_fast_bolt",
+          "name": "Rivets",
+          "description": "",
+          "price": 150,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_hinge",
+          "category_id": "c_fast_bolt",
+          "name": "Door Hinges",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

@@ -32,37 +32,112 @@
           "id": "c_grain",
           "name": "Aata/Rice/Daal",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_grain_aata",
+          "name": "Aata",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_grain"
+        },
+        {
+          "id": "c_grain_rice",
+          "name": "Rice/Daal",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_grain"
         },
         {
           "id": "c_oil",
           "name": "Cooking Oil/Ghee",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_oil_cook",
+          "name": "Cooking Oil",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_oil"
+        },
+        {
+          "id": "c_oil_ghee",
+          "name": "Ghee",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_oil"
         },
         {
           "id": "c_dairy",
           "name": "Dairy/Eggs",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_dairy_milk",
+          "name": "Milk/Yogurt",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_dairy"
+        },
+        {
+          "id": "c_dairy_egg",
+          "name": "Eggs",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_dairy"
         },
         {
           "id": "c_bev",
           "name": "Beverages",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_bev_tea",
+          "name": "Tea/Coffee",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_bev"
+        },
+        {
+          "id": "c_bev_cold",
+          "name": "Cold Drinks",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_bev"
         },
         {
           "id": "c_house",
           "name": "Household",
           "sort": 4,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_house_clean",
+          "name": "Cleaning",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_house"
+        },
+        {
+          "id": "c_house_pers",
+          "name": "Personal",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_house"
         }
       ],
       "items": [
         {
           "id": "i_aata",
-          "category_id": "c_grain",
+          "category_id": "c_grain_aata",
           "name": "Aata 10kg",
           "description": "",
           "price": 1450,
@@ -71,38 +146,78 @@
           "modifiers": []
         },
         {
-          "id": "i_rice",
-          "category_id": "c_grain",
-          "name": "Basmati Rice 5kg",
+          "id": "i_aata5",
+          "category_id": "c_grain_aata",
+          "name": "Aata 5kg",
           "description": "",
-          "price": 1800,
+          "price": 780,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_daal",
-          "category_id": "c_grain",
-          "name": "Daal Masoor 1kg",
+          "id": "i_maida",
+          "category_id": "c_grain_aata",
+          "name": "Maida 1kg",
           "description": "",
-          "price": 320,
+          "price": 180,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_suji",
+          "category_id": "c_grain_aata",
+          "name": "Suji 1kg",
+          "description": "",
+          "price": 160,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_rice",
+          "category_id": "c_grain_rice",
+          "name": "Basmati Rice 5kg",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_daal",
+          "category_id": "c_grain_rice",
+          "name": "Daal Masoor 1kg",
+          "description": "",
+          "price": 320,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
           "id": "i_chann",
-          "category_id": "c_grain",
+          "category_id": "c_grain_rice",
           "name": "Chana Daal 1kg",
           "description": "",
           "price": 280,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_moong",
+          "category_id": "c_grain_rice",
+          "name": "Moong Daal 1kg",
+          "description": "",
+          "price": 300,
           "available": true,
           "sort": 3,
           "modifiers": []
         },
         {
           "id": "i_oil",
-          "category_id": "c_oil",
+          "category_id": "c_oil_cook",
           "name": "Cooking Oil 5L",
           "description": "",
           "price": 2100,
@@ -111,18 +226,18 @@
           "modifiers": []
         },
         {
-          "id": "i_ghee",
-          "category_id": "c_oil",
-          "name": "Banaspati 1kg",
+          "id": "i_sunflo",
+          "category_id": "c_oil_cook",
+          "name": "Sunflower Oil 5L",
           "description": "",
-          "price": 550,
+          "price": 1950,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
           "id": "i_olive",
-          "category_id": "c_oil",
+          "category_id": "c_oil_cook",
           "name": "Olive Oil 500ml",
           "description": "",
           "price": 1200,
@@ -131,8 +246,58 @@
           "modifiers": []
         },
         {
+          "id": "i_mustard",
+          "category_id": "c_oil_cook",
+          "name": "Mustard Oil 1L",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_ghee",
+          "category_id": "c_oil_ghee",
+          "name": "Banaspati 1kg",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_dghee",
+          "category_id": "c_oil_ghee",
+          "name": "Desi Ghee 1kg",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_ghee5",
+          "category_id": "c_oil_ghee",
+          "name": "Banaspati 5kg",
+          "description": "",
+          "price": 2600,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_butter_g",
+          "category_id": "c_oil_ghee",
+          "name": "Butter Ghee 1kg",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_milk",
-          "category_id": "c_dairy",
+          "category_id": "c_dairy_milk",
           "name": "Milk Pack 1L",
           "description": "",
           "price": 280,
@@ -141,38 +306,78 @@
           "modifiers": []
         },
         {
-          "id": "i_eggs",
-          "category_id": "c_dairy",
-          "name": "Eggs (Dozen)",
+          "id": "i_yogurt",
+          "category_id": "c_dairy_milk",
+          "name": "Yogurt 1kg",
           "description": "",
-          "price": 420,
+          "price": 350,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_yogurt",
-          "category_id": "c_dairy",
-          "name": "Yogurt 1kg",
+          "id": "i_butter",
+          "category_id": "c_dairy_milk",
+          "name": "Butter 200g",
           "description": "",
-          "price": 350,
+          "price": 380,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
-          "id": "i_butter",
-          "category_id": "c_dairy",
-          "name": "Butter 200g",
+          "id": "i_cream",
+          "category_id": "c_dairy_milk",
+          "name": "Cream Pack",
           "description": "",
-          "price": 380,
+          "price": 250,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_eggs",
+          "category_id": "c_dairy_egg",
+          "name": "Eggs (Dozen)",
+          "description": "",
+          "price": 420,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_eggs30",
+          "category_id": "c_dairy_egg",
+          "name": "Eggs (30)",
+          "description": "",
+          "price": 1050,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_brown",
+          "category_id": "c_dairy_egg",
+          "name": "Brown Eggs (6)",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_quail",
+          "category_id": "c_dairy_egg",
+          "name": "Quail Eggs",
+          "description": "",
+          "price": 200,
           "available": true,
           "sort": 3,
           "modifiers": []
         },
         {
           "id": "i_tea",
-          "category_id": "c_bev",
+          "category_id": "c_bev_tea",
           "name": "Tea Whitener",
           "description": "",
           "price": 250,
@@ -181,28 +386,78 @@
           "modifiers": []
         },
         {
-          "id": "i_juice",
-          "category_id": "c_bev",
-          "name": "Juice 1L",
+          "id": "i_teabag",
+          "category_id": "c_bev_tea",
+          "name": "Tea Bags",
           "description": "",
-          "price": 220,
+          "price": 180,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_cola",
-          "category_id": "c_bev",
-          "name": "Soft Drink 1.5L",
+          "id": "i_coffee",
+          "category_id": "c_bev_tea",
+          "name": "Coffee Jar",
           "description": "",
-          "price": 180,
+          "price": 650,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_milo",
+          "category_id": "c_bev_tea",
+          "name": "Chocolate Drink",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_juice",
+          "category_id": "c_bev_cold",
+          "name": "Juice 1L",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_cola",
+          "category_id": "c_bev_cold",
+          "name": "Soft Drink 1.5L",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_waterb",
+          "category_id": "c_bev_cold",
+          "name": "Mineral Water 6pk",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_energy",
+          "category_id": "c_bev_cold",
+          "name": "Energy Drink",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_det",
-          "category_id": "c_house",
+          "category_id": "c_house_clean",
           "name": "Detergent 1kg",
           "description": "",
           "price": 450,
@@ -211,23 +466,73 @@
           "modifiers": []
         },
         {
-          "id": "i_soap",
-          "category_id": "c_house",
-          "name": "Bath Soap",
+          "id": "i_dish",
+          "category_id": "c_house_clean",
+          "name": "Dishwash Liquid",
           "description": "",
-          "price": 120,
+          "price": 220,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_tissue",
-          "category_id": "c_house",
-          "name": "Tissue Pack",
+          "id": "i_phenol",
+          "category_id": "c_house_clean",
+          "name": "Phenyl 1L",
           "description": "",
           "price": 180,
           "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_bleach",
+          "category_id": "c_house_clean",
+          "name": "Bleach 1L",
+          "description": "",
+          "price": 160,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_soap",
+          "category_id": "c_house_pers",
+          "name": "Bath Soap",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_tissue",
+          "category_id": "c_house_pers",
+          "name": "Tissue Pack",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_tooth",
+          "category_id": "c_house_pers",
+          "name": "Toothpaste",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_shamp",
+          "category_id": "c_house_pers",
+          "name": "Shampoo Sachet",
+          "description": "",
+          "price": 40,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

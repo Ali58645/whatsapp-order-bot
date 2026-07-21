@@ -154,12 +154,41 @@ def validate_menu_v2(raw: Any, *, strict_limits: bool = True) -> dict:
             sort = int(cat.get("sort", i))
         except (TypeError, ValueError) as exc:
             raise MenuV2Error(f"categories[{i}].sort must be int") from exc
+        raw_parent = cat.get("parent_id")
+        parent_id = str(raw_parent).strip() if raw_parent else ""
+        if parent_id == cid:
+            raise MenuV2Error(f"categories[{i}].parent_id cannot reference itself")
         categories.append({
             "id": cid,
             "name": name,
             "sort": sort,
             "visible": bool(cat.get("visible", True)),
+            "parent_id": parent_id or None,
         })
+
+    # Validate parent refs + max depth 2 (sub-categories cannot have children)
+    by_id = {c["id"]: c for c in categories}
+    for i, cat in enumerate(categories):
+        pid = cat.get("parent_id")
+        if not pid:
+            continue
+        if pid not in by_id:
+            raise MenuV2Error(f"categories[{i}].parent_id unknown: {pid}")
+        parent = by_id[pid]
+        if parent.get("parent_id"):
+            raise MenuV2Error(
+                f"categories[{i}]: max depth 2 — parent '{pid}' is already a sub-category"
+            )
+    # After parent refs validated: WhatsApp list shows roots OR children of one parent
+    roots = [c for c in categories if not c.get("parent_id")]
+    if len(roots) > ROWS_MAX:
+        raise MenuV2Error(f"max {ROWS_MAX} root categories (got {len(roots)})")
+    for r in roots:
+        kids = [c for c in categories if c.get("parent_id") == r["id"]]
+        if len(kids) > ROWS_MAX:
+            raise MenuV2Error(
+                f"category '{r['name']}': max {ROWS_MAX} sub-categories (got {len(kids)})"
+            )
     categories.sort(key=lambda c: c["sort"])
 
     items_in = raw.get("items") or []
@@ -263,6 +292,32 @@ def visible_categories(menu: dict) -> list[dict]:
     return [c for c in menu.get("categories", []) if c.get("visible", True)]
 
 
+def root_categories(menu: dict) -> list[dict]:
+    """Visible top-level categories (no parent_id)."""
+    return [c for c in visible_categories(menu) if not c.get("parent_id")]
+
+
+def child_categories(menu: dict, parent_id: str) -> list[dict]:
+    """Visible sub-categories under parent_id."""
+    return [
+        c for c in visible_categories(menu)
+        if (c.get("parent_id") or "") == parent_id
+    ]
+
+
+def is_leaf(menu: dict, category_id: str) -> bool:
+    """True when category has no visible children (items browse target)."""
+    return len(child_categories(menu, category_id)) == 0
+
+
+def descendant_item_count(menu: dict, category_id: str) -> int:
+    """Available items on this category plus all leaf descendants."""
+    kids = child_categories(menu, category_id)
+    if kids:
+        return sum(descendant_item_count(menu, k["id"]) for k in kids)
+    return len(available_items(menu, category_id))
+
+
 def available_items(menu: dict, category_id: str | None = None) -> list[dict]:
     items = [
         it for it in menu.get("items", [])
@@ -317,7 +372,7 @@ def build_greeting_and_entry(to: str, menu: dict, tenant=None) -> list[dict]:
             "text": {"body": greeting},
         }
     ]
-    cats = visible_categories(menu)
+    cats = root_categories(menu)
     if len(cats) == 0:
         # Flat: all available items
         payloads.append(
@@ -325,8 +380,8 @@ def build_greeting_and_entry(to: str, menu: dict, tenant=None) -> list[dict]:
         )
     elif len(cats) == 1:
         payloads.append(
-            build_item_list_payload(
-                to, menu, category_id=cats[0]["id"], page=0, button_label=button, tenant=tenant
+            build_browse_payload(
+                to, menu, cats[0]["id"], page=0, button_label=button, tenant=tenant
             )
         )
     else:
@@ -335,19 +390,61 @@ def build_greeting_and_entry(to: str, menu: dict, tenant=None) -> list[dict]:
 
 
 def build_category_list_payload(
-    to: str, menu: dict, button_label: str | None = None, tenant=None
+    to: str,
+    menu: dict,
+    button_label: str | None = None,
+    tenant=None,
+    *,
+    parent_id: str | None = None,
 ) -> dict:
+    """
+    List root categories, or sub-categories when parent_id is set.
+    """
     settings = menu.get("settings") or {}
     mr = _order_msg(tenant)
     label = button_label or settings.get("menu_button_label") or mr.button("order.menu_button_label")
-    cats = visible_categories(menu)
+    if parent_id:
+        cats = child_categories(menu, parent_id)
+        parent = find_category(menu, parent_id)
+        body = (
+            mr.text("order.item_choose", {"category": parent["name"]})
+            if parent
+            else mr.text("order.category_choose")
+        )
+    else:
+        cats = root_categories(menu)
+        body = mr.text("order.category_choose")
     rows = []
     for c in cats[:ROWS_MAX]:
-        count = len(available_items(menu, c["id"]))
-        rows.append((f"cat:{c['id']}", c["name"], f"{count} items" if count else ""))
+        kids = child_categories(menu, c["id"])
+        if kids:
+            rows.append((f"cat:{c['id']}", c["name"], f"{len(kids)} groups"))
+        else:
+            count = len(available_items(menu, c["id"]))
+            rows.append((f"cat:{c['id']}", c["name"], f"{count} items" if count else ""))
     if not rows:
         rows.append(("cat:empty", "No categories", "Add items in Menu Builder"))
-    return build_list(to, mr.text("order.category_choose"), label[:OPTION_LABEL_MAX], rows)
+    return build_list(to, body, label[:OPTION_LABEL_MAX], rows)
+
+
+def build_browse_payload(
+    to: str,
+    menu: dict,
+    category_id: str,
+    page: int = 0,
+    button_label: str | None = None,
+    tenant=None,
+) -> dict:
+    """
+    If category has sub-categories → list them; else → item list.
+    """
+    if child_categories(menu, category_id):
+        return build_category_list_payload(
+            to, menu, button_label=button_label, tenant=tenant, parent_id=category_id
+        )
+    return build_item_list_payload(
+        to, menu, category_id=category_id, page=page, button_label=button_label, tenant=tenant
+    )
 
 
 def build_item_list_payload(
@@ -492,13 +589,29 @@ def preview_flow_steps(menu: dict, to: str = "preview") -> list[dict]:
         kind = p.get("type", "text")
         steps.append({"id": f"entry_{i}", "kind": kind, "payload": p, "label": "Entry"})
 
-    cats = visible_categories(menu)
-    cat_id = cats[0]["id"] if len(cats) == 1 else (cats[0]["id"] if cats else None)
+    cats = root_categories(menu)
+    cat_id = cats[0]["id"] if cats else None
     if len(cats) > 1 and cats:
-        # Simulate tapping first category
-        item_payload = build_item_list_payload(to, menu, category_id=cats[0]["id"], page=0)
-        steps.append({"id": "items", "kind": "interactive", "payload": item_payload, "label": "Items"})
-        cat_id = cats[0]["id"]
+        # Simulate tapping first root (may open sub-cats or items)
+        browse = build_browse_payload(to, menu, cats[0]["id"], page=0)
+        steps.append({"id": "browse", "kind": "interactive", "payload": browse, "label": "Browse"})
+        kids = child_categories(menu, cats[0]["id"])
+        if kids:
+            item_payload = build_item_list_payload(to, menu, category_id=kids[0]["id"], page=0)
+            steps.append({"id": "items", "kind": "interactive", "payload": item_payload, "label": "Items"})
+            cat_id = kids[0]["id"]
+        else:
+            cat_id = cats[0]["id"]
+    elif len(cats) == 1:
+        kids = child_categories(menu, cats[0]["id"])
+        if kids:
+            item_payload = build_item_list_payload(to, menu, category_id=kids[0]["id"], page=0)
+            # entry already showed browse/subcats when single root with children
+            if not is_leaf(menu, cats[0]["id"]):
+                steps.append({"id": "items", "kind": "interactive", "payload": item_payload, "label": "Items"})
+            cat_id = kids[0]["id"]
+        else:
+            cat_id = cats[0]["id"]
     elif len(cats) == 0:
         cat_id = None
 

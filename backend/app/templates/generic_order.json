@@ -29,16 +29,52 @@
     "menu_v2": {
       "categories": [
         {
-          "id": "c_items",
-          "name": "Items",
+          "id": "c_pop",
+          "name": "Popular",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_pop_a",
+          "name": "Group A",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_pop"
+        },
+        {
+          "id": "c_pop_b",
+          "name": "Group B",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_pop"
+        },
+        {
+          "id": "c_more",
+          "name": "More Items",
+          "sort": 1,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_more_a",
+          "name": "Group C",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_more"
+        },
+        {
+          "id": "c_more_b",
+          "name": "Group D",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_more"
         }
       ],
       "items": [
         {
           "id": "i_a",
-          "category_id": "c_items",
+          "category_id": "c_pop_a",
           "name": "Item A",
           "description": "Edit in Settings",
           "price": 100,
@@ -48,7 +84,7 @@
         },
         {
           "id": "i_b",
-          "category_id": "c_items",
+          "category_id": "c_pop_a",
           "name": "Item B",
           "description": "",
           "price": 200,
@@ -58,12 +94,142 @@
         },
         {
           "id": "i_c",
-          "category_id": "c_items",
+          "category_id": "c_pop_a",
           "name": "Item C",
           "description": "",
           "price": 300,
           "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_d",
+          "category_id": "c_pop_a",
+          "name": "Item D",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_e2",
+          "category_id": "c_pop_b",
+          "name": "Item E2",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_f2",
+          "category_id": "c_pop_b",
+          "name": "Item F2",
+          "description": "",
+          "price": 500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_g2",
+          "category_id": "c_pop_b",
+          "name": "Item G2",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_h2",
+          "category_id": "c_pop_b",
+          "name": "Item H2",
+          "description": "",
+          "price": 600,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_e",
+          "category_id": "c_more_a",
+          "name": "Item E",
+          "description": "",
+          "price": 500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_f",
+          "category_id": "c_more_a",
+          "name": "Item F",
+          "description": "",
+          "price": 600,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_g",
+          "category_id": "c_more_a",
+          "name": "Item G",
+          "description": "",
+          "price": 700,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_h",
+          "category_id": "c_more_a",
+          "name": "Item H",
+          "description": "",
+          "price": 800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_i",
+          "category_id": "c_more_b",
+          "name": "Item I",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_j",
+          "category_id": "c_more_b",
+          "name": "Item J",
+          "description": "",
+          "price": 1000,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_k",
+          "category_id": "c_more_b",
+          "name": "Item K",
+          "description": "",
+          "price": 1100,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_l",
+          "category_id": "c_more_b",
+          "name": "Item L",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

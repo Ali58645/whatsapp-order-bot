@@ -29,16 +29,52 @@
     "menu_v2": {
       "categories": [
         {
-          "id": "c_water",
-          "name": "Water Orders",
+          "id": "c_bottle",
+          "name": "19L Bottles",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_bot_new",
+          "name": "New / Refill",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_bottle"
+        },
+        {
+          "id": "c_bot_sched",
+          "name": "Regular Plan",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_bottle"
+        },
+        {
+          "id": "c_pack",
+          "name": "Packs & Dispenser",
+          "sort": 1,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_pack_small",
+          "name": "Small Packs",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_pack"
+        },
+        {
+          "id": "c_pack_gear",
+          "name": "Equipment",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_pack"
         }
       ],
       "items": [
         {
           "id": "i_19new",
-          "category_id": "c_water",
+          "category_id": "c_bot_new",
           "name": "19L Bottle (new)",
           "description": "With bottle",
           "price": 350,
@@ -48,7 +84,7 @@
         },
         {
           "id": "i_19ref",
-          "category_id": "c_water",
+          "category_id": "c_bot_new",
           "name": "19L Refill",
           "description": "Empty exchange",
           "price": 150,
@@ -57,21 +93,141 @@
           "modifiers": []
         },
         {
-          "id": "i_pack6",
-          "category_id": "c_water",
-          "name": "6-Bottle Pack",
-          "description": "Small bottles",
-          "price": 800,
+          "id": "i_19x2",
+          "category_id": "c_bot_new",
+          "name": "2x 19L Refill",
+          "description": "",
+          "price": 280,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_19x4",
+          "category_id": "c_bot_new",
+          "name": "4x 19L Refill",
+          "description": "",
+          "price": 520,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_week",
+          "category_id": "c_bot_sched",
+          "name": "Weekly 2x Refill",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_month",
+          "category_id": "c_bot_sched",
+          "name": "Monthly Pack",
+          "description": "",
+          "price": 1100,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_office",
+          "category_id": "c_bot_sched",
+          "name": "Office 10x",
+          "description": "",
+          "price": 1400,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_home",
+          "category_id": "c_bot_sched",
+          "name": "Home Starter",
+          "description": "",
+          "price": 500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_pack6",
+          "category_id": "c_pack_small",
+          "name": "6-Bottle Pack",
+          "description": "Small bottles",
+          "price": 800,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_pack12",
+          "category_id": "c_pack_small",
+          "name": "12-Bottle Pack",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_pack24",
+          "category_id": "c_pack_small",
+          "name": "24-Bottle Pack",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_cup",
+          "category_id": "c_pack_small",
+          "name": "Cup Pack 100",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_disp",
-          "category_id": "c_water",
+          "category_id": "c_pack_gear",
           "name": "Dispenser",
           "description": "Purchase",
           "price": 4500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_stand",
+          "category_id": "c_pack_gear",
+          "name": "Bottle Stand",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_pump",
+          "category_id": "c_pack_gear",
+          "name": "Manual Pump",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_hotcold",
+          "category_id": "c_pack_gear",
+          "name": "Hot/Cold Disp",
+          "description": "",
+          "price": 12000,
           "available": true,
           "sort": 3,
           "modifiers": []

@@ -71,6 +71,30 @@
             "value": "Gyne"
           },
           {
+            "id": "s_ent",
+            "title": "ENT",
+            "description": "Ear nose throat",
+            "value": "ENT"
+          },
+          {
+            "id": "s_eye",
+            "title": "Eye",
+            "description": "Ophthalmology",
+            "value": "Eye"
+          },
+          {
+            "id": "s_ortho",
+            "title": "Ortho",
+            "description": "Bones / joints",
+            "value": "Ortho"
+          },
+          {
+            "id": "s_card",
+            "title": "Cardio",
+            "description": "Heart",
+            "value": "Cardio"
+          },
+          {
             "id": "s_oth",
             "title": "Other",
             "description": "Other",

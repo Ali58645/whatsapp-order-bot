@@ -68,6 +68,24 @@
             "title": "Free Trial",
             "description": "Tour + trial",
             "value": "Trial"
+          },
+          {
+            "id": "p_coup",
+            "title": "Couple",
+            "description": "2 members",
+            "value": "Couple"
+          },
+          {
+            "id": "p_stud",
+            "title": "Student",
+            "description": "Student plan",
+            "value": "Student"
+          },
+          {
+            "id": "p_corp",
+            "title": "Corporate",
+            "description": "Office group",
+            "value": "Corporate"
           }
         ],
         "locations": [
@@ -85,6 +103,11 @@
             "id": "b3",
             "title": "Branch 2",
             "value": "Branch2"
+          },
+          {
+            "id": "b4",
+            "title": "24/7 branch",
+            "value": "24/7"
           }
         ],
         "current_system": [

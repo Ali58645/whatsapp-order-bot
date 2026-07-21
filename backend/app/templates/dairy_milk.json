@@ -29,16 +29,73 @@
     "menu_v2": {
       "categories": [
         {
-          "id": "c_dairy",
-          "name": "Dairy",
+          "id": "c_milk",
+          "name": "Fresh Milk",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_milk_fresh",
+          "name": "Fresh",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_milk"
+        },
+        {
+          "id": "c_milk_pack",
+          "name": "Packaged",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_milk"
+        },
+        {
+          "id": "c_cult",
+          "name": "Yogurt/Butter",
+          "sort": 1,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_cult_yog",
+          "name": "Yogurt",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_cult"
+        },
+        {
+          "id": "c_cult_but",
+          "name": "Butter",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_cult"
+        },
+        {
+          "id": "c_ghee",
+          "name": "Ghee/Cream",
+          "sort": 2,
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_ghee_desi",
+          "name": "Ghee",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_ghee"
+        },
+        {
+          "id": "c_ghee_crm",
+          "name": "Cream/Cheese",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_ghee"
         }
       ],
       "items": [
         {
           "id": "i_milk1",
-          "category_id": "c_dairy",
+          "category_id": "c_milk_fresh",
           "name": "Fresh Milk 1L",
           "description": "",
           "price": 220,
@@ -48,7 +105,7 @@
         },
         {
           "id": "i_milk2",
-          "category_id": "c_dairy",
+          "category_id": "c_milk_fresh",
           "name": "Fresh Milk 2L",
           "description": "",
           "price": 420,
@@ -57,43 +114,223 @@
           "modifiers": []
         },
         {
-          "id": "i_yog",
-          "category_id": "c_dairy",
-          "name": "Yogurt 1kg",
+          "id": "i_milk5",
+          "category_id": "c_milk_fresh",
+          "name": "Fresh Milk 5L",
           "description": "",
-          "price": 300,
+          "price": 1000,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_toned",
+          "category_id": "c_milk_fresh",
+          "name": "Toned Milk 1L",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_uht",
+          "category_id": "c_milk_pack",
+          "name": "UHT Milk 1L",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_full",
+          "category_id": "c_milk_pack",
+          "name": "Full Cream 1L",
+          "description": "",
+          "price": 300,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_skim",
+          "category_id": "c_milk_pack",
+          "name": "Skim Milk 1L",
+          "description": "",
+          "price": 260,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_flav",
+          "category_id": "c_milk_pack",
+          "name": "Flavored Milk",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_yog",
+          "category_id": "c_cult_yog",
+          "name": "Yogurt 1kg",
+          "description": "",
+          "price": 300,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_lassi",
+          "category_id": "c_cult_yog",
+          "name": "Lassi 1L",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_raita",
+          "category_id": "c_cult_yog",
+          "name": "Raita Pack",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_greek",
+          "category_id": "c_cult_yog",
+          "name": "Greek Yogurt",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_but",
-          "category_id": "c_dairy",
+          "category_id": "c_cult_but",
           "name": "Butter 200g",
           "description": "",
           "price": 380,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_but500",
+          "category_id": "c_cult_but",
+          "name": "Butter 500g",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_spread",
+          "category_id": "c_cult_but",
+          "name": "Butter Spread",
+          "description": "",
+          "price": 420,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_white",
+          "category_id": "c_cult_but",
+          "name": "White Butter",
+          "description": "",
+          "price": 350,
           "available": true,
           "sort": 3,
           "modifiers": []
         },
         {
           "id": "i_ghee",
-          "category_id": "c_dairy",
+          "category_id": "c_ghee_desi",
           "name": "Desi Ghee 1kg",
           "description": "",
           "price": 2200,
           "available": true,
-          "sort": 4,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_ghee500",
+          "category_id": "c_ghee_desi",
+          "name": "Desi Ghee 500g",
+          "description": "",
+          "price": 1150,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_banas",
+          "category_id": "c_ghee_desi",
+          "name": "Banaspati 1kg",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_pure",
+          "category_id": "c_ghee_desi",
+          "name": "Pure Cow Ghee",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         },
         {
           "id": "i_cream",
-          "category_id": "c_dairy",
+          "category_id": "c_ghee_crm",
           "name": "Fresh Cream",
           "description": "",
           "price": 250,
           "available": true,
-          "sort": 5,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_cheese",
+          "category_id": "c_ghee_crm",
+          "name": "Cheese Slice",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_khoya",
+          "category_id": "c_ghee_crm",
+          "name": "Khoya 500g",
+          "description": "",
+          "price": 800,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_paneer",
+          "category_id": "c_ghee_crm",
+          "name": "Paneer 250g",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

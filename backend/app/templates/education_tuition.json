@@ -71,6 +71,30 @@
             "value": "Entry"
           },
           {
+            "id": "c_acc",
+            "title": "Accounts",
+            "description": "Commerce",
+            "value": "Accounts"
+          },
+          {
+            "id": "c_urdu",
+            "title": "Urdu",
+            "description": "Language",
+            "value": "Urdu"
+          },
+          {
+            "id": "c_isl",
+            "title": "Islamiyat",
+            "description": "Islamic studies",
+            "value": "Islamiyat"
+          },
+          {
+            "id": "c_css",
+            "title": "CSS / PMS",
+            "description": "Competitive",
+            "value": "CSS"
+          },
+          {
             "id": "c_oth",
             "title": "Other",
             "description": "Other",
@@ -92,6 +116,11 @@
             "id": "m_home",
             "title": "Home tutor",
             "value": "Home"
+          },
+          {
+            "id": "m_group",
+            "title": "Group class",
+            "value": "Group"
           }
         ],
         "current_system": [

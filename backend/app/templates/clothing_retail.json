@@ -32,31 +32,91 @@
           "id": "c_men",
           "name": "Men",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_men_trad",
+          "name": "Traditional",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_men"
+        },
+        {
+          "id": "c_men_west",
+          "name": "Western",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_men"
         },
         {
           "id": "c_wom",
           "name": "Women",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_wom_suit",
+          "name": "Suits",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_wom"
+        },
+        {
+          "id": "c_wom_oth",
+          "name": "Abaya/Dupatta",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_wom"
         },
         {
           "id": "c_kid",
           "name": "Kids",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_kid_boy",
+          "name": "Boys",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_kid"
+        },
+        {
+          "id": "c_kid_girl",
+          "name": "Girls",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_kid"
         },
         {
           "id": "c_fab",
           "name": "Fabric",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_fab_cot",
+          "name": "Cotton/Lawn",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_fab"
+        },
+        {
+          "id": "c_fab_lux",
+          "name": "Silk/Chiffon",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_fab"
         }
       ],
       "items": [
         {
           "id": "i_kurta",
-          "category_id": "c_men",
+          "category_id": "c_men_trad",
           "name": "Cotton Kurta",
           "description": "",
           "price": 2200,
@@ -88,7 +148,7 @@
         },
         {
           "id": "i_shalwar",
-          "category_id": "c_men",
+          "category_id": "c_men_trad",
           "name": "Shalwar Kameez",
           "description": "",
           "price": 3500,
@@ -119,9 +179,9 @@
           ]
         },
         {
-          "id": "i_jeans",
-          "category_id": "c_men",
-          "name": "Denim Jeans",
+          "id": "i_waist",
+          "category_id": "c_men_trad",
+          "name": "Waistcoat",
           "description": "",
           "price": 2800,
           "available": true,
@@ -151,8 +211,168 @@
           ]
         },
         {
+          "id": "i_shal",
+          "category_id": "c_men_trad",
+          "name": "Shalwar Only",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_jeans",
+          "category_id": "c_men_west",
+          "name": "Denim Jeans",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_polo",
+          "category_id": "c_men_west",
+          "name": "Polo Shirt",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_tshirt",
+          "category_id": "c_men_west",
+          "name": "T-Shirt",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_formal",
+          "category_id": "c_men_west",
+          "name": "Formal Shirt",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
           "id": "i_lawn",
-          "category_id": "c_wom",
+          "category_id": "c_wom_suit",
           "name": "Lawn Suit",
           "description": "",
           "price": 4500,
@@ -183,11 +403,11 @@
           ]
         },
         {
-          "id": "i_abaya",
-          "category_id": "c_wom",
-          "name": "Abaya",
+          "id": "i_kurti",
+          "category_id": "c_wom_suit",
+          "name": "Kurti",
           "description": "",
-          "price": 3200,
+          "price": 2200,
           "available": true,
           "sort": 1,
           "modifiers": [
@@ -215,18 +435,134 @@
           ]
         },
         {
+          "id": "i_embro",
+          "category_id": "c_wom_suit",
+          "name": "Embroidered",
+          "description": "",
+          "price": 6500,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_winter",
+          "category_id": "c_wom_suit",
+          "name": "Winter Suit",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_abaya",
+          "category_id": "c_wom_oth",
+          "name": "Abaya",
+          "description": "",
+          "price": 3200,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
           "id": "i_dupatta",
-          "category_id": "c_wom",
+          "category_id": "c_wom_oth",
           "name": "Dupatta",
           "description": "",
           "price": 900,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_hijab",
+          "category_id": "c_wom_oth",
+          "name": "Hijab",
+          "description": "",
+          "price": 650,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_shawl",
+          "category_id": "c_wom_oth",
+          "name": "Shawl",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_kidset",
-          "category_id": "c_kid",
+          "category_id": "c_kid_boy",
           "name": "Kids Suit",
           "description": "",
           "price": 1800,
@@ -258,7 +594,7 @@
         },
         {
           "id": "i_kidt",
-          "category_id": "c_kid",
+          "category_id": "c_kid_boy",
           "name": "Kids T-Shirt",
           "description": "",
           "price": 650,
@@ -289,8 +625,200 @@
           ]
         },
         {
+          "id": "i_kidj",
+          "category_id": "c_kid_boy",
+          "name": "Kids Jeans",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kpolo",
+          "category_id": "c_kid_boy",
+          "name": "Kids Polo",
+          "description": "",
+          "price": 800,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kidf",
+          "category_id": "c_kid_girl",
+          "name": "Kids Frock",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kgown",
+          "category_id": "c_kid_girl",
+          "name": "Party Frock",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_kleg",
+          "category_id": "c_kid_girl",
+          "name": "Leggings",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_ktop",
+          "category_id": "c_kid_girl",
+          "name": "Girls Top",
+          "description": "",
+          "price": 700,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "sz_s",
+                  "label": "S",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_m",
+                  "label": "M",
+                  "price_delta": 0
+                },
+                {
+                  "id": "sz_l",
+                  "label": "L",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
           "id": "i_cotton",
-          "category_id": "c_fab",
+          "category_id": "c_fab_cot",
           "name": "Cotton (meter)",
           "description": "",
           "price": 450,
@@ -300,7 +828,7 @@
         },
         {
           "id": "i_lawnf",
-          "category_id": "c_fab",
+          "category_id": "c_fab_cot",
           "name": "Lawn (meter)",
           "description": "",
           "price": 380,
@@ -309,13 +837,63 @@
           "modifiers": []
         },
         {
+          "id": "i_khaddar",
+          "category_id": "c_fab_cot",
+          "name": "Khaddar (m)",
+          "description": "",
+          "price": 420,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_linen",
+          "category_id": "c_fab_cot",
+          "name": "Linen (meter)",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_silk",
-          "category_id": "c_fab",
+          "category_id": "c_fab_lux",
           "name": "Silk (meter)",
           "description": "",
           "price": 1200,
           "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_chiff",
+          "category_id": "c_fab_lux",
+          "name": "Chiffon (meter)",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_velvet",
+          "category_id": "c_fab_lux",
+          "name": "Velvet (meter)",
+          "description": "",
+          "price": 900,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_organza",
+          "category_id": "c_fab_lux",
+          "name": "Organza (m)",
+          "description": "",
+          "price": 700,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

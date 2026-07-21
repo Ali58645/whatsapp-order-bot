@@ -32,31 +32,91 @@
           "id": "c_cakes",
           "name": "Cakes",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_cake_flav",
+          "name": "Flavors",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_cakes"
+        },
+        {
+          "id": "c_cake_spec",
+          "name": "Special",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_cakes"
         },
         {
           "id": "c_past",
           "name": "Pastries",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_past_sweet",
+          "name": "Sweet",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_past"
+        },
+        {
+          "id": "c_past_more",
+          "name": "More",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_past"
         },
         {
           "id": "c_bread",
           "name": "Bread/Rusk",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_bread_loaf",
+          "name": "Bread",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_bread"
+        },
+        {
+          "id": "c_bread_rusk",
+          "name": "Rusk/Toast",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_bread"
         },
         {
           "id": "c_sav",
           "name": "Savory",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_sav_hot",
+          "name": "Hot Snacks",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_sav"
+        },
+        {
+          "id": "c_sav_more",
+          "name": "More",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_sav"
         }
       ],
       "items": [
         {
           "id": "i_choc",
-          "category_id": "c_cakes",
+          "category_id": "c_cake_flav",
           "name": "Chocolate Cake",
           "description": "1 pound",
           "price": 2500,
@@ -66,7 +126,7 @@
         },
         {
           "id": "i_pine",
-          "category_id": "c_cakes",
+          "category_id": "c_cake_flav",
           "name": "Pineapple Cake",
           "description": "1 pound",
           "price": 2200,
@@ -75,28 +135,68 @@
           "modifiers": []
         },
         {
-          "id": "i_bday",
-          "category_id": "c_cakes",
-          "name": "Birthday Deal",
-          "description": "Cake + 6 pastries",
-          "price": 3500,
+          "id": "i_red",
+          "category_id": "c_cake_flav",
+          "name": "Red Velvet",
+          "description": "",
+          "price": 2800,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_fruit",
+          "category_id": "c_cake_flav",
+          "name": "Fruit Cake",
+          "description": "",
+          "price": 2400,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_bday",
+          "category_id": "c_cake_spec",
+          "name": "Birthday Deal",
+          "description": "Cake + 6 pastries",
+          "price": 3500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
           "id": "i_custom",
-          "category_id": "c_cakes",
+          "category_id": "c_cake_spec",
           "name": "Custom Cake",
           "description": "Details in chat",
           "price": 3000,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_anni",
+          "category_id": "c_cake_spec",
+          "name": "Anniversary",
+          "description": "",
+          "price": 3200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_kids",
+          "category_id": "c_cake_spec",
+          "name": "Kids Theme",
+          "description": "",
+          "price": 3500,
           "available": true,
           "sort": 3,
           "modifiers": []
         },
         {
           "id": "i_croissant",
-          "category_id": "c_past",
+          "category_id": "c_past_sweet",
           "name": "Croissant",
           "description": "",
           "price": 180,
@@ -106,7 +206,7 @@
         },
         {
           "id": "i_danish",
-          "category_id": "c_past",
+          "category_id": "c_past_sweet",
           "name": "Danish Pastry",
           "description": "",
           "price": 200,
@@ -116,7 +216,7 @@
         },
         {
           "id": "i_cup",
-          "category_id": "c_past",
+          "category_id": "c_past_sweet",
           "name": "Cupcake (2pc)",
           "description": "",
           "price": 250,
@@ -126,7 +226,7 @@
         },
         {
           "id": "i_eclair",
-          "category_id": "c_past",
+          "category_id": "c_past_sweet",
           "name": "Chocolate Eclair",
           "description": "",
           "price": 220,
@@ -135,8 +235,48 @@
           "modifiers": []
         },
         {
+          "id": "i_muffin",
+          "category_id": "c_past_more",
+          "name": "Muffin",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_donut",
+          "category_id": "c_past_more",
+          "name": "Donut",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_brownie",
+          "category_id": "c_past_more",
+          "name": "Brownie",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_cookie",
+          "category_id": "c_past_more",
+          "name": "Cookies Pack",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_bread",
-          "category_id": "c_bread",
+          "category_id": "c_bread_loaf",
           "name": "Sandwich Bread",
           "description": "",
           "price": 160,
@@ -145,28 +285,78 @@
           "modifiers": []
         },
         {
-          "id": "i_rusk",
-          "category_id": "c_bread",
-          "name": "Rusk Pack",
+          "id": "i_bun",
+          "category_id": "c_bread_loaf",
+          "name": "Burger Buns (4)",
           "description": "",
-          "price": 280,
+          "price": 120,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_bun",
-          "category_id": "c_bread",
-          "name": "Burger Buns (4)",
+          "id": "i_naan",
+          "category_id": "c_bread_loaf",
+          "name": "Naan (2pc)",
           "description": "",
-          "price": 120,
+          "price": 80,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_pita",
+          "category_id": "c_bread_loaf",
+          "name": "Pita Bread",
+          "description": "",
+          "price": 100,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_rusk",
+          "category_id": "c_bread_rusk",
+          "name": "Rusk Pack",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_toast",
+          "category_id": "c_bread_rusk",
+          "name": "Toast Pack",
+          "description": "",
+          "price": 200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_ruskw",
+          "category_id": "c_bread_rusk",
+          "name": "Wheat Rusk",
+          "description": "",
+          "price": 300,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_zwie",
+          "category_id": "c_bread_rusk",
+          "name": "Zwieback",
+          "description": "",
+          "price": 220,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_patties",
-          "category_id": "c_sav",
+          "category_id": "c_sav_hot",
           "name": "Chicken Patty",
           "description": "",
           "price": 120,
@@ -176,7 +366,7 @@
         },
         {
           "id": "i_roll",
-          "category_id": "c_sav",
+          "category_id": "c_sav_hot",
           "name": "Chicken Roll",
           "description": "",
           "price": 200,
@@ -186,12 +376,62 @@
         },
         {
           "id": "i_samosa_b",
-          "category_id": "c_sav",
+          "category_id": "c_sav_hot",
           "name": "Aloo Samosa",
           "description": "",
           "price": 60,
           "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_pakora",
+          "category_id": "c_sav_hot",
+          "name": "Pakora Plate",
+          "description": "",
+          "price": 150,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_pizza_s",
+          "category_id": "c_sav_more",
+          "name": "Mini Pizza",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_sandwich",
+          "category_id": "c_sav_more",
+          "name": "Club Sandwich",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_shawarma",
+          "category_id": "c_sav_more",
+          "name": "Shawarma",
+          "description": "",
+          "price": 280,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_wrap",
+          "category_id": "c_sav_more",
+          "name": "Chicken Wrap",
+          "description": "",
+          "price": 320,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

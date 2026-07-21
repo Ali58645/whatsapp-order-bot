@@ -11,9 +11,12 @@ OUT = Path(__file__).resolve().parent
 # Keep titles <= 24, option labels <= 20, <=6 items/cat, modifiers <=3 opts
 
 
-def cat(cid: str, name: str, sort: int) -> dict:
+def cat(cid: str, name: str, sort: int, parent_id: str | None = None) -> dict:
     assert len(name) <= 24, name
-    return {"id": cid, "name": name, "sort": sort, "visible": True}
+    out = {"id": cid, "name": name, "sort": sort, "visible": True}
+    if parent_id:
+        out["parent_id"] = parent_id
+    return out
 
 
 def item(
@@ -201,6 +204,8 @@ TEMPLATES.append(
                 item("i_deal2", "c_deals", "Deal for 2", 1499, 0, "2 mains + drinks"),
                 item("i_deal4", "c_deals", "Family Deal", 2999, 1, "4 people"),
                 item("i_student", "c_deals", "Student Deal", 499, 2),
+                item("i_bbqdeal", "c_deals", "BBQ Platter", 2499, 3, "Mixed BBQ"),
+                item("i_lunch", "c_deals", "Lunch Special", 399, 4),
                 item("i_chai", "c_drink", "Doodh Patti", 100, 0),
                 item("i_soft", "c_drink", "Soft Drink", 80, 1),
                 item("i_lassi", "c_drink", "Sweet Lassi", 150, 2),
@@ -252,6 +257,8 @@ TEMPLATES.append(
                 item("i_oil", "c_oil", "Cooking Oil 5L", 2100, 0),
                 item("i_ghee", "c_oil", "Banaspati 1kg", 550, 1),
                 item("i_olive", "c_oil", "Olive Oil 500ml", 1200, 2),
+                item("i_mustard", "c_oil", "Mustard Oil 1L", 650, 3),
+                item("i_sunflo", "c_oil", "Sunflower Oil 5L", 1950, 4),
                 item("i_milk", "c_dairy", "Milk Pack 1L", 280, 0),
                 item("i_eggs", "c_dairy", "Eggs (Dozen)", 420, 1),
                 item("i_yogurt", "c_dairy", "Yogurt 1kg", 350, 2),
@@ -259,9 +266,13 @@ TEMPLATES.append(
                 item("i_tea", "c_bev", "Tea Whitener", 250, 0),
                 item("i_juice", "c_bev", "Juice 1L", 220, 1),
                 item("i_cola", "c_bev", "Soft Drink 1.5L", 180, 2),
+                item("i_waterb", "c_bev", "Mineral Water 6pk", 280, 3),
+                item("i_energy", "c_bev", "Energy Drink", 250, 4),
                 item("i_det", "c_house", "Detergent 1kg", 450, 0),
                 item("i_soap", "c_house", "Bath Soap", 120, 1),
                 item("i_tissue", "c_house", "Tissue Pack", 180, 2),
+                item("i_dish", "c_house", "Dishwash Liquid", 220, 3),
+                item("i_phenol", "c_house", "Phenyl 1L", 180, 4),
             ],
             charge=50,
             free_above=2000,
@@ -287,12 +298,19 @@ TEMPLATES.append(
         facts="19L bottles, refill, packs. Regular delivery available on request.",
         menu_v2=menu(
             "Assalam o Alaikum! Paani order karne ke liye neeche se muntakhib karein 💧",
-            [cat("c_water", "Water Orders", 0)],
             [
-                item("i_19new", "c_water", "19L Bottle (new)", 350, 0, "With bottle"),
-                item("i_19ref", "c_water", "19L Refill", 150, 1, "Empty exchange"),
-                item("i_pack6", "c_water", "6-Bottle Pack", 800, 2, "Small bottles"),
-                item("i_disp", "c_water", "Dispenser", 4500, 3, "Purchase"),
+                cat("c_bottle", "19L Bottles", 0),
+                cat("c_pack", "Packs & Dispenser", 1),
+            ],
+            [
+                item("i_19new", "c_bottle", "19L Bottle (new)", 350, 0, "With bottle"),
+                item("i_19ref", "c_bottle", "19L Refill", 150, 1, "Empty exchange"),
+                item("i_19x2", "c_bottle", "2x 19L Refill", 280, 2),
+                item("i_19x4", "c_bottle", "4x 19L Refill", 520, 3),
+                item("i_pack6", "c_pack", "6-Bottle Pack", 800, 0, "Small bottles"),
+                item("i_pack12", "c_pack", "12-Bottle Pack", 1500, 1),
+                item("i_disp", "c_pack", "Dispenser", 4500, 2, "Purchase"),
+                item("i_stand", "c_pack", "Bottle Stand", 1200, 3),
             ],
             charge=0,
             free_above=0,
@@ -345,15 +363,19 @@ TEMPLATES.append(
                 item("i_disprin", "c_otc", "Disprin", 40, 1),
                 item("i_ors", "c_otc", "ORS Sachet", 50, 2),
                 item("i_cough", "c_otc", "Cough Syrup", 280, 3),
+                item("i_antac", "c_otc", "Antacid Tab", 80, 4),
                 item("i_shamp", "c_pc", "Shampoo 200ml", 450, 0),
                 item("i_tooth", "c_pc", "Toothpaste", 220, 1),
                 item("i_san", "c_pc", "Hand Sanitizer", 180, 2),
+                item("i_lotion", "c_pc", "Body Lotion", 550, 3),
                 item("i_diaper", "c_baby", "Diapers M (pack)", 1200, 0),
                 item("i_wipes", "c_baby", "Baby Wipes", 350, 1),
                 item("i_feed", "c_baby", "Feeding Bottle", 650, 2),
+                item("i_bsoap", "c_baby", "Baby Soap", 280, 3),
                 item("i_vitc", "c_supp", "Vitamin C", 400, 0),
                 item("i_multi", "c_supp", "Multivitamin", 850, 1),
                 item("i_omega", "c_supp", "Omega-3", 1100, 2),
+                item("i_cal", "c_supp", "Calcium Tab", 650, 3),
             ],
             charge=100,
             free_above=2000,
@@ -397,9 +419,13 @@ TEMPLATES.append(
                 item("i_bread", "c_bread", "Sandwich Bread", 160, 0),
                 item("i_rusk", "c_bread", "Rusk Pack", 280, 1),
                 item("i_bun", "c_bread", "Burger Buns (4)", 120, 2),
+                item("i_naan", "c_bread", "Naan (2pc)", 80, 3),
+                item("i_toast", "c_bread", "Toast Pack", 200, 4),
                 item("i_patties", "c_sav", "Chicken Patty", 120, 0),
                 item("i_roll", "c_sav", "Chicken Roll", 200, 1),
                 item("i_samosa_b", "c_sav", "Aloo Samosa", 60, 2),
+                item("i_pakora", "c_sav", "Pakora Plate", 150, 3),
+                item("i_pizza_s", "c_sav", "Mini Pizza", 350, 4),
             ],
             charge=100,
             free_above=2500,
@@ -435,14 +461,19 @@ TEMPLATES.append(
                 item("i_kurta", "c_men", "Cotton Kurta", 2200, 0, modifiers=size),
                 item("i_shalwar", "c_men", "Shalwar Kameez", 3500, 1, modifiers=size),
                 item("i_jeans", "c_men", "Denim Jeans", 2800, 2, modifiers=size),
+                item("i_polo", "c_men", "Polo Shirt", 1800, 3, modifiers=size),
                 item("i_lawn", "c_wom", "Lawn Suit", 4500, 0, modifiers=size),
                 item("i_abaya", "c_wom", "Abaya", 3200, 1, modifiers=size),
                 item("i_dupatta", "c_wom", "Dupatta", 900, 2),
+                item("i_kurti", "c_wom", "Kurti", 2200, 3, modifiers=size),
                 item("i_kidset", "c_kid", "Kids Suit", 1800, 0, modifiers=size),
                 item("i_kidt", "c_kid", "Kids T-Shirt", 650, 1, modifiers=size),
+                item("i_kidj", "c_kid", "Kids Jeans", 1200, 2, modifiers=size),
+                item("i_kidf", "c_kid", "Kids Frock", 1500, 3, modifiers=size),
                 item("i_cotton", "c_fab", "Cotton (meter)", 450, 0),
                 item("i_lawnf", "c_fab", "Lawn (meter)", 380, 1),
                 item("i_silk", "c_fab", "Silk (meter)", 1200, 2),
+                item("i_chiff", "c_fab", "Chiffon (meter)", 550, 3),
             ],
             charge=150,
             free_above=5000,
@@ -485,18 +516,24 @@ TEMPLATES.append(
                     {"id": "svc_fac", "title": "Facial", "description": "Skin care", "value": "Facial"},
                     {"id": "svc_bri", "title": "Bridal", "description": "Bridal package", "value": "Bridal"},
                     {"id": "svc_man", "title": "Manicure", "description": "Nails", "value": "Manicure"},
+                    {"id": "svc_ped", "title": "Pedicure", "description": "Feet care", "value": "Pedicure"},
                     {"id": "svc_col", "title": "Hair Color", "description": "Coloring", "value": "Color"},
+                    {"id": "svc_wax", "title": "Waxing", "description": "Body wax", "value": "Waxing"},
+                    {"id": "svc_meh", "title": "Mehndi", "description": "Henna", "value": "Mehndi"},
+                    {"id": "svc_mak", "title": "Makeup", "description": "Party/bridal", "value": "Makeup"},
                     {"id": "svc_oth", "title": "Other", "description": "Something else", "value": "Other"},
                 ],
                 [
                     {"id": "loc_main", "title": "Main branch", "value": "Main"},
                     {"id": "loc_mall", "title": "Mall outlet", "value": "Mall"},
                     {"id": "loc_home", "title": "Home service", "value": "Home"},
+                    {"id": "loc_ladies", "title": "Ladies only", "value": "Ladies"},
                 ],
                 [
                     {"id": "vis_new", "title": "Pehli baar", "sheet_value": "New"},
                     {"id": "vis_ret", "title": "Wapas aa rahe", "sheet_value": "Returning"},
                     {"id": "vis_ref", "title": "Referral", "sheet_value": "Referral"},
+                    {"id": "vis_pkg", "title": "Package member", "sheet_value": "Package"},
                 ],
             ),
         },
@@ -526,7 +563,21 @@ TEMPLATES.append(
                     "Bahi POS aap ke business ki sales, stock, khata aur invoicing "
                     "ko ek jagah manage karta hai."
                 ),
-            }
+            },
+            "interactive": lead_interactive(
+                [
+                    {"id": "grocery", "title": "Grocery / Kiryana", "description": "Kirana store", "value": "Grocery / Kiryana"},
+                    {"id": "restaurant", "title": "Restaurant", "description": "Cafe / restaurant", "value": "Restaurant"},
+                    {"id": "pharmacy", "title": "Pharmacy", "description": "Medical store", "value": "Pharmacy"},
+                    {"id": "garments", "title": "Garments", "description": "Clothing retail", "value": "Garments"},
+                    {"id": "electronics", "title": "Mobile / Electronics", "description": "Phones & gadgets", "value": "Mobile / Electronics"},
+                    {"id": "general_store", "title": "General Store", "description": "Variety store", "value": "General Store"},
+                    {"id": "hardware", "title": "Hardware", "description": "Tools & supplies", "value": "Hardware"},
+                    {"id": "bakery", "title": "Bakery", "description": "Cakes & bread", "value": "Bakery"},
+                    {"id": "beauty", "title": "Beauty / Salon", "description": "Cosmetics / salon", "value": "Beauty"},
+                    {"id": "other", "title": "Other", "description": "Something else", "value": "Other"},
+                ],
+            ),
         },
     )
 )
@@ -544,11 +595,19 @@ TEMPLATES.append(
         greeting_en="Assalam o Alaikum! Tap below to view the menu.",
         menu_v2=menu(
             "Assalam o Alaikum! Order ke liye neeche menu dekhein.",
-            [cat("c_items", "Items", 0)],
             [
-                item("i_a", "c_items", "Item A", 100, 0, "Edit in Settings"),
-                item("i_b", "c_items", "Item B", 200, 1),
-                item("i_c", "c_items", "Item C", 300, 2),
+                cat("c_pop", "Popular", 0),
+                cat("c_more", "More Items", 1),
+            ],
+            [
+                item("i_a", "c_pop", "Item A", 100, 0, "Edit in Settings"),
+                item("i_b", "c_pop", "Item B", 200, 1),
+                item("i_c", "c_pop", "Item C", 300, 2),
+                item("i_d", "c_pop", "Item D", 400, 3),
+                item("i_e", "c_more", "Item E", 500, 0),
+                item("i_f", "c_more", "Item F", 600, 1),
+                item("i_g", "c_more", "Item G", 700, 2),
+                item("i_h", "c_more", "Item H", 800, 3),
             ],
             charge=100,
             free_above=0,
@@ -604,15 +663,20 @@ TEMPLATES.append(
                 item("i_paint1", "c_paint", "Emulsion 1L", 1200, 0),
                 item("i_paint4", "c_paint", "Emulsion 4L", 4200, 1),
                 item("i_thinner", "c_paint", "Thinner 1L", 350, 2),
+                item("i_primer", "c_paint", "Primer 1L", 900, 3),
+                item("i_brush", "c_paint", "Paint Brush Set", 450, 4),
                 item("i_pipe", "c_plumb", "PVC Pipe 1in", 180, 0, "Per length"),
                 item("i_tap", "c_plumb", "Basin Mixer", 2200, 1),
                 item("i_elbow", "c_plumb", "Elbow Joint", 60, 2),
+                item("i_valve", "c_plumb", "Ball Valve", 350, 3),
                 item("i_switch", "c_elec", "Switch Board", 450, 0),
                 item("i_wire", "c_elec", "Wire 1.5mm (coil)", 2800, 1),
                 item("i_bulb", "c_elec", "LED Bulb 12W", 350, 2),
+                item("i_socket", "c_elec", "Wall Socket", 280, 3),
                 item("i_screw2", "c_fast", "Screw Pack", 150, 0),
                 item("i_nail", "c_fast", "Nail Pack", 120, 1),
                 item("i_nut", "c_fast", "Nut Bolt Assort", 200, 2),
+                item("i_washer", "c_fast", "Washer Pack", 100, 3),
             ],
             delivery_enabled=False,
             charge=0,
@@ -649,16 +713,23 @@ TEMPLATES.append(
                 item("i_c20", "c_chg", "20W Fast Charger", 1200, 0),
                 item("i_ctype", "c_chg", "Type-C Cable", 450, 1),
                 item("i_light", "c_chg", "Lightning Cable", 550, 2),
+                item("i_car", "c_chg", "Car Charger", 800, 3),
                 item("i_cover", "c_cov", "Silicon Cover", 400, 0),
                 item("i_glass", "c_cov", "Tempered Glass", 350, 1),
                 item("i_wallet", "c_cov", "Wallet Case", 900, 2),
+                item("i_clear", "c_cov", "Clear Case", 350, 3),
                 item("i_buds", "c_aud", "Wireless Earbuds", 2500, 0),
                 item("i_bt", "c_aud", "BT Speaker Mini", 1800, 1),
+                item("i_wired", "c_aud", "Wired Earphones", 450, 2),
+                item("i_neck", "c_aud", "Neckband", 2200, 3),
                 item("i_pb10", "c_pb", "Power Bank 10k", 2200, 0),
                 item("i_pb20", "c_pb", "Power Bank 20k", 3500, 1),
+                item("i_pb5", "c_pb", "Power Bank 5k", 1500, 2),
+                item("i_mag", "c_pb", "MagSafe Bank", 4500, 3),
                 item("i_scr", "c_rep", "Screen Repair", 1, 0, "Quote after model"),
                 item("i_bat", "c_rep", "Battery Replace", 1, 1, "Quote after model"),
                 item("i_diag", "c_rep", "Diagnosis", 500, 2),
+                item("i_soft", "c_rep", "Software Fix", 800, 3),
             ],
             charge=100,
             free_above=3000,
@@ -693,15 +764,19 @@ TEMPLATES.append(
                 item("i_wash", "c_home", "Washing Machine", 45000, 0, "Auto 7kg"),
                 item("i_fridge", "c_home", "Refrigerator", 85000, 1, "Inverter"),
                 item("i_iron", "c_home", "Dry Iron", 3500, 2),
+                item("i_vac", "c_home", "Vacuum Cleaner", 18000, 3),
                 item("i_micro", "c_kit", "Microwave", 22000, 0),
                 item("i_blend", "c_kit", "Blender", 6500, 1),
                 item("i_kettle", "c_kit", "Electric Kettle", 4200, 2),
+                item("i_toast", "c_kit", "Toaster", 5500, 3),
                 item("i_fan", "c_fan", "Pedestal Fan", 8500, 0),
                 item("i_ac", "c_fan", "AC 1.5 Ton", 145000, 1, "Inverter"),
                 item("i_cooler", "c_fan", "Room Cooler", 18000, 2),
+                item("i_cfan", "c_fan", "Ceiling Fan", 6500, 3),
                 item("i_trim", "c_sm", "Trimmer", 2800, 0),
                 item("i_scale", "c_sm", "Kitchen Scale", 1500, 1),
                 item("i_ext", "c_sm", "Extension Board", 900, 2),
+                item("i_hair", "c_sm", "Hair Dryer", 3200, 3),
             ],
             charge=300,
             free_above=50000,
@@ -738,14 +813,24 @@ TEMPLATES.append(
             [
                 item("i_chkg", "c_ch", "Chicken (per kg)", 550, 0),
                 item("i_chbon", "c_ch", "Boneless (kg)", 850, 1),
+                item("i_chleg", "c_ch", "Legs (kg)", 600, 2),
+                item("i_chbr", "c_ch", "Breast (kg)", 750, 3),
                 item("i_mutkg", "c_mut", "Mutton (per kg)", 2200, 0),
                 item("i_mutk", "c_mut", "Mutton Karahi Cut", 2300, 1),
+                item("i_mutch", "c_mut", "Mutton Chops (kg)", 2400, 2),
+                item("i_mutleg", "c_mut", "Leg Piece (kg)", 2350, 3),
                 item("i_beefkg", "c_beef", "Beef (per kg)", 1600, 0),
                 item("i_keema", "c_beef", "Beef Keema (kg)", 1700, 1),
+                item("i_steak", "c_beef", "Beef Steak (kg)", 2200, 2),
+                item("i_ribs", "c_beef", "Beef Ribs (kg)", 1800, 3),
                 item("i_fishkg", "c_fish", "Rohu (per kg)", 900, 0),
                 item("i_prawn", "c_fish", "Prawns (kg)", 1800, 1),
+                item("i_til", "c_fish", "Tilapia (kg)", 750, 2),
+                item("i_surmai", "c_fish", "Surmai (kg)", 2200, 3),
                 item("i_qorma", "c_cut", "Qorma Cut (kg)", 600, 0),
                 item("i_boticut", "c_cut", "Boti Cut (kg)", 650, 1),
+                item("i_handi", "c_cut", "Handi Cut (kg)", 620, 2),
+                item("i_biryani", "c_cut", "Biryani Cut (kg)", 580, 3),
             ],
             charge=100,
             free_above=3000,
@@ -792,6 +877,8 @@ TEMPLATES.append(
                 item("i_dhani", "c_herb", "Dhania bunch", 40, 0),
                 item("i_podi", "c_herb", "Podina bunch", 40, 1),
                 item("i_adrak", "c_herb", "Adrak (kg)", 500, 2),
+                item("i_lehsun", "c_herb", "Lehsun (kg)", 450, 3),
+                item("i_hari", "c_herb", "Hari Mirch (kg)", 200, 4),
             ],
             charge=80,
             free_above=1500,
@@ -818,14 +905,24 @@ TEMPLATES.append(
         notes="Like water_supplier: customers can request regular morning delivery.",
         menu_v2=menu(
             "Assalam o Alaikum! Fresh dairy — subah delivery / regular subscription available.",
-            [cat("c_dairy", "Dairy", 0)],
             [
-                item("i_milk1", "c_dairy", "Fresh Milk 1L", 220, 0),
-                item("i_milk2", "c_dairy", "Fresh Milk 2L", 420, 1),
-                item("i_yog", "c_dairy", "Yogurt 1kg", 300, 2),
-                item("i_but", "c_dairy", "Butter 200g", 380, 3),
-                item("i_ghee", "c_dairy", "Desi Ghee 1kg", 2200, 4),
-                item("i_cream", "c_dairy", "Fresh Cream", 250, 5),
+                cat("c_milk", "Fresh Milk", 0),
+                cat("c_cult", "Yogurt/Butter", 1),
+                cat("c_ghee", "Ghee/Cream", 2),
+            ],
+            [
+                item("i_milk1", "c_milk", "Fresh Milk 1L", 220, 0),
+                item("i_milk2", "c_milk", "Fresh Milk 2L", 420, 1),
+                item("i_milk5", "c_milk", "Fresh Milk 5L", 1000, 2),
+                item("i_toned", "c_milk", "Toned Milk 1L", 200, 3),
+                item("i_yog", "c_cult", "Yogurt 1kg", 300, 0),
+                item("i_but", "c_cult", "Butter 200g", 380, 1),
+                item("i_lassi", "c_cult", "Lassi 1L", 250, 2),
+                item("i_raita", "c_cult", "Raita Pack", 180, 3),
+                item("i_ghee", "c_ghee", "Desi Ghee 1kg", 2200, 0),
+                item("i_cream", "c_ghee", "Fresh Cream", 250, 1),
+                item("i_cheese", "c_ghee", "Cheese Slice", 450, 2),
+                item("i_khoya", "c_ghee", "Khoya 500g", 800, 3),
             ],
             charge=50,
             free_above=1000,
@@ -873,11 +970,15 @@ TEMPLATES.append(
                     {"id": "p_a", "title": "Annual", "description": "12 months", "value": "Annual"},
                     {"id": "p_pt", "title": "Personal Train", "description": "PT sessions", "value": "PT"},
                     {"id": "p_tr", "title": "Free Trial", "description": "Tour + trial", "value": "Trial"},
+                    {"id": "p_coup", "title": "Couple", "description": "2 members", "value": "Couple"},
+                    {"id": "p_stud", "title": "Student", "description": "Student plan", "value": "Student"},
+                    {"id": "p_corp", "title": "Corporate", "description": "Office group", "value": "Corporate"},
                 ],
                 [
                     {"id": "b1", "title": "Main gym", "value": "Main"},
                     {"id": "b2", "title": "Ladies", "value": "Ladies"},
                     {"id": "b3", "title": "Branch 2", "value": "Branch2"},
+                    {"id": "b4", "title": "24/7 branch", "value": "24/7"},
                 ],
             ),
         },
@@ -929,6 +1030,10 @@ TEMPLATES.append(
                     {"id": "s_skin", "title": "Skin", "description": "Dermatology", "value": "Skin"},
                     {"id": "s_child", "title": "Child", "description": "Pediatrics", "value": "Child"},
                     {"id": "s_gyn", "title": "Gyne", "description": "Women health", "value": "Gyne"},
+                    {"id": "s_ent", "title": "ENT", "description": "Ear nose throat", "value": "ENT"},
+                    {"id": "s_eye", "title": "Eye", "description": "Ophthalmology", "value": "Eye"},
+                    {"id": "s_ortho", "title": "Ortho", "description": "Bones / joints", "value": "Ortho"},
+                    {"id": "s_card", "title": "Cardio", "description": "Heart", "value": "Cardio"},
                     {"id": "s_oth", "title": "Other", "description": "Other", "value": "Other"},
                 ],
             ),
@@ -968,6 +1073,10 @@ TEMPLATES.append(
                     {"id": "s_dent", "title": "Denting/Paint", "description": "Body work", "value": "Dent"},
                     {"id": "s_ac", "title": "AC service", "description": "Cooling", "value": "AC"},
                     {"id": "s_gen", "title": "General check", "description": "Inspection", "value": "Check"},
+                    {"id": "s_brake", "title": "Brakes", "description": "Brake service", "value": "Brakes"},
+                    {"id": "s_tyre", "title": "Tyres", "description": "Tyre change", "value": "Tyres"},
+                    {"id": "s_batt", "title": "Battery", "description": "Battery replace", "value": "Battery"},
+                    {"id": "s_detail", "title": "Detailing", "description": "Wash + polish", "value": "Detailing"},
                     {"id": "s_oth", "title": "Other", "description": "Other job", "value": "Other"},
                 ],
             ),
@@ -1014,12 +1123,17 @@ TEMPLATES.append(
                     {"id": "c_sci", "title": "Science", "description": "Physics/Chem", "value": "Science"},
                     {"id": "c_comp", "title": "Computer", "description": "IT / coding", "value": "Computer"},
                     {"id": "c_entry", "title": "Entry test", "description": "ECAT/MDCAT", "value": "Entry"},
+                    {"id": "c_acc", "title": "Accounts", "description": "Commerce", "value": "Accounts"},
+                    {"id": "c_urdu", "title": "Urdu", "description": "Language", "value": "Urdu"},
+                    {"id": "c_isl", "title": "Islamiyat", "description": "Islamic studies", "value": "Islamiyat"},
+                    {"id": "c_css", "title": "CSS / PMS", "description": "Competitive", "value": "CSS"},
                     {"id": "c_oth", "title": "Other", "description": "Other", "value": "Other"},
                 ],
                 [
                     {"id": "m_on", "title": "Online", "value": "Online"},
                     {"id": "m_camp", "title": "Campus", "value": "Campus"},
                     {"id": "m_home", "title": "Home tutor", "value": "Home"},
+                    {"id": "m_group", "title": "Group class", "value": "Group"},
                 ],
             ),
         },
@@ -1059,18 +1173,23 @@ TEMPLATES.append(
                     {"id": "t_bh", "title": "Buy House", "description": "Purchase home", "value": "Buy House"},
                     {"id": "t_bp", "title": "Buy Plot", "description": "Plot", "value": "Buy Plot"},
                     {"id": "t_bc", "title": "Buy Shop", "description": "Commercial", "value": "Buy Commercial"},
+                    {"id": "t_bf", "title": "Buy Flat", "description": "Apartment", "value": "Buy Flat"},
                     {"id": "t_rh", "title": "Rent House", "description": "Rental home", "value": "Rent House"},
+                    {"id": "t_rf", "title": "Rent Flat", "description": "Apartment rent", "value": "Rent Flat"},
                     {"id": "t_rc", "title": "Rent Shop", "description": "Commercial rent", "value": "Rent Commercial"},
+                    {"id": "t_inv", "title": "Investment", "description": "ROI focus", "value": "Investment"},
                 ],
                 [
                     {"id": "a1", "title": "DHA / Bahria", "value": "DHA/Bahria"},
                     {"id": "a2", "title": "City center", "value": "Center"},
-                    {"id": "a3", "title": "Other area", "value": "Other"},
+                    {"id": "a3", "title": "Gulberg", "value": "Gulberg"},
+                    {"id": "a4", "title": "Other area", "value": "Other"},
                 ],
                 [
                     {"id": "b1", "title": "Under 1 Cr", "sheet_value": "<1Cr"},
                     {"id": "b2", "title": "1-3 Cr", "sheet_value": "1-3Cr"},
-                    {"id": "b3", "title": "3 Cr+", "sheet_value": "3Cr+"},
+                    {"id": "b3", "title": "3-5 Cr", "sheet_value": "3-5Cr"},
+                    {"id": "b4", "title": "5 Cr+", "sheet_value": "5Cr+"},
                 ],
             ),
         },
@@ -1111,15 +1230,19 @@ TEMPLATES.append(
                 item("i_clean", "c_skin", "Face Cleanser", 1200, 0),
                 item("i_moist", "c_skin", "Moisturizer", 1500, 1),
                 item("i_sun", "c_skin", "Sunscreen SPF50", 1800, 2),
+                item("i_toner", "c_skin", "Face Toner", 1100, 3),
                 item("i_found", "c_make", "Foundation", 2500, 0, modifiers=shade),
                 item("i_lip", "c_make", "Lipstick", 900, 1, modifiers=shade),
                 item("i_mascara", "c_make", "Mascara", 1100, 2),
+                item("i_blush", "c_make", "Blush", 1300, 3, modifiers=shade),
                 item("i_shamp", "c_hair", "Shampoo", 850, 0),
                 item("i_cond", "c_hair", "Conditioner", 850, 1),
                 item("i_serum", "c_hair", "Hair Serum", 1400, 2),
+                item("i_oil", "c_hair", "Hair Oil", 650, 3),
                 item("i_attar", "c_frag", "Attar 12ml", 800, 0),
                 item("i_edt", "c_frag", "Body Mist", 1200, 1),
                 item("i_perfume", "c_frag", "Perfume 50ml", 4500, 2),
+                item("i_deo", "c_frag", "Deodorant", 650, 3),
             ],
             charge=100,
             free_above=3000,
@@ -1164,12 +1287,15 @@ TEMPLATES.append(
                 item("i_rose", "c_bouq", "Rose Bouquet", 2500, 0, modifiers=occasion),
                 item("i_mix", "c_bouq", "Mixed Bouquet", 2200, 1, modifiers=occasion),
                 item("i_orch", "c_bouq", "Orchid Special", 4500, 2, modifiers=occasion),
+                item("i_sunf", "c_bouq", "Sunflower Bunch", 1800, 3, modifiers=occasion),
                 item("i_choc", "c_bask", "Chocolate Basket", 3500, 0, modifiers=occasion),
                 item("i_fruit", "c_bask", "Fruit Basket", 3000, 1, modifiers=occasion),
                 item("i_combo", "c_bask", "Gift Combo", 5000, 2, modifiers=occasion),
+                item("i_dry", "c_bask", "Dry Fruit Box", 4200, 3, modifiers=occasion),
                 item("i_half", "c_cake", "Half kg Cake", 1800, 0),
                 item("i_one", "c_cake", "1 Pound Cake", 2500, 1),
                 item("i_cupg", "c_cake", "Cupcakes (6)", 1200, 2),
+                item("i_brown", "c_cake", "Brownies (6)", 900, 3),
             ],
             charge=200,
             free_above=5000,
@@ -1179,11 +1305,121 @@ TEMPLATES.append(
     )
 )
 
+# ── 23. shoe_store ───────────────────────────────────────────────────────────
+shoe_size = size_mod([("40", "Size 40", 0), ("42", "Size 42", 0), ("44", "Size 44", 0)])
+TEMPLATES.append(
+    tmpl(
+        "shoe_store",
+        "Shoe Store",
+        "shoes",
+        "order",
+        "Men/Women/Kids footwear + accessories — size modifier, ask for other sizes.",
+        icon="footprints",
+        greeting_ur=(
+            "Assalam o Alaikum! [Business] — shoes dekhein aur order karein. "
+            "Size choose karein; aur sizes chat mein pooch sakte hain."
+        ),
+        greeting_en=(
+            "Welcome to [Business]! Browse shoes below. Pick a size — "
+            "ask in chat for other sizes."
+        ),
+        facts="Common sizes on buttons; other sizes confirmed in chat before delivery.",
+        notes="Modifier shows 40/42/44 — customer can request other sizes in chat.",
+        menu_v2=menu(
+            "Assalam o Alaikum! [Business] shoes — size choose karein. Aur sizes chat mein pooch sakte hain.",
+            [
+                cat("c_men", "Men", 0),
+                cat("c_wom", "Women", 1),
+                cat("c_kid", "Kids", 2),
+                cat("c_acc", "Accessories", 3),
+            ],
+            [
+                item("i_sneak", "c_men", "Sneakers", 4500, 0, modifiers=shoe_size),
+                item("i_formal", "c_men", "Formal Shoes", 5500, 1, modifiers=shoe_size),
+                item("i_loaf", "c_men", "Loafers", 4800, 2, modifiers=shoe_size),
+                item("i_sandal", "c_men", "Sandals", 2200, 3, modifiers=shoe_size),
+                item("i_heels", "c_wom", "Heels", 4200, 0, modifiers=shoe_size),
+                item("i_flats", "c_wom", "Flat Sandals", 2800, 1, modifiers=shoe_size),
+                item("i_wsneak", "c_wom", "Women Sneakers", 4000, 2, modifiers=shoe_size),
+                item("i_khussa", "c_wom", "Khussa / Jutti", 2500, 3, modifiers=shoe_size),
+                item("i_ksneak", "c_kid", "Kids Sneakers", 2200, 0, modifiers=shoe_size),
+                item("i_kschool", "c_kid", "School Shoes", 2800, 1, modifiers=shoe_size),
+                item("i_ksand", "c_kid", "Kids Sandals", 1500, 2, modifiers=shoe_size),
+                item("i_kboot", "c_kid", "Kids Boots", 3200, 3, modifiers=shoe_size),
+                item("i_socks", "c_acc", "Socks (3-pack)", 450, 0),
+                item("i_lace", "c_acc", "Shoe Laces", 150, 1),
+                item("i_polish", "c_acc", "Shoe Polish", 280, 2),
+                item("i_insole", "c_acc", "Insoles", 600, 3),
+            ],
+            charge=150,
+            free_above=5000,
+            area_note="City delivery — confirm size before dispatch",
+            confirm="Confirm? Size theek hai? Aur size chahiye to likhein.",
+        ),
+    )
+)
+
+# ── 24. general_store ────────────────────────────────────────────────────────
+TEMPLATES.append(
+    tmpl(
+        "general_store",
+        "General Store",
+        "general_store",
+        "order",
+        "Variety shop — snacks, household, personal care, stationery.",
+        icon="store",
+        greeting_ur=(
+            "Assalam o Alaikum! [Business] general store — zarooriyat order karein. "
+            "Menu neeche hai."
+        ),
+        greeting_en="Welcome to [Business] general store — browse and order below.",
+        menu_v2=menu(
+            "Assalam o Alaikum! [Business] general store — zarooriyat order karein.",
+            [
+                cat("c_snack", "Snacks", 0),
+                cat("c_house", "Household", 1),
+                cat("c_pcare", "Personal Care", 2),
+                cat("c_stat", "Stationery", 3),
+            ],
+            [
+                item("i_chips", "c_snack", "Chips Pack", 80, 0),
+                item("i_biscuits", "c_snack", "Biscuits Pack", 120, 1),
+                item("i_choc", "c_snack", "Chocolate Bar", 150, 2),
+                item("i_nuts", "c_snack", "Mixed Nuts 250g", 450, 3),
+                item("i_det", "c_house", "Detergent 1kg", 450, 0),
+                item("i_tissue", "c_house", "Tissue Pack", 180, 1),
+                item("i_bag", "c_house", "Garbage Bags", 220, 2),
+                item("i_match", "c_house", "Match Box Pack", 60, 3),
+                item("i_soap", "c_pcare", "Bath Soap", 120, 0),
+                item("i_tooth", "c_pcare", "Toothpaste", 220, 1),
+                item("i_shamp", "c_pcare", "Shampoo Sachet", 40, 2),
+                item("i_cream", "c_pcare", "Face Cream", 350, 3),
+                item("i_pen", "c_stat", "Pen Pack (10)", 200, 0),
+                item("i_note", "c_stat", "Notebook", 150, 1),
+                item("i_glue", "c_stat", "Glue Stick", 80, 2),
+                item("i_tape", "c_stat", "Scotch Tape", 60, 3),
+            ],
+            charge=50,
+            free_above=1500,
+            area_note="Local delivery",
+        ),
+    )
+)
+
 
 def main() -> None:
     ids = []
     for t in TEMPLATES:
         path = OUT / f"{t['id']}.json"
+        # Preserve hierarchical menu_v2 already on disk (category → sub-category trees)
+        if path.exists():
+            try:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                emv = (existing.get("config") or {}).get("menu_v2")
+                if emv and any(c.get("parent_id") for c in (emv.get("categories") or [])):
+                    t.setdefault("config", {})["menu_v2"] = emv
+            except (OSError, json.JSONDecodeError):
+                pass
         # Validate title lengths for menu items
         mv = (t.get("config") or {}).get("menu_v2")
         if mv:
@@ -1200,6 +1436,27 @@ def main() -> None:
             counts = Counter(i["category_id"] for i in mv["items"])
             for cid, n in counts.items():
                 assert n <= 10, f"{t['id']} category {cid} has {n} items"
+            roots = [c for c in mv.get("categories") or [] if not c.get("parent_id")]
+            assert roots, f"{t['id']} needs root categories"
+            for c in mv.get("categories") or []:
+                kids = [x for x in mv["categories"] if x.get("parent_id") == c["id"]]
+                if kids:
+                    assert len(kids) >= 1
+                    for k in kids:
+                        n = counts.get(k["id"], 0)
+                        assert n >= 4, f"{t['id']} sub {k['name']} has only {n}"
+                else:
+                    n = counts.get(c["id"], 0)
+                    # leaf root allowed only if no parent — still need >=4 items
+                    if not c.get("parent_id"):
+                        # if this root has no kids, it must have items OR be transitional
+                        pass
+                    else:
+                        assert n >= 4, f"{t['id']} leaf {c['name']} has only {n}"
+            # Every root must have at least one sub-category
+            for r in roots:
+                kids = [x for x in mv["categories"] if x.get("parent_id") == r["id"]]
+                assert kids, f"{t['id']} root {r['name']} needs sub-categories"
 
         path.write_text(json.dumps(t, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         ids.append(t["id"])
@@ -1230,6 +1487,8 @@ def main() -> None:
         "real_estate",
         "beauty_cosmetics",
         "flower_gifts",
+        "shoe_store",
+        "general_store",
     }
     assert set(ids) == expected, set(ids) ^ expected
 

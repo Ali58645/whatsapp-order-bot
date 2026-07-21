@@ -244,7 +244,16 @@ def build_draft_patch(
                     },
                 }
             patch["menu_v2_draft"] = menu
-            # Legacy menu for compat
+            # Legacy menu for compat — leaf categories only (parents have no items)
+            leaf_cats = [
+                c for c in (menu.get("categories") or [])
+                if not any(
+                    (x.get("parent_id") or "") == c.get("id")
+                    for x in (menu.get("categories") or [])
+                )
+            ]
+            # WhatsApp legacy menu row limit — keep first 10 leaves
+            leaf_cats = leaf_cats[:10]
             patch["menu"] = {
                 "shop_name": business_name or "Shop",
                 "delivery_fee": (menu.get("settings") or {}).get("delivery", {}).get("charge", 100),
@@ -258,7 +267,7 @@ def build_draft_patch(
                             if it.get("category_id") == c.get("id")
                         ],
                     }
-                    for c in (menu.get("categories") or [])
+                    for c in leaf_cats
                 ],
             }
         else:

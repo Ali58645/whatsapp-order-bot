@@ -171,6 +171,8 @@ export type MenuV2Category = {
   name: string;
   sort: number;
   visible: boolean;
+  /** Empty/null = root category; set = sub-category under that parent (max depth 2). */
+  parent_id?: string | null;
 };
 export type MenuV2 = {
   categories: MenuV2Category[];

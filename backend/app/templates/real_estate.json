@@ -58,16 +58,34 @@
             "value": "Buy Commercial"
           },
           {
+            "id": "t_bf",
+            "title": "Buy Flat",
+            "description": "Apartment",
+            "value": "Buy Flat"
+          },
+          {
             "id": "t_rh",
             "title": "Rent House",
             "description": "Rental home",
             "value": "Rent House"
           },
           {
+            "id": "t_rf",
+            "title": "Rent Flat",
+            "description": "Apartment rent",
+            "value": "Rent Flat"
+          },
+          {
             "id": "t_rc",
             "title": "Rent Shop",
             "description": "Commercial rent",
             "value": "Rent Commercial"
+          },
+          {
+            "id": "t_inv",
+            "title": "Investment",
+            "description": "ROI focus",
+            "value": "Investment"
           }
         ],
         "locations": [
@@ -83,6 +101,11 @@
           },
           {
             "id": "a3",
+            "title": "Gulberg",
+            "value": "Gulberg"
+          },
+          {
+            "id": "a4",
             "title": "Other area",
             "value": "Other"
           }
@@ -100,8 +123,13 @@
           },
           {
             "id": "b3",
-            "title": "3 Cr+",
-            "sheet_value": "3Cr+"
+            "title": "3-5 Cr",
+            "sheet_value": "3-5Cr"
+          },
+          {
+            "id": "b4",
+            "title": "5 Cr+",
+            "sheet_value": "5Cr+"
           }
         ]
       }

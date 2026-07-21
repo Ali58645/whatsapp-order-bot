@@ -32,25 +32,70 @@
           "id": "c_bouq",
           "name": "Bouquets",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_bouq_rose",
+          "name": "Roses",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_bouq"
+        },
+        {
+          "id": "c_bouq_mix",
+          "name": "Mixed",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_bouq"
         },
         {
           "id": "c_bask",
           "name": "Gift Baskets",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_bask_food",
+          "name": "Food",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_bask"
+        },
+        {
+          "id": "c_bask_combo",
+          "name": "Combos",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_bask"
         },
         {
           "id": "c_cake",
           "name": "Cakes add-on",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_cake_std",
+          "name": "Cakes",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_cake"
+        },
+        {
+          "id": "c_cake_small",
+          "name": "Small Treats",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_cake"
         }
       ],
       "items": [
         {
           "id": "i_rose",
-          "category_id": "c_bouq",
+          "category_id": "c_bouq_rose",
           "name": "Rose Bouquet",
           "description": "",
           "price": 2500,
@@ -81,9 +126,9 @@
           ]
         },
         {
-          "id": "i_mix",
-          "category_id": "c_bouq",
-          "name": "Mixed Bouquet",
+          "id": "i_red12",
+          "category_id": "c_bouq_rose",
+          "name": "12 Red Roses",
           "description": "",
           "price": 2200,
           "available": true,
@@ -113,11 +158,11 @@
           ]
         },
         {
-          "id": "i_orch",
-          "category_id": "c_bouq",
-          "name": "Orchid Special",
+          "id": "i_mix_r",
+          "category_id": "c_bouq_rose",
+          "name": "Mixed Roses",
           "description": "",
-          "price": 4500,
+          "price": 2800,
           "available": true,
           "sort": 2,
           "modifiers": [
@@ -145,8 +190,168 @@
           ]
         },
         {
+          "id": "i_white",
+          "category_id": "c_bouq_rose",
+          "name": "White Roses",
+          "description": "",
+          "price": 2600,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_mix",
+          "category_id": "c_bouq_mix",
+          "name": "Mixed Bouquet",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_orch",
+          "category_id": "c_bouq_mix",
+          "name": "Orchid Special",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_sunf",
+          "category_id": "c_bouq_mix",
+          "name": "Sunflower Bunch",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_lilies",
+          "category_id": "c_bouq_mix",
+          "name": "Lilies",
+          "description": "",
+          "price": 3200,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
           "id": "i_choc",
-          "category_id": "c_bask",
+          "category_id": "c_bask_food",
           "name": "Chocolate Basket",
           "description": "",
           "price": 3500,
@@ -178,7 +383,7 @@
         },
         {
           "id": "i_fruit",
-          "category_id": "c_bask",
+          "category_id": "c_bask_food",
           "name": "Fruit Basket",
           "description": "",
           "price": 3000,
@@ -209,11 +414,11 @@
           ]
         },
         {
-          "id": "i_combo",
-          "category_id": "c_bask",
-          "name": "Gift Combo",
+          "id": "i_dry",
+          "category_id": "c_bask_food",
+          "name": "Dry Fruit Box",
           "description": "",
-          "price": 5000,
+          "price": 4200,
           "available": true,
           "sort": 2,
           "modifiers": [
@@ -241,8 +446,168 @@
           ]
         },
         {
+          "id": "i_tea",
+          "category_id": "c_bask_food",
+          "name": "Tea Hamper",
+          "description": "",
+          "price": 2800,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_combo",
+          "category_id": "c_bask_combo",
+          "name": "Gift Combo",
+          "description": "",
+          "price": 5000,
+          "available": true,
+          "sort": 0,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_spa",
+          "category_id": "c_bask_combo",
+          "name": "Spa Basket",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 1,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_baby",
+          "category_id": "c_bask_combo",
+          "name": "Baby Gift",
+          "description": "",
+          "price": 3800,
+          "available": true,
+          "sort": 2,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "i_corp",
+          "category_id": "c_bask_combo",
+          "name": "Corporate Box",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 3,
+          "modifiers": [
+            {
+              "id": "mod_occ",
+              "name": "Occasion",
+              "options": [
+                {
+                  "id": "oc_b",
+                  "label": "Birthday",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_a",
+                  "label": "Anniversary",
+                  "price_delta": 0
+                },
+                {
+                  "id": "oc_c",
+                  "label": "Condolence",
+                  "price_delta": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
           "id": "i_half",
-          "category_id": "c_cake",
+          "category_id": "c_cake_std",
           "name": "Half kg Cake",
           "description": "",
           "price": 1800,
@@ -252,7 +617,7 @@
         },
         {
           "id": "i_one",
-          "category_id": "c_cake",
+          "category_id": "c_cake_std",
           "name": "1 Pound Cake",
           "description": "",
           "price": 2500,
@@ -261,13 +626,63 @@
           "modifiers": []
         },
         {
+          "id": "i_two",
+          "category_id": "c_cake_std",
+          "name": "2 Pound Cake",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_custom_c",
+          "category_id": "c_cake_std",
+          "name": "Custom Message",
+          "description": "",
+          "price": 3000,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_cupg",
-          "category_id": "c_cake",
+          "category_id": "c_cake_small",
           "name": "Cupcakes (6)",
           "description": "",
           "price": 1200,
           "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_brown",
+          "category_id": "c_cake_small",
+          "name": "Brownies (6)",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_macaron",
+          "category_id": "c_cake_small",
+          "name": "Macarons (6)",
+          "description": "",
+          "price": 1500,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_truffle",
+          "category_id": "c_cake_small",
+          "name": "Truffles Box",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

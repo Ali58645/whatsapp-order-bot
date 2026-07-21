@@ -15,6 +15,7 @@ from typing import Callable, Awaitable
 
 from app.menu_v2 import (
     MORE_ROW_ID,
+    build_browse_payload,
     build_category_list_payload,
     build_confirm_buttons,
     build_greeting_and_entry,
@@ -26,8 +27,8 @@ from app.menu_v2 import (
     find_item,
     format_cart_summary,
     resolve_modifier_delta,
+    root_categories,
     validate_menu_v2,
-    visible_categories,
 )
 from app.interactive import parse_interactive_reply
 from app.sessions import clear_session, get_sender_lock
@@ -145,7 +146,7 @@ async def _handle_reply(
     on_confirm,
 ) -> dict:
     mr = tenant.msg()
-    # Category pick
+    # Category pick (root or sub-category)
     if reply_id.startswith("cat:"):
         cat_id = reply_id[4:]
         if cat_id == "empty":
@@ -153,8 +154,8 @@ async def _handle_reply(
         meta["category_id"] = cat_id
         meta["page"] = 0
         meta["phase"] = "ORDER_BROWSE"
-        payload = build_item_list_payload(
-            sender, menu, category_id=cat_id, page=0, tenant=tenant
+        payload = build_browse_payload(
+            sender, menu, cat_id, page=0, tenant=tenant
         )
         await send(sender, interactive_payload=payload, tenant=tenant)
         return {"status": "ok"}
@@ -222,15 +223,23 @@ async def _handle_reply(
     # Cart more / done
     if reply_id == "cart:more":
         meta["phase"] = "ORDER_BROWSE"
-        cats = visible_categories(menu)
+        cats = root_categories(menu)
         if len(cats) > 1:
             await send(
                 sender,
                 interactive_payload=build_category_list_payload(sender, menu, tenant=tenant),
                 tenant=tenant,
             )
+        elif len(cats) == 1:
+            await send(
+                sender,
+                interactive_payload=build_browse_payload(
+                    sender, menu, cats[0]["id"], page=0, tenant=tenant
+                ),
+                tenant=tenant,
+            )
         else:
-            cat_id = cats[0]["id"] if cats else meta.get("category_id")
+            cat_id = meta.get("category_id")
             await send(
                 sender,
                 interactive_payload=build_item_list_payload(

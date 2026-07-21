@@ -328,3 +328,62 @@ async def test_preview_endpoint_uses_same_builder(menu_db, menu_env):
         expected = build_greeting_and_entry("preview", draft)
         assert data["steps"][0]["payload"] == expected[0]
         assert data["steps"][1]["payload"] == expected[1]
+
+
+def test_parent_id_hierarchy_browse():
+    from app.menu_v2 import (
+        build_browse_payload,
+        child_categories,
+        root_categories,
+        validate_menu_v2,
+        MenuV2Error,
+    )
+    raw = {
+        "categories": [
+            {"id": "r1", "name": "Men", "sort": 0, "visible": True},
+            {"id": "s1", "name": "Sneakers", "sort": 0, "visible": True, "parent_id": "r1"},
+            {"id": "s2", "name": "Formal", "sort": 1, "visible": True, "parent_id": "r1"},
+        ],
+        "items": [
+            {
+                "id": "i1",
+                "category_id": "s1",
+                "name": "Shoe A",
+                "description": "",
+                "price": 100,
+                "available": True,
+                "sort": 0,
+                "modifiers": [],
+            },
+        ],
+        "settings": empty_menu_v2()["settings"],
+    }
+    m = validate_menu_v2(raw)
+    assert len(root_categories(m)) == 1
+    assert len(child_categories(m, "r1")) == 2
+    rows = build_browse_payload("1", m, "r1")["interactive"]["action"]["sections"][0]["rows"]
+    assert rows[0]["id"] == "cat:s1"
+    rows2 = build_browse_payload("1", m, "s1")["interactive"]["action"]["sections"][0]["rows"]
+    assert rows2[0]["id"].startswith("item:")
+    bad = {
+        **raw,
+        "categories": raw["categories"]
+        + [{"id": "x", "name": "TooDeep", "sort": 0, "visible": True, "parent_id": "s1"}],
+    }
+    with pytest.raises(MenuV2Error, match="depth"):
+        validate_menu_v2(bad)
+
+
+def test_order_templates_have_subcategories():
+    import json
+    from pathlib import Path
+    from app.menu_v2 import validate_menu_v2, root_categories, child_categories
+    for path in Path("app/templates").glob("*.json"):
+        data = json.loads(path.read_text())
+        if data.get("flow_mode") != "order":
+            continue
+        m = validate_menu_v2(data["config"]["menu_v2"])
+        roots = root_categories(m)
+        assert roots, data["id"]
+        for r in roots:
+            assert child_categories(m, r["id"]), f"{data['id']} root {r['name']} needs subs"

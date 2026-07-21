@@ -32,37 +32,112 @@
           "id": "c_chg",
           "name": "Chargers/Cables",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_chg_wall",
+          "name": "Chargers",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_chg"
+        },
+        {
+          "id": "c_chg_cable",
+          "name": "Cables",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_chg"
         },
         {
           "id": "c_cov",
           "name": "Covers/Protectors",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_cov_case",
+          "name": "Cases",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_cov"
+        },
+        {
+          "id": "c_cov_glass",
+          "name": "Glass",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_cov"
         },
         {
           "id": "c_aud",
           "name": "Earbuds/Audio",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_aud_buds",
+          "name": "Earbuds",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_aud"
+        },
+        {
+          "id": "c_aud_spk",
+          "name": "Speakers",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_aud"
         },
         {
           "id": "c_pb",
           "name": "Power Banks",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_pb_std",
+          "name": "Standard",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_pb"
+        },
+        {
+          "id": "c_pb_spec",
+          "name": "Special",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_pb"
         },
         {
           "id": "c_rep",
           "name": "Repairs",
           "sort": 4,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_rep_hard",
+          "name": "Hardware",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_rep"
+        },
+        {
+          "id": "c_rep_soft",
+          "name": "Software",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_rep"
         }
       ],
       "items": [
         {
           "id": "i_c20",
-          "category_id": "c_chg",
+          "category_id": "c_chg_wall",
           "name": "20W Fast Charger",
           "description": "",
           "price": 1200,
@@ -71,28 +146,78 @@
           "modifiers": []
         },
         {
-          "id": "i_ctype",
-          "category_id": "c_chg",
-          "name": "Type-C Cable",
+          "id": "i_c65",
+          "category_id": "c_chg_wall",
+          "name": "65W Charger",
           "description": "",
-          "price": 450,
+          "price": 2500,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_light",
-          "category_id": "c_chg",
-          "name": "Lightning Cable",
+          "id": "i_car",
+          "category_id": "c_chg_wall",
+          "name": "Car Charger",
           "description": "",
-          "price": 550,
+          "price": 800,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_wireless",
+          "category_id": "c_chg_wall",
+          "name": "Wireless Pad",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_ctype",
+          "category_id": "c_chg_cable",
+          "name": "Type-C Cable",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_light",
+          "category_id": "c_chg_cable",
+          "name": "Lightning Cable",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_micro",
+          "category_id": "c_chg_cable",
+          "name": "Micro USB",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_hub",
+          "category_id": "c_chg_cable",
+          "name": "USB Hub",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_cover",
-          "category_id": "c_cov",
+          "category_id": "c_cov_case",
           "name": "Silicon Cover",
           "description": "",
           "price": 400,
@@ -101,28 +226,78 @@
           "modifiers": []
         },
         {
-          "id": "i_glass",
-          "category_id": "c_cov",
-          "name": "Tempered Glass",
+          "id": "i_wallet",
+          "category_id": "c_cov_case",
+          "name": "Wallet Case",
           "description": "",
-          "price": 350,
+          "price": 900,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_wallet",
-          "category_id": "c_cov",
-          "name": "Wallet Case",
+          "id": "i_clear",
+          "category_id": "c_cov_case",
+          "name": "Clear Case",
           "description": "",
-          "price": 900,
+          "price": 350,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_rugged",
+          "category_id": "c_cov_case",
+          "name": "Rugged Case",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_glass",
+          "category_id": "c_cov_glass",
+          "name": "Tempered Glass",
+          "description": "",
+          "price": 350,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_priv",
+          "category_id": "c_cov_glass",
+          "name": "Privacy Glass",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_cam",
+          "category_id": "c_cov_glass",
+          "name": "Camera Glass",
+          "description": "",
+          "price": 250,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_full",
+          "category_id": "c_cov_glass",
+          "name": "Full Cover Glass",
+          "description": "",
+          "price": 450,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_buds",
-          "category_id": "c_aud",
+          "category_id": "c_aud_buds",
           "name": "Wireless Earbuds",
           "description": "",
           "price": 2500,
@@ -131,38 +306,158 @@
           "modifiers": []
         },
         {
-          "id": "i_bt",
-          "category_id": "c_aud",
-          "name": "BT Speaker Mini",
+          "id": "i_neck",
+          "category_id": "c_aud_buds",
+          "name": "Neckband",
           "description": "",
-          "price": 1800,
+          "price": 2200,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
-          "id": "i_pb10",
-          "category_id": "c_pb",
-          "name": "Power Bank 10k",
+          "id": "i_wired",
+          "category_id": "c_aud_buds",
+          "name": "Wired Earphones",
           "description": "",
-          "price": 2200,
+          "price": 450,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_pro",
+          "category_id": "c_aud_buds",
+          "name": "ANC Earbuds",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_bt",
+          "category_id": "c_aud_spk",
+          "name": "BT Speaker Mini",
+          "description": "",
+          "price": 1800,
           "available": true,
           "sort": 0,
           "modifiers": []
         },
         {
-          "id": "i_pb20",
-          "category_id": "c_pb",
-          "name": "Power Bank 20k",
+          "id": "i_boom",
+          "category_id": "c_aud_spk",
+          "name": "Party Speaker",
           "description": "",
-          "price": 3500,
+          "price": 4500,
           "available": true,
           "sort": 1,
           "modifiers": []
         },
         {
+          "id": "i_sound",
+          "category_id": "c_aud_spk",
+          "name": "Soundbar Mini",
+          "description": "",
+          "price": 6500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_mic",
+          "category_id": "c_aud_spk",
+          "name": "Karaoke Mic",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_pb5",
+          "category_id": "c_pb_std",
+          "name": "Power Bank 5k",
+          "description": "",
+          "price": 1500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_pb10",
+          "category_id": "c_pb_std",
+          "name": "Power Bank 10k",
+          "description": "",
+          "price": 2200,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_pb20",
+          "category_id": "c_pb_std",
+          "name": "Power Bank 20k",
+          "description": "",
+          "price": 3500,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_pb30",
+          "category_id": "c_pb_std",
+          "name": "Power Bank 30k",
+          "description": "",
+          "price": 4800,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_mag",
+          "category_id": "c_pb_spec",
+          "name": "MagSafe Bank",
+          "description": "",
+          "price": 4500,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_solar",
+          "category_id": "c_pb_spec",
+          "name": "Solar Bank",
+          "description": "",
+          "price": 3800,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_mini",
+          "category_id": "c_pb_spec",
+          "name": "Mini Bank",
+          "description": "",
+          "price": 1200,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_pd",
+          "category_id": "c_pb_spec",
+          "name": "PD 65W Bank",
+          "description": "",
+          "price": 5500,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_scr",
-          "category_id": "c_rep",
+          "category_id": "c_rep_hard",
           "name": "Screen Repair",
           "description": "Quote after model",
           "price": 1,
@@ -172,7 +467,7 @@
         },
         {
           "id": "i_bat",
-          "category_id": "c_rep",
+          "category_id": "c_rep_hard",
           "name": "Battery Replace",
           "description": "Quote after model",
           "price": 1,
@@ -181,13 +476,63 @@
           "modifiers": []
         },
         {
+          "id": "i_charg_p",
+          "category_id": "c_rep_hard",
+          "name": "Charging Port",
+          "description": "Quote after model",
+          "price": 1,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_back",
+          "category_id": "c_rep_hard",
+          "name": "Back Glass",
+          "description": "Quote after model",
+          "price": 1,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_diag",
-          "category_id": "c_rep",
+          "category_id": "c_rep_soft",
           "name": "Diagnosis",
           "description": "",
           "price": 500,
           "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_soft",
+          "category_id": "c_rep_soft",
+          "name": "Software Fix",
+          "description": "",
+          "price": 800,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_data",
+          "category_id": "c_rep_soft",
+          "name": "Data Recovery",
+          "description": "",
+          "price": 1500,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_unlock",
+          "category_id": "c_rep_soft",
+          "name": "Unlock Service",
+          "description": "",
+          "price": 1000,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],

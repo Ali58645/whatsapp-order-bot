@@ -27,7 +27,9 @@ function buildPreviewSteps(menu: MenuV2): { label: string; payload: StepPayload 
     payload: { type: "text", text: { body: greeting } },
   });
 
-  const cats = menu.categories.filter((c) => c.visible);
+  const roots = menu.categories.filter((c) => c.visible && !c.parent_id);
+  const childrenOf = (pid: string) =>
+    menu.categories.filter((c) => c.visible && (c.parent_id || "") === pid);
   const button = menu.settings.menu_button_label.slice(0, LIMITS.buttonLabel) || "Menu";
 
   const itemRows = (catId: string | null, page: number) => {
@@ -57,7 +59,19 @@ function buildPreviewSteps(menu: MenuV2): { label: string; payload: StepPayload 
     return rows;
   };
 
-  if (cats.length > 1) {
+  const catRows = (list: typeof roots) =>
+    list.slice(0, LIMITS.rowsMax).map((c) => {
+      const kids = childrenOf(c.id);
+      return {
+        id: `cat:${c.id}`,
+        title: c.name.slice(0, LIMITS.categoryName),
+        description: kids.length
+          ? `${kids.length} groups`
+          : `${menu.items.filter((i) => i.category_id === c.id && i.available).length} items`,
+      };
+    });
+
+  if (roots.length > 1) {
     steps.push({
       label: "Categories",
       payload: {
@@ -65,52 +79,60 @@ function buildPreviewSteps(menu: MenuV2): { label: string; payload: StepPayload 
         interactive: {
           type: "list",
           body: { text: "Category choose karein:" },
-          action: {
-            button,
-            sections: [
-              {
-                rows: cats.slice(0, LIMITS.rowsMax).map((c) => ({
-                  id: `cat:${c.id}`,
-                  title: c.name.slice(0, LIMITS.categoryName),
-                  description: `${menu.items.filter((i) => i.category_id === c.id && i.available).length} items`,
-                })),
-              },
-            ],
-          },
+          action: { button, sections: [{ rows: catRows(roots) }] },
         },
       },
     });
-    if (cats[0]) {
+  }
+
+  let leafId: string | null = roots[0]?.id ?? null;
+  if (roots[0]) {
+    const kids = childrenOf(roots[0].id);
+    if (kids.length) {
       steps.push({
-        label: "Items",
+        label: "Sub-categories",
         payload: {
           type: "interactive",
           interactive: {
             type: "list",
-            body: { text: `${cats[0].name} — item choose karein:` },
-            action: { button, sections: [{ rows: itemRows(cats[0].id, 0) }] },
+            body: { text: `${roots[0].name} — choose karein:` },
+            action: { button, sections: [{ rows: catRows(kids) }] },
           },
         },
       });
+      leafId = kids[0].id;
     }
-  } else {
-    const catId = cats[0]?.id ?? null;
     steps.push({
       label: "Items",
       payload: {
         type: "interactive",
         interactive: {
           type: "list",
-          body: { text: cats[0] ? `${cats[0].name} — item choose karein:` : "Item choose karein:" },
-          action: { button, sections: [{ rows: itemRows(catId, 0) }] },
+          body: {
+            text: leafId
+              ? `${menu.categories.find((c) => c.id === leafId)?.name || ""} — item choose karein:`
+              : "Item choose karein:",
+          },
+          action: { button, sections: [{ rows: itemRows(leafId, 0) }] },
+        },
+      },
+    });
+  } else {
+    steps.push({
+      label: "Items",
+      payload: {
+        type: "interactive",
+        interactive: {
+          type: "list",
+          body: { text: "Item choose karein:" },
+          action: { button, sections: [{ rows: itemRows(null, 0) }] },
         },
       },
     });
   }
 
-  const firstCat = cats[0]?.id;
   const firstItem = menu.items
-    .filter((i) => i.available && (!firstCat || i.category_id === firstCat))
+    .filter((i) => i.available && (!leafId || i.category_id === leafId))
     .sort((a, b) => a.sort - b.sort)[0];
 
   if (firstItem?.modifiers?.[0]?.options?.length) {

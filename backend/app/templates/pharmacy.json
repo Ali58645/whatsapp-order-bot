@@ -32,31 +32,91 @@
           "id": "c_otc",
           "name": "OTC Medicines",
           "sort": 0,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_otc_pain",
+          "name": "Pain/Fever",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_otc"
+        },
+        {
+          "id": "c_otc_other",
+          "name": "Cough/Stomach",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_otc"
         },
         {
           "id": "c_pc",
           "name": "Personal Care",
           "sort": 1,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_pc_hair",
+          "name": "Hair/Oral",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_pc"
+        },
+        {
+          "id": "c_pc_skin",
+          "name": "Skin/Hands",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_pc"
         },
         {
           "id": "c_baby",
           "name": "Baby Care",
           "sort": 2,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_baby_hyg",
+          "name": "Hygiene",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_baby"
+        },
+        {
+          "id": "c_baby_feed",
+          "name": "Feeding",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_baby"
         },
         {
           "id": "c_supp",
           "name": "Supplements",
           "sort": 3,
-          "visible": true
+          "visible": true,
+          "parent_id": null
+        },
+        {
+          "id": "c_supp_vit",
+          "name": "Vitamins",
+          "sort": 0,
+          "visible": true,
+          "parent_id": "c_supp"
+        },
+        {
+          "id": "c_supp_oth",
+          "name": "Other",
+          "sort": 1,
+          "visible": true,
+          "parent_id": "c_supp"
         }
       ],
       "items": [
         {
           "id": "i_panadol",
-          "category_id": "c_otc",
+          "category_id": "c_otc_pain",
           "name": "Panadol Tab",
           "description": "Strip",
           "price": 35,
@@ -66,7 +126,7 @@
         },
         {
           "id": "i_disprin",
-          "category_id": "c_otc",
+          "category_id": "c_otc_pain",
           "name": "Disprin",
           "description": "",
           "price": 40,
@@ -75,28 +135,68 @@
           "modifiers": []
         },
         {
-          "id": "i_ors",
-          "category_id": "c_otc",
-          "name": "ORS Sachet",
+          "id": "i_brufen",
+          "category_id": "c_otc_pain",
+          "name": "Brufen",
           "description": "",
-          "price": 50,
+          "price": 80,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_flagyl",
+          "category_id": "c_otc_pain",
+          "name": "Flagyl",
+          "description": "",
+          "price": 60,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_ors",
+          "category_id": "c_otc_other",
+          "name": "ORS Sachet",
+          "description": "",
+          "price": 50,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
           "id": "i_cough",
-          "category_id": "c_otc",
+          "category_id": "c_otc_other",
           "name": "Cough Syrup",
           "description": "",
           "price": 280,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_antac",
+          "category_id": "c_otc_other",
+          "name": "Antacid Tab",
+          "description": "",
+          "price": 80,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_diges",
+          "category_id": "c_otc_other",
+          "name": "Digestive Syrup",
+          "description": "",
+          "price": 220,
           "available": true,
           "sort": 3,
           "modifiers": []
         },
         {
           "id": "i_shamp",
-          "category_id": "c_pc",
+          "category_id": "c_pc_hair",
           "name": "Shampoo 200ml",
           "description": "",
           "price": 450,
@@ -106,7 +206,7 @@
         },
         {
           "id": "i_tooth",
-          "category_id": "c_pc",
+          "category_id": "c_pc_hair",
           "name": "Toothpaste",
           "description": "",
           "price": 220,
@@ -115,18 +215,68 @@
           "modifiers": []
         },
         {
-          "id": "i_san",
-          "category_id": "c_pc",
-          "name": "Hand Sanitizer",
+          "id": "i_mouth",
+          "category_id": "c_pc_hair",
+          "name": "Mouthwash",
           "description": "",
-          "price": 180,
+          "price": 350,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_brush",
+          "category_id": "c_pc_hair",
+          "name": "Toothbrush",
+          "description": "",
+          "price": 120,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_san",
+          "category_id": "c_pc_skin",
+          "name": "Hand Sanitizer",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_lotion",
+          "category_id": "c_pc_skin",
+          "name": "Body Lotion",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_facew",
+          "category_id": "c_pc_skin",
+          "name": "Face Wash",
+          "description": "",
+          "price": 400,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_cream",
+          "category_id": "c_pc_skin",
+          "name": "Moisturizer",
+          "description": "",
+          "price": 480,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_diaper",
-          "category_id": "c_baby",
+          "category_id": "c_baby_hyg",
           "name": "Diapers M (pack)",
           "description": "",
           "price": 1200,
@@ -136,7 +286,7 @@
         },
         {
           "id": "i_wipes",
-          "category_id": "c_baby",
+          "category_id": "c_baby_hyg",
           "name": "Baby Wipes",
           "description": "",
           "price": 350,
@@ -145,18 +295,68 @@
           "modifiers": []
         },
         {
-          "id": "i_feed",
-          "category_id": "c_baby",
-          "name": "Feeding Bottle",
+          "id": "i_bsoap",
+          "category_id": "c_baby_hyg",
+          "name": "Baby Soap",
           "description": "",
-          "price": 650,
+          "price": 280,
           "available": true,
           "sort": 2,
           "modifiers": []
         },
         {
+          "id": "i_oil",
+          "category_id": "c_baby_hyg",
+          "name": "Baby Oil",
+          "description": "",
+          "price": 320,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
+          "id": "i_feed",
+          "category_id": "c_baby_feed",
+          "name": "Feeding Bottle",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_nip",
+          "category_id": "c_baby_feed",
+          "name": "Nipple Pack",
+          "description": "",
+          "price": 180,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_form",
+          "category_id": "c_baby_feed",
+          "name": "Formula Starter",
+          "description": "",
+          "price": 1800,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_cereal",
+          "category_id": "c_baby_feed",
+          "name": "Baby Cereal",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_vitc",
-          "category_id": "c_supp",
+          "category_id": "c_supp_vit",
           "name": "Vitamin C",
           "description": "",
           "price": 400,
@@ -166,7 +366,7 @@
         },
         {
           "id": "i_multi",
-          "category_id": "c_supp",
+          "category_id": "c_supp_vit",
           "name": "Multivitamin",
           "description": "",
           "price": 850,
@@ -175,13 +375,63 @@
           "modifiers": []
         },
         {
+          "id": "i_cal",
+          "category_id": "c_supp_vit",
+          "name": "Calcium Tab",
+          "description": "",
+          "price": 650,
+          "available": true,
+          "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_vitd",
+          "category_id": "c_supp_vit",
+          "name": "Vitamin D",
+          "description": "",
+          "price": 550,
+          "available": true,
+          "sort": 3,
+          "modifiers": []
+        },
+        {
           "id": "i_omega",
-          "category_id": "c_supp",
+          "category_id": "c_supp_oth",
           "name": "Omega-3",
           "description": "",
           "price": 1100,
           "available": true,
+          "sort": 0,
+          "modifiers": []
+        },
+        {
+          "id": "i_iron",
+          "category_id": "c_supp_oth",
+          "name": "Iron Syrup",
+          "description": "",
+          "price": 380,
+          "available": true,
+          "sort": 1,
+          "modifiers": []
+        },
+        {
+          "id": "i_prot",
+          "category_id": "c_supp_oth",
+          "name": "Protein Powder",
+          "description": "",
+          "price": 3200,
+          "available": true,
           "sort": 2,
+          "modifiers": []
+        },
+        {
+          "id": "i_probiot",
+          "category_id": "c_supp_oth",
+          "name": "Probiotic",
+          "description": "",
+          "price": 900,
+          "available": true,
+          "sort": 3,
           "modifiers": []
         }
       ],
