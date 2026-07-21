@@ -89,7 +89,7 @@ export default function OwnerHome() {
           <span className="font-medium">{t("completeBot")}</span>
           {nudge.greeting && (
             <Link to="/my-bot" className="text-primary underline-offset-2 hover:underline">
-              {t("completeGreeting")}
+              Open My Bot → Greeting
             </Link>
           )}
           {nudge.menu && (

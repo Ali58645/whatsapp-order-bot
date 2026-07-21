@@ -95,7 +95,7 @@ export function LeadOptionsEditor({
   return (
     <div className="space-y-3">
       <AccordionSection
-        title="Business type list"
+        title="1. Business type"
         count={btItems.length}
         countLabel={btItems.length === 1 ? "row" : "rows"}
         defaultOpen
@@ -137,7 +137,7 @@ export function LeadOptionsEditor({
           features={{
             reorder: true,
             valueField: true,
-            valueLabel: "Value for sheet",
+            valueLabel: "Saved as",
             descriptionField: true,
           }}
           addDisabledHint="WhatsApp list limit: 10 rows"
@@ -156,7 +156,7 @@ export function LeadOptionsEditor({
       </AccordionSection>
 
       <AccordionSection
-        title="Locations buttons"
+        title="2. Locations"
         count={locItems.length}
         countLabel={locItems.length === 1 ? "button" : "buttons"}
       >
@@ -189,7 +189,7 @@ export function LeadOptionsEditor({
       </AccordionSection>
 
       <AccordionSection
-        title="Current system buttons"
+        title="3. Current system"
         count={sysItems.length}
         countLabel={sysItems.length === 1 ? "button" : "buttons"}
       >
@@ -222,7 +222,7 @@ export function LeadOptionsEditor({
       </AccordionSection>
 
       <AccordionSection
-        title="Scheduling"
+        title="4. Demo scheduling"
         count={schedulingItems.length}
         countLabel="slot buttons"
       >

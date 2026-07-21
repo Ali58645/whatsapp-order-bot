@@ -14,6 +14,7 @@ const Businesses = lazy(() => import("./pages/Businesses"));
 const Team = lazy(() => import("./pages/Team"));
 const AccessLog = lazy(() => import("./pages/AccessLog"));
 const OwnerHome = lazy(() => import("./pages/owner/OwnerHome"));
+const OwnerBot = lazy(() => import("./pages/owner/OwnerBot"));
 const Customers = lazy(() => import("./pages/owner/Customers"));
 const Billing = lazy(() => import("./pages/owner/Billing"));
 const Channels = lazy(() => import("./pages/Channels"));
@@ -99,7 +100,7 @@ export default function App() {
           element={
             <OwnerOnly>
               <SuspensePage>
-                <Settings ownerMode />
+                <OwnerBot />
               </SuspensePage>
             </OwnerOnly>
           }

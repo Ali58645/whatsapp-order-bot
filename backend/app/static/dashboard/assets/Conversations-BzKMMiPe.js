@@ -1,4 +1,4 @@
-import{c as m,j as e,a as j,r as n,b as v,t as $,L as Q,B as J,S as P,g as se,d as ae,I as ne,A as ie,e as re,M as le}from"./index-CkAfqbKM.js";import{C as G}from"./ChannelBadge-JLqm68R4.js";import{W as oe}from"./WhatsAppThread-B0zVriNI.js";import{C as ce}from"./chevron-left-DjRGJk0u.js";import{S as de,a as xe}from"./switch-DafnJAG4.js";import{P as he}from"./plus-Cgn-KtX3.js";import{S as me}from"./badge-CjC_HSHJ.js";import{E as ue}from"./empty-state-BbZEwm9n.js";/**
+import{c as m,j as e,a as j,r as n,b as v,t as $,L as Q,B as J,S as P,g as se,d as ae,I as ne,A as ie,e as re,M as le}from"./index-CJiiF0Y_.js";import{C as G}from"./ChannelBadge-Ctz61Tvr.js";import{W as oe}from"./WhatsAppThread-BPXvMa7v.js";import{C as ce}from"./chevron-left-D1XtyRRx.js";import{S as de,a as xe}from"./switch-frTqNcls.js";import{P as he}from"./plus-DaLJga_b.js";import{S as me}from"./badge-0OOeBnjY.js";import{E as ue}from"./empty-state-CASJHe3H.js";/**
  * @license lucide-react v1.25.0 - ISC
  *
  * This source code is licensed under the ISC license.

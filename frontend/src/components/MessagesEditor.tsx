@@ -48,6 +48,8 @@ type Props = {
   onResetField: (key: string) => void;
   busy: boolean;
   publishing: boolean;
+  /** Owner My Bot — parent owns Save & go live */
+  hideActions?: boolean;
 };
 
 export function MessagesEditor({
@@ -60,6 +62,7 @@ export function MessagesEditor({
   onResetField,
   busy,
   publishing,
+  hideActions = false,
 }: Props) {
   const section = flowMode === "order" ? "order" : "lead";
   const sectionDraft = (draft?.[section] as Record<string, string>) || {};
@@ -78,28 +81,32 @@ export function MessagesEditor({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Edit bot message templates — use {"{{variable}}"} for dynamic text
-        </p>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onSave}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save draft
-          </Button>
-          <Button type="button" size="sm" disabled={publishing} onClick={onPublish}>
-            {publishing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4" />
-            )}
-            Publish messages
-          </Button>
+      {!hideActions && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Edit bot message templates — use {"{{variable}}"} for dynamic text
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onSave}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save draft
+            </Button>
+            <Button type="button" size="sm" disabled={publishing} onClick={onPublish}>
+              {publishing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              Publish messages
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
-        <h2 className="text-sm font-semibold capitalize">{section} messages</h2>
+        <h2 className="text-sm font-semibold capitalize">
+          {hideActions ? "Reply templates" : `${section} messages`}
+        </h2>
         {stringKeys.map((key) => (
           <MessageField
             key={key}
@@ -112,7 +119,7 @@ export function MessagesEditor({
         ))}
       </section>
 
-      {flowMode === "lead" && (
+      {flowMode === "lead" && !hideActions && (
         <p className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
           Interactive option sets (business type, locations, system, scheduling) are edited under{" "}
           <span className="text-foreground">Lead options</span>.
