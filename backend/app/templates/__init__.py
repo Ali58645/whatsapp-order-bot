@@ -228,6 +228,7 @@ def build_draft_patch(
         # Clear owner greeting variants / image so template greeting is the source of truth
         patch["greeting_variants"] = []
         patch["greeting_image_url"] = ""
+        patch["greeting_blocks"] = []
 
     if flow == "order":
         menu = cfg_in.get("menu_v2")

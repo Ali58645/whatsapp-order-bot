@@ -9,34 +9,69 @@ from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 
-def greeting_messages(tenant) -> list[str]:
+def _https_image(url: str) -> str:
+    u = (url or "").strip()
+    if u.lower().startswith("https://"):
+        return u[:2048]
+    return ""
+
+
+def greeting_blocks(tenant) -> list[dict[str, str]]:
     """
-    All greeting bubbles to send, in order: primary greeting_text then extras.
-    Empty lines skipped. No random pick — every non-empty line is sent.
+    Greeting bubbles to send: [{text, image_url}, ...] in order.
+    Prefers config.greeting_blocks; falls back to greeting_text / variants / image.
     """
-    custom = (getattr(tenant, "greeting_text", "") or "").strip()
     raw = getattr(tenant, "_raw_config", None) or {}
+    blocks_in = raw.get("greeting_blocks")
+    out: list[dict[str, str]] = []
+    if isinstance(blocks_in, list) and blocks_in:
+        for item in blocks_in:
+            if isinstance(item, dict):
+                text = str(item.get("text") or "").strip()
+                img = _https_image(str(item.get("image_url") or ""))
+                if text or img:
+                    out.append({"text": text, "image_url": img})
+            elif isinstance(item, str) and item.strip():
+                out.append({"text": item.strip(), "image_url": ""})
+        if out:
+            return out
+
+    custom = (getattr(tenant, "greeting_text", "") or "").strip()
+    first_img = _https_image(str(raw.get("greeting_image_url") or ""))
     variants = raw.get("greeting_variants") or []
-    extras = [str(v).strip() for v in variants if isinstance(v, str) and str(v).strip()]
-    lines: list[str] = []
-    if custom:
-        lines.append(custom)
-    lines.extend(extras)
-    return lines
+    extras: list[str] = []
+    for v in variants:
+        if isinstance(v, dict):
+            t = str(v.get("text") or "").strip()
+            if t:
+                extras.append(t)
+        elif isinstance(v, str) and v.strip():
+            extras.append(v.strip())
+    if custom or first_img:
+        out.append({"text": custom, "image_url": first_img})
+    for e in extras:
+        out.append({"text": e, "image_url": ""})
+    return out
+
+
+def greeting_messages(tenant) -> list[str]:
+    """Text-only greeting lines (compat)."""
+    return [b["text"] for b in greeting_blocks(tenant) if b.get("text")]
 
 
 def pick_greeting_text(tenant) -> str:
-    """Joined greetings (compat). Prefer greeting_messages() for WhatsApp sends."""
+    """Joined greetings (compat). Prefer greeting_blocks() for WhatsApp sends."""
     msgs = greeting_messages(tenant)
     return "\n\n".join(msgs) if msgs else ""
 
 
 def greeting_image_url(tenant) -> str:
+    """First greeting image (compat)."""
+    blocks = greeting_blocks(tenant)
+    if blocks:
+        return blocks[0].get("image_url") or ""
     raw = getattr(tenant, "_raw_config", None) or {}
-    url = str(raw.get("greeting_image_url") or "").strip()
-    if url.startswith("https://"):
-        return url[:2048]
-    return ""
+    return _https_image(str(raw.get("greeting_image_url") or ""))
 
 
 def business_hours_config(tenant) -> dict[str, Any]:

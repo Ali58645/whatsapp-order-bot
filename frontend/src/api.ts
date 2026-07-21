@@ -144,6 +144,7 @@ export type TenantConfig = {
   owner_whatsapp: string;
   greeting_image_url?: string;
   greeting_variants?: string[];
+  greeting_blocks?: { text: string; image_url?: string }[];
   business_hours?: {
     enabled?: boolean;
     timezone?: string;

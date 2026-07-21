@@ -22,6 +22,39 @@ import { cn } from "../../lib/utils";
 
 type Step = "greeting" | "questions" | "faq" | "more";
 
+type GreetingBlock = { text: string; image_url: string };
+
+function readGreetingBlocks(config: TenantConfigResponse["config"]): GreetingBlock[] {
+  const blocks = config.greeting_blocks;
+  if (Array.isArray(blocks) && blocks.length) {
+    return blocks.map((b) => ({
+      text: (b?.text || "").toString(),
+      image_url: (b?.image_url || "").toString(),
+    }));
+  }
+  const texts = [config.greeting_text || "", ...(config.greeting_variants || [])];
+  const firstImg = config.greeting_image_url || "";
+  const mapped = texts.map((text, i) => ({
+    text,
+    image_url: i === 0 ? firstImg : "",
+  }));
+  return mapped.length ? mapped : [{ text: "", image_url: "" }];
+}
+
+function writeGreetingBlocks(
+  config: TenantConfigResponse["config"],
+  blocks: GreetingBlock[]
+): TenantConfigResponse["config"] {
+  const next = blocks.length ? blocks : [{ text: "", image_url: "" }];
+  return {
+    ...config,
+    greeting_blocks: next,
+    greeting_text: next[0]?.text || "",
+    greeting_image_url: next[0]?.image_url || "",
+    greeting_variants: next.slice(1).map((b) => b.text),
+  };
+}
+
 type MessagesDraft = {
   lead?: Record<string, string>;
   order?: Record<string, string>;
@@ -151,12 +184,12 @@ export default function OwnerBot() {
         }
       }
 
-      const greetingBoxes = [
-        cfg.config.greeting_text || "",
-        ...(cfg.config.greeting_variants || []),
-      ]
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const greetingBlocks = readGreetingBlocks(cfg.config)
+        .map((b) => ({
+          text: b.text.trim(),
+          image_url: b.image_url.trim(),
+        }))
+        .filter((b) => b.text || b.image_url);
 
       const updated = await api<TenantConfigResponse>(
         `/api/dashboard/tenants/${tenantId}/config`,
@@ -164,10 +197,11 @@ export default function OwnerBot() {
           method: "POST",
           body: JSON.stringify({
             name: cfg.name,
-            greeting_text: greetingBoxes[0] || "",
+            greeting_blocks: greetingBlocks,
+            greeting_text: greetingBlocks[0]?.text || "",
             greeting_language: cfg.config.greeting_language,
-            greeting_image_url: cfg.config.greeting_image_url || "",
-            greeting_variants: greetingBoxes.slice(1),
+            greeting_image_url: greetingBlocks[0]?.image_url || "",
+            greeting_variants: greetingBlocks.slice(1).map((b) => b.text).filter(Boolean),
             business_hours: cfg.config.business_hours || { enabled: false },
             owner_whatsapp: cfg.config.owner_whatsapp || "",
             campaign_phrase: cfg.config.campaign_phrase,
@@ -410,7 +444,7 @@ export default function OwnerBot() {
               <div>
                 <Label>Greeting messages</Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Each box is sent as its own WhatsApp bubble, in order. Add as many as you need.
+                  Each box is its own WhatsApp bubble. Optional image URL on every box.
                 </p>
               </div>
               {!readonly && (
@@ -418,37 +452,27 @@ export default function OwnerBot() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const boxes = [
-                      cfg.config.greeting_text || "",
-                      ...(cfg.config.greeting_variants || []),
-                      "",
-                    ];
+                  onClick={() =>
                     setCfg({
                       ...cfg,
-                      config: {
-                        ...cfg.config,
-                        greeting_text: boxes[0] || "",
-                        greeting_variants: boxes.slice(1),
-                      },
-                    });
-                  }}
+                      config: writeGreetingBlocks(cfg.config, [
+                        ...readGreetingBlocks(cfg.config),
+                        { text: "", image_url: "" },
+                      ]),
+                    })
+                  }
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add greeting
                 </Button>
               )}
             </div>
-            {(
-              [cfg.config.greeting_text || "", ...(cfg.config.greeting_variants || [])].length
-                ? [cfg.config.greeting_text || "", ...(cfg.config.greeting_variants || [])]
-                : [""]
-            ).map((text, idx, boxes) => (
+            {readGreetingBlocks(cfg.config).map((block, idx, boxes) => (
               <div
                 key={`greet-${idx}`}
-                className="rounded-xl border border-border bg-muted/15 p-3"
+                className="space-y-2 rounded-xl border border-border bg-muted/15 p-3"
               >
-                <div className="mb-1.5 flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-muted-foreground">
                     Message {idx + 1}
                     {idx === 0 ? " · first" : ""}
@@ -457,17 +481,15 @@ export default function OwnerBot() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
-                      onClick={() => {
-                        const next = boxes.filter((_, i) => i !== idx);
+                      onClick={() =>
                         setCfg({
                           ...cfg,
-                          config: {
-                            ...cfg.config,
-                            greeting_text: next[0] || "",
-                            greeting_variants: next.slice(1),
-                          },
-                        });
-                      }}
+                          config: writeGreetingBlocks(
+                            cfg.config,
+                            boxes.filter((_, i) => i !== idx)
+                          ),
+                        })
+                      }
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Remove
@@ -476,16 +498,14 @@ export default function OwnerBot() {
                 </div>
                 <Textarea
                   rows={3}
-                  value={text}
+                  value={block.text}
                   onChange={(e) => {
-                    const next = boxes.map((b, i) => (i === idx ? e.target.value : b));
+                    const next = boxes.map((b, i) =>
+                      i === idx ? { ...b, text: e.target.value } : b
+                    );
                     setCfg({
                       ...cfg,
-                      config: {
-                        ...cfg.config,
-                        greeting_text: next[0] || "",
-                        greeting_variants: next.slice(1),
-                      },
+                      config: writeGreetingBlocks(cfg.config, next),
                     });
                   }}
                   disabled={readonly}
@@ -495,6 +515,28 @@ export default function OwnerBot() {
                       : "Next greeting message…"
                   }
                 />
+                <div>
+                  <Label className="text-xs">Image URL (optional)</Label>
+                  <Input
+                    className="mt-1.5"
+                    placeholder="https://…"
+                    value={block.image_url}
+                    onChange={(e) => {
+                      const next = boxes.map((b, i) =>
+                        i === idx ? { ...b, image_url: e.target.value } : b
+                      );
+                      setCfg({
+                        ...cfg,
+                        config: writeGreetingBlocks(cfg.config, next),
+                      });
+                    }}
+                    disabled={readonly}
+                    inputMode="url"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Public https image sent with this message.
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -526,34 +568,50 @@ export default function OwnerBot() {
             </p>
             <div className="space-y-2 rounded-xl bg-[var(--wa-bg)] p-3">
               {[
-                ...(cfg.config.greeting_text || "").trim()
-                  ? [(cfg.config.greeting_text || "").trim()]
-                  : [],
-                ...(cfg.config.greeting_variants || [])
-                  .map((g) => g.trim())
-                  .filter(Boolean),
-                isLead
-                  ? (
-                      leadMsgs.q_business_name ||
-                      "Barah-e-karam apne business ya shop ka naam farmaayein."
-                    ).trim()
-                  : "",
+                ...readGreetingBlocks(cfg.config)
+                  .filter((b) => b.text.trim() || b.image_url.trim())
+                  .map((b) => ({
+                    text: b.text.trim() || (b.image_url ? "[image]" : ""),
+                    image: b.image_url.trim(),
+                  })),
+                ...(isLead
+                  ? [
+                      {
+                        text: (
+                          leadMsgs.q_business_name ||
+                          "Barah-e-karam apne business ya shop ka naam farmaayein."
+                        ).trim(),
+                        image: "",
+                      },
+                    ]
+                  : []),
               ]
-                .filter(Boolean)
+                .filter((b) => b.text)
                 .map((bubble, i) => (
                   <div
-                    key={`${i}-${bubble.slice(0, 24)}`}
-                    className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100"
+                    key={`${i}-${bubble.text.slice(0, 24)}`}
+                    className="mr-auto max-w-[90%] overflow-hidden rounded-2xl rounded-bl-sm bg-[var(--wa-in)] text-[13px] text-zinc-100"
                   >
-                    <p className="transcript-text whitespace-pre-wrap">{bubble}</p>
+                    {bubble.image ? (
+                      <img
+                        src={bubble.image}
+                        alt=""
+                        className="max-h-36 w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : null}
+                    <p className="transcript-text whitespace-pre-wrap px-3 py-2">{bubble.text}</p>
                   </div>
                 ))}
-              {!(cfg.config.greeting_text || "").trim() &&
-                !(cfg.config.greeting_variants || []).some((g) => g.trim()) && (
-                  <div className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
-                    …
-                  </div>
-                )}
+              {!readGreetingBlocks(cfg.config).some(
+                (b) => b.text.trim() || b.image_url.trim()
+              ) && (
+                <div className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
+                  …
+                </div>
+              )}
             </div>
           </div>
           <div>
@@ -593,24 +651,6 @@ export default function OwnerBot() {
               </p>
             </div>
           )}
-          <div>
-            <Label>Greeting image URL (optional)</Label>
-            <Input
-              className="mt-1.5"
-              placeholder="https://…"
-              value={cfg.config.greeting_image_url || ""}
-              onChange={(e) =>
-                setCfg({
-                  ...cfg,
-                  config: { ...cfg.config, greeting_image_url: e.target.value },
-                })
-              }
-              disabled={readonly}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Public https image — sent with the first greeting. Host on your CDN or Imgur.
-            </p>
-          </div>
           {isLead && (
             <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
               <div className="flex items-center justify-between gap-3">

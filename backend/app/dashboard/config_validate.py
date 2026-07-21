@@ -52,6 +52,38 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
                 cleaned.append(t)
         out["greeting_variants"] = cleaned
 
+    if "greeting_blocks" in patch:
+        raw = patch["greeting_blocks"]
+        if not isinstance(raw, list):
+            _err("greeting_blocks must be a list")
+        cleaned_blocks = []
+        for i, item in enumerate(raw):
+            if isinstance(item, str):
+                text = sanitize_text(item, max_len=GREETING_MAX)
+                img = ""
+            elif isinstance(item, dict):
+                text = sanitize_text(str(item.get("text") or ""), max_len=GREETING_MAX)
+                img = str(item.get("image_url") or "").strip()
+                if img and not img.startswith("https://"):
+                    _err(f"greeting_blocks[{i}].image_url must be an https:// link")
+                img = img[:2048] if img else ""
+            else:
+                _err(f"greeting_blocks[{i}] must be a string or object")
+            if text or img:
+                cleaned_blocks.append({"text": text, "image_url": img})
+        out["greeting_blocks"] = cleaned_blocks
+        # Keep legacy fields in sync for older readers
+        if cleaned_blocks:
+            out["greeting_text"] = cleaned_blocks[0].get("text") or ""
+            out["greeting_image_url"] = cleaned_blocks[0].get("image_url") or ""
+            out["greeting_variants"] = [
+                b.get("text") or "" for b in cleaned_blocks[1:] if (b.get("text") or "").strip()
+            ]
+        else:
+            out["greeting_text"] = ""
+            out["greeting_image_url"] = ""
+            out["greeting_variants"] = []
+
     if "business_hours" in patch:
         try:
             from app.owner_tools import validate_business_hours
