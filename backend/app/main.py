@@ -1222,6 +1222,10 @@ async def send_whatsapp_message(
 # ---------------------------------------------------------------------------
 # Dashboard UI (mount last — SPA + static assets under /dashboard/)
 # ---------------------------------------------------------------------------
+# StaticFiles(html=True) only falls back for directory URLs (…/), not SPA paths
+# like /dashboard/settings. Hard refresh would 404 with {"detail":"Not Found"}.
+# Serve real files when they exist; otherwise always return index.html so React
+# Router can render (and send expired sessions to /login).
 
 @app.get("/dashboard", include_in_schema=False)
 async def dashboard_redirect():
@@ -1234,12 +1238,37 @@ async def dashboard_redirect():
 
 
 if _DASHBOARD_BUILT:
+    from fastapi.responses import FileResponse  # noqa: E402
+
     log.info("main: mounting dashboard UI from %s", _DASHBOARD_DIR)
-    app.mount(
-        "/dashboard",
-        StaticFiles(directory=str(_DASHBOARD_DIR), html=True),
-        name="dashboard-ui",
-    )
+    _assets = _DASHBOARD_DIR / "assets"
+    if _assets.is_dir():
+        app.mount(
+            "/dashboard/assets",
+            StaticFiles(directory=str(_assets)),
+            name="dashboard-assets",
+        )
+
+    @app.get("/dashboard/", include_in_schema=False)
+    @app.get("/dashboard/{full_path:path}", include_in_schema=False)
+    async def dashboard_spa(full_path: str = ""):
+        root = _DASHBOARD_DIR.resolve()
+        if full_path:
+            candidate = (root / full_path).resolve()
+            try:
+                candidate.relative_to(root)
+            except ValueError as exc:
+                raise HTTPException(status_code=404, detail="Not Found") from exc
+            if candidate.is_file():
+                return FileResponse(candidate)
+        index = root / "index.html"
+        if not index.is_file():
+            raise HTTPException(
+                status_code=503,
+                detail=f"Dashboard UI not found at {_DASHBOARD_DIR}. Run: npm run build",
+            )
+        return FileResponse(index)
+
 else:
 
     @app.get("/dashboard/", include_in_schema=False)

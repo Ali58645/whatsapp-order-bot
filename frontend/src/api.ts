@@ -514,6 +514,10 @@ export async function api<T>(
   const res = await fetch(url, { ...rest, headers });
   if (res.status === 401) {
     clearSession();
+    // Hard refresh / expired JWT: leave the SPA route and show login
+    if (typeof window !== "undefined" && !window.location.pathname.endsWith("/login")) {
+      window.location.assign("/dashboard/login");
+    }
     throw new ApiError(401, "Unauthorized");
   }
   if (!res.ok) {
