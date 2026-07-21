@@ -190,17 +190,21 @@ export function ConversationPhone({
   const messages = conversation?.history ?? [];
   const windowOpen = conversation?.window_open ?? false;
   const botName = me?.tenant?.name || "Your bot";
-  const subtitle = phase ? `${contactWa} · ${phase}` : contactWa;
 
   const composer = (
     <div className="space-y-2">
-      {muted && (
+      {!windowOpen && !loading && (
+        <p className="rounded-lg bg-black/40 px-2 py-1.5 text-center text-[10px] text-zinc-400">
+          Customer must message first (24h WhatsApp window).
+        </p>
+      )}
+      {muted && windowOpen && (
         <p className="text-center text-[10px] font-medium text-amber-400/90">
-          You&apos;re replying — bot is paused for 24h
+          Live — you&apos;re replying · bot is paused
         </p>
       )}
       <div className="flex items-center gap-2">
-        <button type="button" className="text-[#8696a0]" aria-hidden>
+        <button type="button" className="text-[#8696a0]" aria-hidden tabIndex={-1}>
           <Plus className="h-6 w-6" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[#2a3942] px-3 py-2">
@@ -217,11 +221,11 @@ export function ConversationPhone({
             }}
             disabled={!windowOpen || sending}
             placeholder={
-              windowOpen
-                ? muted
-                  ? "Reply as yourself…"
-                  : "Message (enables takeover)"
-                : "24h window closed"
+              !windowOpen
+                ? "Window closed"
+                : muted
+                  ? "Type your reply…"
+                  : "Type to reply (pauses bot)"
             }
             className="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-white placeholder:text-[#8696a0] focus:outline-none disabled:opacity-50"
           />
@@ -242,13 +246,10 @@ export function ConversationPhone({
 
   return (
     <div className="flex w-full max-w-[420px] flex-col gap-3">
-      {/* Human takeover control */}
       <div
         className={cn(
           "rounded-2xl border px-4 py-3 transition",
-          muted
-            ? "border-amber-500/40 bg-amber-500/10"
-            : "border-border bg-card"
+          muted ? "border-amber-500/40 bg-amber-500/10" : "border-border bg-card"
         )}
       >
         <div className="flex items-center justify-between gap-3">
@@ -262,9 +263,13 @@ export function ConversationPhone({
               <Hand className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold">Human takeover</p>
+              <p className="text-sm font-semibold">
+                {muted ? "You’re handling this chat" : "Bot is handling this chat"}
+              </p>
               <p className="text-xs text-muted-foreground">
-                {muted ? "You handle this chat — bot won’t reply" : "Bot is handling replies"}
+                {muted
+                  ? "Toggle off anytime to let the bot resume"
+                  : "Toggle on to reply yourself — bot stays quiet"}
               </p>
             </div>
           </div>
@@ -277,13 +282,13 @@ export function ConversationPhone({
         </div>
         {confirmTakeover && !muted && (
           <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
-            <p className="text-sm font-medium text-amber-200">Pause the bot for this customer?</p>
+            <p className="text-sm font-medium text-amber-200">Take over from the bot?</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              The bot stops replying for 24 hours while you take over.
+              The bot won’t reply for 24 hours. You’ll see their messages live here.
             </p>
             <div className="mt-3 flex gap-2">
               <Button size="sm" onClick={() => void toggleTakeover()} disabled={muteBusy}>
-                {muteBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirm"}
+                {muteBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Yes, take over"}
               </Button>
               <Button
                 size="sm"
@@ -300,7 +305,7 @@ export function ConversationPhone({
 
       <PhoneChatFrame
         contactName={contactName}
-        subtitle={muted ? `${subtitle} · You` : subtitle}
+        subtitle={muted ? `${contactWa || ""} · You`.trim() : contactWa || undefined}
         channel={channel || conversation?.contact?.channel}
         botName={botName}
         onBack={onBack}

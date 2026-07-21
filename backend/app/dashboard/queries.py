@@ -196,12 +196,22 @@ async def overview(db: AsyncSession, tenant_phone_id: str | None = None) -> dict
 
 # ── Leads ─────────────────────────────────────────────────────────────────────
 
-def _lead_dict(lead: DBLead, contact: DBContact | None = None) -> dict:
+def _lead_dict(
+    lead: DBLead,
+    contact: DBContact | None = None,
+    *,
+    muted_until: datetime | None = None,
+) -> dict:
     c = contact or lead.contact
     sess = getattr(lead, "session", None)
     last_preview = ""
+    last_role = ""
     if sess and sess.history:
-        last_preview = (sess.history[-1].get("content") or "")[:140]
+        last = sess.history[-1] or {}
+        last_preview = (last.get("content") or "")[:140]
+        last_role = last.get("role") or ""
+    muted_iso = _iso(muted_until) if muted_until else None
+    takeover = bool(muted_until and muted_until > _utc_now())
     return {
         "id": lead.id,
         "tenant_id": lead.tenant_id,
@@ -219,6 +229,9 @@ def _lead_dict(lead: DBLead, contact: DBContact | None = None) -> dict:
         "updated_at": _iso(lead.updated_at),
         "last_activity": _iso(lead.updated_at or lead.created_at),
         "last_message_preview": last_preview,
+        "last_message_role": last_role,
+        "human_takeover": takeover,
+        "muted_until": muted_iso,
         "contact": {
             "id": c.id if c else None,
             "wa_id": c.wa_id if c else "",
@@ -271,11 +284,53 @@ async def list_leads(
 
     stmt = stmt.limit(min(limit, 200)).offset(max(offset, 0))
     rows = (await db.execute(stmt)).scalars().all()
+
+    mute_map: dict[tuple[int, str, str], datetime] = {}
+    if rows:
+        pairs = {
+            (
+                r.tenant_id,
+                getattr(r.contact, "channel", "whatsapp") if r.contact else "whatsapp",
+                r.contact.wa_id if r.contact else "",
+            )
+            for r in rows
+            if r.contact and r.contact.wa_id
+        }
+        if pairs:
+            mute_rows = (
+                await db.execute(
+                    select(DBMute).where(
+                        or_(
+                            *[
+                                (
+                                    (DBMute.tenant_id == tid)
+                                    & (DBMute.channel == ch)
+                                    & (DBMute.wa_id == wa)
+                                )
+                                for tid, ch, wa in pairs
+                            ]
+                        )
+                    )
+                )
+            ).scalars().all()
+            for m in mute_rows:
+                mute_map[(m.tenant_id, m.channel, m.wa_id)] = m.muted_until
+
+    items = []
+    for r in rows:
+        c = r.contact
+        key = (
+            r.tenant_id,
+            getattr(c, "channel", "whatsapp") if c else "whatsapp",
+            c.wa_id if c else "",
+        )
+        items.append(_lead_dict(r, muted_until=mute_map.get(key)))
+
     return {
         "total": total,
         "limit": limit,
         "offset": offset,
-        "items": [_lead_dict(r) for r in rows],
+        "items": items,
     }
 
 

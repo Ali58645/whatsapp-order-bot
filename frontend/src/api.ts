@@ -306,6 +306,9 @@ export type Lead = {
   updated_at: string | null;
   last_activity: string | null;
   last_message_preview?: string;
+  last_message_role?: string;
+  human_takeover?: boolean;
+  muted_until?: string | null;
   contact: ContactBrief;
   history?: { role: string; content: string; sender?: string }[];
   phase?: string | null;
