@@ -198,11 +198,16 @@ async def test_manual_app_reply_mutes_contact_and_subsequent_message_ignored(cli
     # No reply should be sent by bot for an echo
     mock_send.assert_not_called()
 
-    # Now a follow-up message from CUSTOMER should be ignored (muted)
+    # Now a follow-up message from CUSTOMER should not trigger a bot reply (muted)
+    # but is accepted so the owner inbox can show it live
     r2 = await client.post("/webhook", json=_text_payload(CUSTOMER, "Bahi POS chahiye"))
     assert r2.status_code == 200
-    assert r2.json() == {"status": "ignored"}
+    assert r2.json() == {"status": "ok", "bot": "muted"}
     mock_send.assert_not_called()
+    from app.sessions import get_session
+
+    hist = get_session(CUSTOMER, tenant_id="12345")
+    assert any("Bahi POS chahiye" in (m.get("content") or "") for m in hist)
 
 
 @pytest.mark.asyncio

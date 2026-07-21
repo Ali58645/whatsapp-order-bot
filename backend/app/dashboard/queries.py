@@ -573,7 +573,14 @@ async def conversation_for_contact(
         "last_inbound_at": _iso(contact.last_seen),
         "active_session_id": primary.id if primary else None,
         "phase": primary.phase if primary else None,
-        "history": timeline if timeline else (list(primary.history or []) if primary else []),
+        "history": [
+            {
+                "role": m.get("role", "user"),
+                "content": m.get("content", ""),
+                **({"sender": m["sender"]} if m.get("sender") else {}),
+            }
+            for m in (timeline if timeline else (list(primary.history or []) if primary else []))
+        ],
         "timeline": timeline,
     }
 

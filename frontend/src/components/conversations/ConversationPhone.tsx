@@ -50,20 +50,22 @@ export function ConversationPhone({
   const muted = isMuted(conversation);
   const contactWa = waId || conversation?.contact?.wa_id || "";
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
+    if (!silent) setLoading(true);
     try {
       const sessionQ = sessionId ? `?session_id=${sessionId}` : "";
-      const [profile, conv] = await Promise.all([
-        api<MeResponse>("/api/dashboard/me", { tenant: false }),
-        api<Conversation>(`/api/dashboard/conversations/${contactId}${sessionQ}`, {
-          tenant: false,
-        }),
-      ]);
-      setMe(profile);
+      if (!silent) {
+        const profile = await api<MeResponse>("/api/dashboard/me", { tenant: false });
+        setMe(profile);
+      }
+      const conv = await api<Conversation>(
+        `/api/dashboard/conversations/${contactId}${sessionQ}`,
+        { tenant: false }
+      );
 
       let history = conv.history ?? [];
-      if (!history.length && leadId) {
+      if (!history.length && leadId && !silent) {
         try {
           const lead = await api<Lead>(`/api/dashboard/leads/${leadId}`, { tenant: false });
           if (lead.history?.length) history = lead.history;
@@ -71,18 +73,38 @@ export function ConversationPhone({
           /* ignore */
         }
       }
-      setConversation({ ...conv, history });
+
+      setConversation((prev) => {
+        const incoming = conv.history ?? [];
+        // Keep previous messages if API briefly returns empty during race
+        if (silent && !incoming.length && (prev?.history?.length || 0) > 0) {
+          return { ...conv, history: prev!.history, muted_until: conv.muted_until };
+        }
+        return { ...conv, history: incoming.length ? incoming : history };
+      });
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed to load chat");
-      setConversation(null);
+      if (!silent) {
+        toast.error(e instanceof Error ? e.message : "Failed to load chat");
+        setConversation(null);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [contactId, leadId, sessionId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void refresh({ silent: false });
+  }, [refresh]);
+
+  // Live inbox: poll while this chat is open (inbound during takeover)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void refresh({ silent: true });
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [refresh]);
+
+  const load = useCallback(() => refresh({ silent: false }), [refresh]);
 
   async function resolveTenantPhone(): Promise<string> {
     const fromMe = me?.tenant?.phone_number_id;

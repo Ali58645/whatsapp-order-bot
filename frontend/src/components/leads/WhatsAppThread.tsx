@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Lock } from "lucide-react";
 import { cn } from "../../lib/utils";
 
@@ -90,6 +90,7 @@ const WALLPAPER = `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox
 
 export function WhatsAppThread({ messages, view = "owner", embedded = true }: Props) {
   const items = useMemo(() => messages.filter((m) => (m.content || "").trim()), [messages]);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const now = useMemo(
     () =>
       new Date().toLocaleTimeString(undefined, {
@@ -99,6 +100,10 @@ export function WhatsAppThread({ messages, view = "owner", embedded = true }: Pr
       }),
     []
   );
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [items.length]);
 
   if (!items.length) {
     return (
@@ -145,6 +150,7 @@ export function WhatsAppThread({ messages, view = "owner", embedded = true }: Pr
           time={now}
         />
       ))}
+      <div ref={bottomRef} />
     </div>
   );
 }

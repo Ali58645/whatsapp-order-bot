@@ -375,6 +375,22 @@ async def readyz():
 # Lead flow
 # ---------------------------------------------------------------------------
 
+async def _db_record_muted_inbound(
+    sender: str, tenant: Tenant, text: str, profile_name: str = ""
+) -> None:
+    """Persist inbound message during human takeover (memory already updated)."""
+    try:
+        from app.db.store import SessionStore
+
+        store = await SessionStore.load(sender, tenant, profile_name=profile_name)
+        store.history = list(get_session(sender, tenant_id=tenant.phone_number_id))
+        store.meta = dict(store.meta or {})
+        store.meta.setdefault("phase", store.phase or "GREETING")
+        await store.save()
+    except Exception as exc:
+        log.error(f"db: muted inbound persist failed for {sender} — {exc}")
+
+
 async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
     from app.gate import check_gate
 
@@ -389,6 +405,22 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
     gate = check_gate(entry, active_session=active, tenant=tenant)
 
     if not gate.allowed:
+        # Human takeover: still store customer messages for the live inbox
+        if gate.muted and gate.sender and (gate.text or "").strip():
+            from app.transcript import record_user
+
+            record_user(gate.sender, tid, gate.text or "")
+            profile_name = ""
+            try:
+                contacts = entry.get("contacts", [])
+                if contacts:
+                    profile_name = contacts[0].get("profile", {}).get("name", "")
+            except Exception:
+                pass
+            asyncio.create_task(
+                _db_record_muted_inbound(gate.sender, tenant, gate.text or "", profile_name)
+            )
+            return {"status": "ok", "bot": "muted"}
         if not gate.is_status_event:
             try:
                 contacts = entry.get("contacts", [])

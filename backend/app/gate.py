@@ -44,6 +44,7 @@ class GateResult:
     referral: Optional[dict] = None     # raw referral object if present
     lead_source: Optional[str] = None   # human-readable source label
     is_status_event: bool = False       # True for delivered/read receipts
+    muted: bool = False                 # Human takeover — record inbound, no bot reply
 
 
 # ── Mute helpers ─────────────────────────────────────────────────────────────
@@ -161,13 +162,25 @@ def check_gate_normalized(
         return GateResult(allowed=False, sender=sender)
 
     if is_muted(sender, tenant_id):
-        log.info(f"gate: {sender} is muted — silent")
-        return GateResult(allowed=False, sender=sender)
+        msg_type: str = nm.message_type
+        text: Optional[str] = nm.text
+        if nm.interactive_reply:
+            msg_type = "interactive"
+            _rid, _title = nm.interactive_reply
+            text = (_title or _rid or text or "").strip() or text
+        log.info(f"gate: {sender} is muted — silent (still record for inbox)")
+        return GateResult(
+            allowed=False,
+            sender=sender,
+            text=text,
+            message_type=msg_type,
+            muted=True,
+        )
 
-    msg_type: str = nm.message_type
+    msg_type = nm.message_type
     if nm.interactive_reply:
         msg_type = "interactive"
-    text: Optional[str] = nm.text
+    text = nm.text
 
     referral: Optional[dict] = nm.referral
     if referral:
