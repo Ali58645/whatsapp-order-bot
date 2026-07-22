@@ -144,6 +144,104 @@ def test_grounding_sends_full_small_corpus():
 
 
 @pytest.mark.asyncio
+async def test_answer_cache_skips_second_llm_call():
+    calls = {"n": 0}
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            async def create(**kwargs):
+                calls["n"] += 1
+                assert kwargs.get("temperature") == 0
+
+                class R:
+                    content = [
+                        type("B", (), {"text": "We open Monday to Friday, 9am to 5pm."})()
+                    ]
+
+                return R()
+
+    class T:
+        phone_number_id = "cache-q"
+        faq_list = []
+        _raw_config = {
+            "knowledge_base": {
+                **empty_knowledge_base(),
+                "enabled": True,
+                "status": "published",
+                "complete_knowledge": "Open Mon–Fri 9am–5pm.",
+            }
+        }
+
+    invalidate_knowledge_cache("cache-q")
+    a1 = await answer_from_knowledge(
+        "What are your business hours?",
+        T(),
+        client=FakeClient(),
+        model="test",
+        lang_hint="en",
+        miss_policy="unavailable",
+    )
+    a2 = await answer_from_knowledge(
+        "what are your business hours??",
+        T(),
+        client=FakeClient(),
+        model="test",
+        lang_hint="en",
+        conversation_snippet="user: hi\nassistant: hello",
+        miss_policy="unavailable",
+    )
+    assert a1 == a2
+    assert calls["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_similar_question_reuses_cached_answer():
+    calls = {"n": 0}
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            async def create(**kwargs):
+                calls["n"] += 1
+
+                class R:
+                    content = [type("B", (), {"text": "We sell POS systems for cafes."})()]
+
+                return R()
+
+    class T:
+        phone_number_id = "cache-sim"
+        faq_list = []
+        _raw_config = {
+            "knowledge_base": {
+                **empty_knowledge_base(),
+                "enabled": True,
+                "status": "published",
+                "complete_knowledge": "We sell POS systems for cafes and restaurants.",
+            }
+        }
+
+    invalidate_knowledge_cache("cache-sim")
+    a1 = await answer_from_knowledge(
+        "What products do you sell?",
+        T(),
+        client=FakeClient(),
+        model="test",
+        miss_policy="unavailable",
+    )
+    a2 = await answer_from_knowledge(
+        "Which products are you selling?",
+        T(),
+        client=FakeClient(),
+        model="test",
+        miss_policy="unavailable",
+    )
+    assert a1 == a2
+    assert calls["n"] == 1
+
+
+@pytest.mark.asyncio
 async def test_answer_paraphrase_question_with_fake_client():
     class FakeClient:
         class messages:
