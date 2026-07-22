@@ -142,6 +142,7 @@ export function KnowledgeBaseEditor({
   const [search, setSearch] = useState("");
   const [previewQ, setPreviewQ] = useState("");
   const [previewAnswer, setPreviewAnswer] = useState("");
+  const [previewDetail, setPreviewDetail] = useState("");
   const [previewBusy, setPreviewBusy] = useState(false);
 
   const charCount = knowledgeCharCount(kbWithFaqRows(value, faqRows));
@@ -189,19 +190,26 @@ export function KnowledgeBaseEditor({
     }
     setPreviewBusy(true);
     setPreviewAnswer("");
+    setPreviewDetail("");
     try {
       const kb = kbWithFaqRows(value, faqRows);
-      const res = await api<{ answer: string; matched: boolean }>(
-        `/api/dashboard/tenants/${tenantDbId}/knowledge/preview`,
-        {
-          method: "POST",
-          body: JSON.stringify({ question, knowledge_base: kb }),
-          tenant: false,
-        }
-      );
+      const res = await api<{
+        answer: string;
+        matched: boolean;
+        used_ai?: boolean;
+        detail?: string | null;
+        model?: string;
+      }>(`/api/dashboard/tenants/${tenantDbId}/knowledge/preview`, {
+        method: "POST",
+        body: JSON.stringify({ question, knowledge_base: kb, lang: "en" }),
+        tenant: false,
+      });
       setPreviewAnswer(res.answer || "");
-      if (!res.matched) {
-        toast.message("No confirmed match — bot would offer human support");
+      if (res.detail) setPreviewDetail(res.detail);
+      if (res.matched) {
+        toast.success(res.used_ai ? "Answered from your knowledge (AI)" : "Answer ready");
+      } else {
+        toast.message(res.detail || "No confirmed match — bot would offer human support");
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Preview failed");
@@ -355,7 +363,8 @@ export function KnowledgeBaseEditor({
           <h3 className="text-sm font-semibold">Preview test question</h3>
         </div>
         <p className="text-xs text-muted-foreground">
-          Try a customer-style question against the current editor content (including drafts).
+          Uses AI (Anthropic) with only the company knowledge above — including drafts. Save &amp;
+          publish for WhatsApp customers.
         </p>
         <Textarea
           rows={2}
@@ -374,8 +383,13 @@ export function KnowledgeBaseEditor({
           Test answer
         </Button>
         {previewAnswer && (
-          <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm whitespace-pre-wrap">
-            {previewAnswer}
+          <div className="space-y-1">
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm whitespace-pre-wrap">
+              {previewAnswer}
+            </div>
+            {previewDetail && (
+              <p className="text-xs text-muted-foreground">{previewDetail}</p>
+            )}
           </div>
         )}
       </div>

@@ -295,6 +295,13 @@ async def preview_knowledge(
 
     # Import AI client from main (same provider as WhatsApp path)
     from app.main import ANTHROPIC_MODEL, anthropic_client
+    import os
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise HTTPException(
+            status_code=503,
+            detail="AI is not configured — set ANTHROPIC_API_KEY for knowledge answers",
+        )
 
     lang = str((body or {}).get("lang") or "en")
     try:

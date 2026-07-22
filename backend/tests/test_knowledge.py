@@ -134,6 +134,70 @@ async def test_answer_from_knowledge_no_client_unavailable():
     assert ans2 is None
 
 
+def test_grounding_sends_full_small_corpus():
+    from app.knowledge import grounding_excerpts
+
+    corpus = "## Complete company knowledge\nWe automate EHR reporting and staff scheduling."
+    out = grounding_excerpts(corpus, "What operational workflows can you automate?")
+    assert "EHR reporting" in out
+    assert "staff scheduling" in out
+
+
+@pytest.mark.asyncio
+async def test_answer_paraphrase_question_with_fake_client():
+    class FakeClient:
+        class messages:
+            @staticmethod
+            async def create(**kwargs):
+                # Model should receive full knowledge for small corpus
+                user = kwargs["messages"][0]["content"]
+                assert "EHR" in user or "scheduling" in user
+
+                class R:
+                    content = [
+                        type(
+                            "B",
+                            (),
+                            {
+                                "text": (
+                                    "We automate EHR reporting integrations and staff scheduling "
+                                    "for senior living communities."
+                                )
+                            },
+                        )()
+                    ]
+
+                return R()
+
+    class T:
+        phone_number_id = "t-para"
+        faq_list = []
+        _raw_config = {
+            "knowledge_base": {
+                **empty_knowledge_base(),
+                "enabled": True,
+                "status": "published",
+                "complete_knowledge": (
+                    "AccellionX automates EHR integrations, operational dashboards, "
+                    "and AI chat agents for senior living."
+                ),
+            }
+        }
+
+    invalidate_knowledge_cache("t-para")
+    ans = await answer_from_knowledge(
+        "What operational workflows can AccellionX automate?",
+        T(),
+        client=FakeClient(),
+        model="test",
+        lang_hint="en",
+        miss_policy="unavailable",
+    )
+    assert ans is not None
+    assert "EHR" in ans or "scheduling" in ans or "automate" in ans.lower()
+    assert "don't have confirmed" not in ans.lower()
+
+
 @pytest.mark.asyncio
 async def test_preview_uses_draft_content():
     class FakeClient:
@@ -158,6 +222,7 @@ async def test_preview_uses_draft_content():
         model="test",
     )
     assert result["matched"] is True
+    assert result["used_ai"] is True
     assert "9" in result["answer"]
 
 
