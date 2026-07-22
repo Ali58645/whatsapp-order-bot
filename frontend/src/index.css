@@ -146,7 +146,7 @@
   }
 
   .page-subtitle {
-    @apply mt-1.5 max-w-xl text-sm leading-relaxed text-muted-foreground;
+    @apply mt-1.5 max-w-3xl text-sm leading-relaxed text-muted-foreground;
   }
 
   .metric-tile {

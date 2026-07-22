@@ -19,7 +19,11 @@ def tenant_config_response(row) -> dict:
     t = Tenant.from_db_row(row)
     cfg = dict(row.config or {})
     from app.flow import default_bahi_pos_flow, seed_flow_into_config
+    from app.knowledge import knowledge_char_count, migrate_faq_into_knowledge
+
+    cfg = migrate_faq_into_knowledge(cfg)
     cfg = seed_flow_into_config(cfg)
+    kb = cfg.get("knowledge_base") or {}
     ob = cfg.get("onboarding") or {}
     return {
         "id": row.id,
@@ -45,6 +49,8 @@ def tenant_config_response(row) -> dict:
             "facts_pricing_note": t.facts_pricing_note,
             "facts_claims_note": t.facts_claims_note,
             "faq": t.faq_list,
+            "knowledge_base": kb,
+            "knowledge_char_count": knowledge_char_count(kb if isinstance(kb, dict) else {}),
             "menu": t.menu.model_dump() if t.menu else None,
             "menu_v2": cfg.get("menu_v2"),
             "menu_v2_draft": cfg.get("menu_v2_draft"),
@@ -65,8 +71,19 @@ async def apply_config_save(db, tenant_db_id: int, patch: dict, changed_by: str)
     current = dict(row.config or {})
     name = cleaned.pop("name", None)
     current.update(cleaned)
+    # When only faq is patched, mirror into knowledge_base.faq
+    if "faq" in cleaned and "knowledge_base" not in cleaned:
+        from app.knowledge import empty_knowledge_base, migrate_faq_into_knowledge
+
+        current = migrate_faq_into_knowledge(current)
+        kb = dict(current.get("knowledge_base") or empty_knowledge_base())
+        kb["faq"] = list(cleaned["faq"])
+        current["knowledge_base"] = kb
     await save_tenant_config(db, tenant_db_id, name=name, config=current, changed_by=changed_by)
     invalidate_tenant(row.phone_number_id)
+    from app.knowledge import invalidate_knowledge_cache
+
+    invalidate_knowledge_cache(row.phone_number_id)
     row = await get_tenant_row(db, tenant_db_id)
     return tenant_config_response(row)
 

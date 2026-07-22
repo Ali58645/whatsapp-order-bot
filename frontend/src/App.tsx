@@ -114,6 +114,16 @@ export default function App() {
           }
         />
         <Route
+          path="my-bot/:section"
+          element={
+            <OwnerOnly>
+              <SuspensePage>
+                <OwnerBot />
+              </SuspensePage>
+            </OwnerOnly>
+          }
+        />
+        <Route
           path="menu"
           element={
             <OwnerOnly>
@@ -154,6 +164,14 @@ export default function App() {
 
         <Route
           path="channels"
+          element={
+            <SuspensePage>
+              <Channels />
+            </SuspensePage>
+          }
+        />
+        <Route
+          path="channels/:channel"
           element={
             <SuspensePage>
               <Channels />

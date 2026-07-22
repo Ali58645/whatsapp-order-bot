@@ -20,7 +20,14 @@ import { Dialog, DialogContent, DialogSrTitle } from "../components/ui/dialog";
 import { MenuBuilder } from "../components/MenuBuilder";
 import { MessagesEditor } from "../components/MessagesEditor";
 import { LeadOptionsEditor } from "../components/LeadOptionsEditor";
-import { OptionListEditor, OptionListItem, stripEmptyOptionRows } from "../components/OptionListEditor";
+import {
+  KnowledgeBaseEditor,
+  KnowledgeBase,
+  faqRowsFromKb,
+  kbWithFaqRows,
+  normalizeKnowledgeBase,
+} from "../components/KnowledgeBaseEditor";
+import { OptionListItem } from "../components/OptionListEditor";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { FlowBuilder } from "../components/FlowBuilder";
 import { cn } from "../lib/utils";
@@ -55,6 +62,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>(menuOnly ? "menu" : "general");
   const [faqRows, setFaqRows] = useState<OptionListItem[]>([]);
+  const [knowledge, setKnowledge] = useState<KnowledgeBase>(() => normalizeKnowledgeBase(null));
   const [templateOpen, setTemplateOpen] = useState(false);
   const [pickTemplateId, setPickTemplateId] = useState("pos_lead");
   const [templateConfirm, setTemplateConfirm] = useState(false);
@@ -117,13 +125,9 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
     })
       .then((data) => {
         setCfg(data);
-        setFaqRows(
-          (data.config.faq || []).map((f, i) => ({
-            id: `faq_${Date.now()}_${i}`,
-            label: f.question,
-            answer: f.answer,
-          }))
-        );
+        const kb = normalizeKnowledgeBase(data.config.knowledge_base, data.config.faq);
+        setKnowledge(kb);
+        setFaqRows(faqRowsFromKb(kb));
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -164,12 +168,9 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
     e?.preventDefault();
     if (!cfg || selectedDbId == null) return;
 
-    const faqClean = stripEmptyOptionRows(faqRows).map((r) => ({
-      question: r.label.trim(),
-      answer: (r.answer || "").trim(),
-    }));
+    const kbPayload = kbWithFaqRows(knowledge, faqRows);
 
-    const labels = faqClean.map((f) => f.question.toLowerCase());
+    const labels = kbPayload.faq.map((f) => f.question.toLowerCase());
     const dups = labels.filter((l, i) => labels.indexOf(l) !== i);
     if (dups.length) {
       const msg = "Duplicate FAQ questions are not allowed";
@@ -204,7 +205,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
         facts_features: cfg.config.facts_features,
         facts_pricing_note: cfg.config.facts_pricing_note,
         facts_claims_note: cfg.config.facts_claims_note,
-        faq: faqClean,
+        knowledge_base: kbPayload,
         messages_draft: draft,
       };
       // Owners must never send wiring fields (server also rejects)
@@ -223,13 +224,9 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
         { method: "POST", body: JSON.stringify(body), tenant: false }
       );
       setCfg(updated);
-      setFaqRows(
-        (updated.config.faq || []).map((f, i) => ({
-          id: `faq_${Date.now()}_${i}`,
-          label: f.question,
-          answer: f.answer,
-        }))
-      );
+      const nextKb = normalizeKnowledgeBase(updated.config.knowledge_base, updated.config.faq);
+      setKnowledge(nextKb);
+      setFaqRows(faqRowsFromKb(nextKb));
       toast.success("Settings saved — live within ~60s");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Save failed";
@@ -313,10 +310,6 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
     });
   }
 
-  function setFaqItems(items: OptionListItem[]) {
-    setFaqRows(items);
-  }
-
   async function applyStarterTemplate() {
     if (!selectedDbId || !pickTemplateId) return;
     if (!templateConfirm) {
@@ -335,7 +328,9 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
         }),
         tenant: false,
       });
-      toast.success("Template applied to draft — review greeting, questions, FAQ, then publish");
+      toast.success(
+        "Template applied to draft — review greeting, questions, knowledge base, then publish"
+      );
       setTemplateOpen(false);
       setTemplateConfirm(false);
       // Reload config
@@ -344,13 +339,9 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
         { tenant: false }
       );
       setCfg(data);
-      setFaqRows(
-        (data.config.faq || []).map((f, i) => ({
-          id: `faq_${Date.now()}_${i}`,
-          label: f.question,
-          answer: f.answer,
-        }))
-      );
+      const kb = normalizeKnowledgeBase(data.config.knowledge_base, data.config.faq);
+      setKnowledge(kb);
+      setFaqRows(faqRowsFromKb(kb));
       loadTenants();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to apply template");
@@ -400,13 +391,9 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
             })
               .then((data) => {
                 setCfg(data);
-                setFaqRows(
-                  (data.config.faq || []).map((f, i) => ({
-                    id: `faq_${Date.now()}_${i}`,
-                    label: f.question,
-                    answer: f.answer,
-                  }))
-                );
+                const kb = normalizeKnowledgeBase(data.config.knowledge_base, data.config.faq);
+                setKnowledge(kb);
+                setFaqRows(faqRowsFromKb(kb));
               })
               .catch((e) => setError(e.message))
               .finally(() => setLoading(false));
@@ -440,7 +427,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
           label: t("menu"),
           show: cfg.flow_mode === "order" && !ownerMode,
         },
-        { id: "faq", label: "FAQ" },
+        { id: "faq", label: "Knowledge Base" },
       ];
 
   return (
@@ -665,7 +652,7 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
                 </p>
               </div>
               <Button variant="outline" size="sm" asChild>
-                <Link to="/channels">
+                <Link to="/channels/whatsapp">
                   <Radio className="mr-2 h-4 w-4" />
                   Manage channels
                 </Link>
@@ -861,24 +848,19 @@ export default function SettingsPage({ ownerMode = false, menuOnly = false }: Pr
         </form>
       )}
 
-      {tab === "faq" && (
+      {tab === "faq" && selectedDbId != null && (
         <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
-          <OptionListEditor
-            title="FAQ pairs"
-            items={faqRows}
-            constraints={{
-              maxItems: 30,
-              maxLabelChars: 200,
-              maxAnswerChars: 500,
-            }}
-            features={{ reorder: true, answerField: true }}
-            addDisabledHint="FAQ limit: 30 pairs"
-            emptyHint="Add common questions customers ask."
-            onChange={setFaqItems}
+          <KnowledgeBaseEditor
+            tenantDbId={selectedDbId}
+            value={knowledge}
+            faqRows={faqRows}
+            onChange={setKnowledge}
+            onFaqRowsChange={setFaqRows}
+            disabled={busy || readonly}
           />
-          <Button type="button" disabled={busy} onClick={() => onSave()}>
+          <Button type="button" disabled={busy || readonly} onClick={() => onSave()}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save FAQ
+            Save Knowledge Base
           </Button>
         </section>
       )}

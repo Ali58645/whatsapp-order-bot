@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Check, LayoutTemplate, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -10,16 +11,30 @@ import {
   TenantConfigResponse,
 } from "../../api";
 import { LeadOptionsEditor, ensureLeadFlow } from "../../components/LeadOptionsEditor";
+import { BusinessHoursEditor } from "../../components/BusinessHoursEditor";
+import {
+  KnowledgeBaseEditor,
+  KnowledgeBase,
+  faqRowsFromKb,
+  kbWithFaqRows,
+  normalizeKnowledgeBase,
+} from "../../components/KnowledgeBaseEditor";
 import { MessagesEditor } from "../../components/MessagesEditor";
-import { OptionListEditor, OptionListItem, stripEmptyOptionRows } from "../../components/OptionListEditor";
+import { OptionListItem } from "../../components/OptionListEditor";
 import { TemplatePicker } from "../../components/TemplatePicker";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogSrTitle } from "../../components/ui/dialog";
 import { Input, Label, Textarea } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/avatar";
-import { cn } from "../../lib/utils";
 
 type Step = "greeting" | "questions" | "faq" | "more";
+
+const VALID_STEPS = new Set<Step>(["greeting", "questions", "faq", "more"]);
+
+function parseStep(raw: string | undefined): Step | null {
+  if (!raw) return null;
+  return VALID_STEPS.has(raw as Step) ? (raw as Step) : null;
+}
 
 type GreetingBlock = { text: string; image_url: string };
 
@@ -62,23 +77,18 @@ type MessagesDraft = {
   [key: string]: unknown;
 };
 
-const STEPS: { id: Step; label: string; hint: string }[] = [
-  { id: "greeting", label: "1. Greeting", hint: "First WhatsApp message" },
-  { id: "questions", label: "2. Questions", hint: "Buttons & demo slots" },
-  { id: "faq", label: "3. FAQ", hint: "Common answers" },
-  { id: "more", label: "More replies", hint: "Optional advanced text" },
-];
-
 /**
- * Owner-only My Bot — one job per step, one Save & go live.
+ * Owner-only My Bot — sections via sidebar under My Bot.
  * Admin wiring stays on /settings.
  */
 export default function OwnerBot() {
+  const navigate = useNavigate();
+  const { section: sectionParam } = useParams<{ section?: string }>();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [cfg, setCfg] = useState<TenantConfigResponse | null>(null);
   const [faqRows, setFaqRows] = useState<OptionListItem[]>([]);
+  const [knowledge, setKnowledge] = useState<KnowledgeBase>(() => normalizeKnowledgeBase(null));
   const [flow, setFlow] = useState<FlowStep[]>([]);
-  const [step, setStep] = useState<Step>("greeting");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -90,6 +100,29 @@ export default function OwnerBot() {
 
   const tenantId = me?.tenant?.id ?? me?.tenant_id ?? null;
   const isLead = (cfg?.flow_mode || me?.tenant?.flow_mode || "lead") === "lead";
+
+  const step: Step = (() => {
+    const parsed = parseStep(sectionParam);
+    if (parsed === "questions" && !isLead) return "greeting";
+    if (parsed) return parsed;
+    return "greeting";
+  })();
+
+  function goToStep(next: Step) {
+    const target = next === "questions" && !isLead ? "faq" : next;
+    navigate(`/my-bot/${target}`);
+  }
+
+  useEffect(() => {
+    const parsed = parseStep(sectionParam);
+    if (!sectionParam || !parsed) {
+      navigate("/my-bot/greeting", { replace: true });
+      return;
+    }
+    if (parsed === "questions" && cfg && !isLead) {
+      navigate("/my-bot/faq", { replace: true });
+    }
+  }, [sectionParam, cfg, isLead, navigate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,13 +140,9 @@ export default function OwnerBot() {
         tenant: false,
       });
       setCfg(data);
-      setFaqRows(
-        (data.config.faq || []).map((f, i) => ({
-          id: `faq_${Date.now()}_${i}`,
-          label: f.question,
-          answer: f.answer,
-        }))
-      );
+      const kb = normalizeKnowledgeBase(data.config.knowledge_base, data.config.faq);
+      setKnowledge(kb);
+      setFaqRows(faqRowsFromKb(kb));
       setFlow((data.config.flow as FlowStep[] | undefined) || []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load");
@@ -159,11 +188,8 @@ export default function OwnerBot() {
     e?.preventDefault();
     if (!cfg || tenantId == null) return;
 
-    const faqClean = stripEmptyOptionRows(faqRows).map((r) => ({
-      question: r.label.trim(),
-      answer: (r.answer || "").trim(),
-    }));
-    const labels = faqClean.map((f) => f.question.toLowerCase());
+    const kbPayload = kbWithFaqRows(knowledge, faqRows);
+    const labels = kbPayload.faq.map((f) => f.question.toLowerCase());
     if (labels.some((l, i) => labels.indexOf(l) !== i)) {
       toast.error("Duplicate FAQ questions are not allowed");
       return;
@@ -212,7 +238,7 @@ export default function OwnerBot() {
             facts_features: cfg.config.facts_features,
             facts_pricing_note: cfg.config.facts_pricing_note,
             facts_claims_note: cfg.config.facts_claims_note,
-            faq: faqClean,
+            knowledge_base: kbPayload,
             messages_draft: draft,
             ...(isLead ? { flow: ensureLeadFlow(flow) } : {}),
           }),
@@ -220,6 +246,9 @@ export default function OwnerBot() {
         }
       );
       setCfg(updated);
+      const nextKb = normalizeKnowledgeBase(updated.config.knowledge_base, updated.config.faq);
+      setKnowledge(nextKb);
+      setFaqRows(faqRowsFromKb(nextKb));
 
       // Publish message drafts so owners don't juggle Save draft / Publish
       try {
@@ -270,19 +299,15 @@ export default function OwnerBot() {
         }));
       setCfg(data);
       setFlow((data.config.flow as FlowStep[] | undefined) || []);
-      setFaqRows(
-        (data.config.faq || []).map((f, i) => ({
-          id: `faq_${Date.now()}_${i}`,
-          label: f.question,
-          answer: f.answer,
-        }))
-      );
-      setStep("greeting");
+      const kb = normalizeKnowledgeBase(data.config.knowledge_base, data.config.faq);
+      setKnowledge(kb);
+      setFaqRows(faqRowsFromKb(kb));
+      navigate("/my-bot/greeting");
       setTemplateOpen(false);
       setTemplateConfirm(false);
       toast.success(
         res.message ||
-          "Template applied — greeting, questions, and FAQ replaced. Edit anything below."
+          "Template applied — greeting, questions, and knowledge base replaced. Edit anything below."
       );
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to apply template");
@@ -317,19 +342,34 @@ export default function OwnerBot() {
   const leadMsgs = (draft.lead || {}) as Record<string, string>;
   const interactive = (draft.interactive || {}) as Record<string, unknown>;
 
-  const visibleSteps = isLead
-    ? STEPS
-    : STEPS.filter((s) => s.id === "greeting" || s.id === "faq" || s.id === "more");
+  const sectionMeta: Record<Step, { title: string; subtitle: string }> = {
+    greeting: {
+      title: "Greeting",
+      subtitle: "First WhatsApp message customers see — greeting plus opening question.",
+    },
+    questions: {
+      title: "Questions",
+      subtitle: "Build the question flow, answer buttons, and niche follow-ups.",
+    },
+    faq: {
+      title: "Knowledge Base",
+      subtitle:
+        "Company information the WhatsApp bot uses to answer questions that aren’t part of the flow.",
+    },
+    more: {
+      title: "More replies",
+      subtitle: "Optional confirmation texts and owner alerts. Most owners can skip this.",
+    },
+  };
+  const { title: pageTitle, subtitle: pageSubtitle } = sectionMeta[step];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 pb-24">
+    <div className="w-full space-y-6 pb-24">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="page-kicker">{cfg.name}</p>
-          <h1 className="page-title mt-1">My Bot</h1>
-          <p className="page-subtitle">
-            Pick a starter template, then edit greeting, questions, and FAQ.
-          </p>
+          <h1 className="page-title mt-1">{pageTitle}</h1>
+          <p className="page-subtitle">{pageSubtitle}</p>
         </div>
         <Button
           type="button"
@@ -353,7 +393,7 @@ export default function OwnerBot() {
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-lg font-semibold">Load starter template</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Replaces greeting, questions &amp; buttons, FAQ, and reply texts for this business.
+              Replaces greeting, questions &amp; buttons, knowledge base, and reply texts for this business.
               You can edit everything afterward.
             </p>
           </div>
@@ -375,7 +415,7 @@ export default function OwnerBot() {
               />
               <span>
                 I understand this will <strong>replace</strong> my current greeting, questions,
-                FAQ, and related bot copy (goes live immediately).
+                knowledge base, and related bot copy (goes live immediately).
               </span>
             </label>
           </div>
@@ -402,37 +442,9 @@ export default function OwnerBot() {
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
       )}
 
-      {/* Step picker */}
-      <nav className="grid gap-2 sm:grid-cols-2" aria-label="Bot setup steps">
-        {visibleSteps.map((s) => {
-          const active = step === s.id;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setStep(s.id)}
-              className={cn(
-                "rounded-2xl border px-4 py-3 text-left transition",
-                active
-                  ? "border-primary bg-primary/10"
-                  : "border-border bg-card hover:bg-muted/30"
-              )}
-            >
-              <p className="text-sm font-semibold">{s.label}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{s.hint}</p>
-            </button>
-          );
-        })}
-      </nav>
-
       {step === "greeting" && (
-        <section className="space-y-5 rounded-2xl border border-border bg-card p-5">
-          <div>
-            <h2 className="text-base font-semibold">Greeting</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Edit the full first WhatsApp message customers see — greeting plus opening question.
-            </p>
-          </div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
+          <section className="space-y-5 rounded-2xl border border-border bg-card p-5 sm:p-6 lg:p-7">
           <div>
             <Label>Business display name</Label>
             <Input
@@ -473,7 +485,7 @@ export default function OwnerBot() {
             {readGreetingBlocks(cfg.config).map((block, idx, boxes) => (
               <div
                 key={`greet-${idx}`}
-                className="space-y-2 rounded-xl border border-border bg-muted/15 p-3"
+                className="space-y-2 rounded-xl border border-border bg-muted/15 p-3 sm:p-4"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-muted-foreground">
@@ -566,58 +578,6 @@ export default function OwnerBot() {
             </div>
           )}
           <div>
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-              Preview — what WhatsApp sends
-            </p>
-            <div className="space-y-2 rounded-xl bg-[var(--wa-bg)] p-3">
-              {[
-                ...readGreetingBlocks(cfg.config)
-                  .filter((b) => b.text.trim() || b.image_url.trim())
-                  .map((b) => ({
-                    text: b.text.trim() || (b.image_url ? "[image]" : ""),
-                    image: b.image_url.trim(),
-                  })),
-                ...(isLead
-                  ? [
-                      {
-                        text: (
-                          leadMsgs.q_business_name ||
-                          "Barah-e-karam apne business ya shop ka naam farmaayein."
-                        ).trim(),
-                        image: "",
-                      },
-                    ]
-                  : []),
-              ]
-                .filter((b) => b.text)
-                .map((bubble, i) => (
-                  <div
-                    key={`${i}-${bubble.text.slice(0, 24)}`}
-                    className="mr-auto max-w-[90%] overflow-hidden rounded-2xl rounded-bl-sm bg-[var(--wa-in)] text-[13px] text-zinc-100"
-                  >
-                    {bubble.image ? (
-                      <img
-                        src={bubble.image}
-                        alt=""
-                        className="max-h-36 w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                    ) : null}
-                    <p className="transcript-text whitespace-pre-wrap px-3 py-2">{bubble.text}</p>
-                  </div>
-                ))}
-              {!readGreetingBlocks(cfg.config).some(
-                (b) => b.text.trim() || b.image_url.trim()
-              ) && (
-                <div className="mr-auto max-w-[90%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
-                  …
-                </div>
-              )}
-            </div>
-          </div>
-          <div>
             <Label>Language</Label>
             <select
               className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
@@ -655,76 +615,17 @@ export default function OwnerBot() {
             </div>
           )}
           {isLead && (
-            <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">Business hours</p>
-                  <p className="text-xs text-muted-foreground">
-                    Outside hours the bot sends an away message only.
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(cfg.config.business_hours?.enabled)}
-                    disabled={readonly}
-                    onChange={(e) =>
-                      setCfg({
-                        ...cfg,
-                        config: {
-                          ...cfg.config,
-                          business_hours: {
-                            timezone: "Asia/Karachi",
-                            days: {
-                              mon: [["09:00", "18:00"]],
-                              tue: [["09:00", "18:00"]],
-                              wed: [["09:00", "18:00"]],
-                              thu: [["09:00", "18:00"]],
-                              fri: [["09:00", "18:00"]],
-                              sat: [["10:00", "14:00"]],
-                              sun: [],
-                            },
-                            away_message:
-                              cfg.config.business_hours?.away_message ||
-                              "Shukriya — abhi team available nahi. Business hours mein rabta karein.",
-                            ...cfg.config.business_hours,
-                            enabled: e.target.checked,
-                          },
-                        },
-                      })
-                    }
-                  />
-                  Enabled
-                </label>
-              </div>
-              {cfg.config.business_hours?.enabled && (
-                <div>
-                  <Label>Away message</Label>
-                  <Textarea
-                    className="mt-1.5"
-                    rows={2}
-                    value={cfg.config.business_hours?.away_message || ""}
-                    disabled={readonly}
-                    onChange={(e) =>
-                      setCfg({
-                        ...cfg,
-                        config: {
-                          ...cfg.config,
-                          business_hours: {
-                            ...cfg.config.business_hours,
-                            enabled: true,
-                            away_message: e.target.value,
-                          },
-                        },
-                      })
-                    }
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Default schedule: Mon–Fri 9–18, Sat 10–14 (Asia/Karachi). Ask AccellionX to
-                    customize days.
-                  </p>
-                </div>
-              )}
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <BusinessHoursEditor
+                value={cfg.config.business_hours}
+                disabled={readonly}
+                onChange={(business_hours) =>
+                  setCfg({
+                    ...cfg,
+                    config: { ...cfg.config, business_hours },
+                  })
+                }
+              />
             </div>
           )}
           {isLead && (
@@ -747,21 +648,70 @@ export default function OwnerBot() {
               </p>
             </div>
           )}
-          <Button type="button" variant="outline" onClick={() => setStep(isLead ? "questions" : "faq")}>
-            Next: {isLead ? "Questions" : "FAQ"}
+          <Button type="button" variant="outline" onClick={() => goToStep(isLead ? "questions" : "faq")}>
+            Next: {isLead ? "Questions" : "Knowledge Base"}
           </Button>
-        </section>
+          </section>
+
+          <aside className="xl:sticky xl:top-20 xl:self-start">
+            <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Preview — what WhatsApp sends
+              </p>
+              <div className="space-y-2 rounded-xl bg-[var(--wa-bg)] p-3 min-h-[220px]">
+                {[
+                  ...readGreetingBlocks(cfg.config)
+                    .filter((b) => b.text.trim() || b.image_url.trim())
+                    .map((b) => ({
+                      text: b.text.trim() || (b.image_url ? "[image]" : ""),
+                      image: b.image_url.trim(),
+                    })),
+                  ...(isLead
+                    ? [
+                        {
+                          text: (
+                            leadMsgs.q_business_name ||
+                            "Barah-e-karam apne business ya shop ka naam farmaayein."
+                          ).trim(),
+                          image: "",
+                        },
+                      ]
+                    : []),
+                ]
+                  .filter((b) => b.text)
+                  .map((bubble, i) => (
+                    <div
+                      key={`${i}-${bubble.text.slice(0, 24)}`}
+                      className="mr-auto max-w-[92%] overflow-hidden rounded-2xl rounded-bl-sm bg-[var(--wa-in)] text-[13px] text-zinc-100"
+                    >
+                      {bubble.image ? (
+                        <img
+                          src={bubble.image}
+                          alt=""
+                          className="max-h-40 w-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : null}
+                      <p className="transcript-text whitespace-pre-wrap px-3 py-2">{bubble.text}</p>
+                    </div>
+                  ))}
+                {!readGreetingBlocks(cfg.config).some(
+                  (b) => b.text.trim() || b.image_url.trim()
+                ) && (
+                  <div className="mr-auto max-w-[92%] rounded-2xl rounded-bl-sm bg-[var(--wa-in)] px-3 py-2 text-[13px] text-zinc-100">
+                    …
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
       )}
 
       {step === "questions" && isLead && (
-        <section className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="text-base font-semibold">Questions & buttons</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Drag to rearrange. On list/button rows, set <strong>Then go to</strong> so each niche
-              (e.g. Assisted living) follows its own questions, then merges back to Demo.
-            </p>
-          </div>
+        <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 lg:p-7">
           <LeadOptionsEditor
             lead={leadMsgs}
             interactive={interactive as Parameters<typeof LeadOptionsEditor>[0]["interactive"]}
@@ -783,33 +733,23 @@ export default function OwnerBot() {
             allowExtras
             readonly={readonly}
           />
-          <Button type="button" variant="outline" onClick={() => setStep("faq")}>
-            Next: FAQ
+          <Button type="button" variant="outline" onClick={() => goToStep("faq")}>
+            Next: Knowledge Base
           </Button>
         </section>
       )}
 
       {step === "faq" && (
-        <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
-          <div>
-            <h2 className="text-base font-semibold">FAQ</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Short answers for common questions (price, timing, etc.).
-            </p>
-          </div>
-          <OptionListEditor
-            title="Questions"
-            items={faqRows}
-            onChange={setFaqRows}
-            constraints={{
-              maxItems: 20,
-              maxLabelChars: 120,
-              maxAnswerChars: 500,
-            }}
-            features={{ answerField: true, reorder: true }}
-            emptyHint="Add common questions customers ask"
+        <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 lg:p-7">
+          <KnowledgeBaseEditor
+            tenantDbId={tenantId}
+            value={knowledge}
+            faqRows={faqRows}
+            onChange={setKnowledge}
+            onFaqRowsChange={setFaqRows}
+            disabled={readonly || busy}
           />
-          <Button type="button" variant="outline" onClick={() => setStep("more")}>
+          <Button type="button" variant="outline" onClick={() => goToStep("more")}>
             Optional: More replies
           </Button>
         </section>
@@ -817,12 +757,6 @@ export default function OwnerBot() {
 
       {step === "more" && (
         <section className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="text-base font-semibold">More replies</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Optional — confirmation texts and other templates. Most owners can skip this.
-            </p>
-          </div>
           <MessagesEditor
             tenantDbId={tenantId}
             flowMode={isLead ? "lead" : "order"}
@@ -843,9 +777,9 @@ export default function OwnerBot() {
 
       {/* Sticky primary action */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-        <div className="mx-auto flex max-w-2xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            One button saves greeting, questions, FAQ, and messages.
+            One button saves greeting, questions, knowledge base, and messages.
           </p>
           <Button
             type="button"

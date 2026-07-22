@@ -1080,14 +1080,40 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
 async def _maybe_faq_reply(
     sender: str, meta: dict, user_text: str, lang: str, tenant: Tenant
 ) -> bool:
-    """If FAQ matches, send answer + phase reprompt. Returns True if handled."""
+    """FAQ / Knowledge Base interrupt. Returns True if a reply was sent."""
     from app.faq import classify_faq_match, match_faq
+    from app.knowledge import answer_from_knowledge, knowledge_faq_list
     from app.lead import build_reprompt
 
-    answer = match_faq(user_text, tenant.faq_list)
+    faq_pairs = knowledge_faq_list(tenant) or tenant.faq_list
+    answer = match_faq(user_text, faq_pairs)
     if not answer:
         answer = await classify_faq_match(
-            user_text, tenant.faq_list, client=anthropic_client, model=ANTHROPIC_MODEL
+            user_text, faq_pairs, client=anthropic_client, model=ANTHROPIC_MODEL
+        )
+    if not answer:
+        # Grounded knowledge answer (or polite unavailable outside active flow)
+        tid = tenant.phone_number_id
+        history = get_session(sender, tenant_id=tid)
+        snippet = "\n".join(
+            f"{m.get('role')}: {str(m.get('content') or '')[:200]}" for m in history[-6:]
+        )
+        phase = meta.get("phase", "") or ""
+        # Mid-flow: only interrupt when we have a real KB hit (preserve questions).
+        # Entry / greeting / idle: offer human handoff when KB has no answer.
+        miss_policy = (
+            "unavailable"
+            if phase in ("", "GREETING", "CONFIRMED", "STALLED")
+            else "none"
+        )
+        answer = await answer_from_knowledge(
+            user_text,
+            tenant,
+            client=anthropic_client,
+            model=ANTHROPIC_MODEL,
+            lang_hint=lang or "ur",
+            conversation_snippet=snippet,
+            miss_policy=miss_policy,
         )
     if not answer:
         return False

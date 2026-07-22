@@ -148,6 +148,19 @@ def validate_config_patch(flow_mode: str, patch: dict) -> dict:
             cleaned_faq.append({"question": q, "answer": a})
         out["faq"] = cleaned_faq
 
+    if "knowledge_base" in patch:
+        try:
+            from datetime import datetime, timezone
+
+            from app.knowledge import validate_knowledge_base
+
+            kb = validate_knowledge_base(patch["knowledge_base"])
+            kb["updated_at"] = datetime.now(timezone.utc).isoformat()
+            out["knowledge_base"] = kb
+            out["faq"] = list(kb.get("faq") or [])
+        except ValueError as exc:
+            _err(str(exc))
+
     if "menu" in patch:
         if flow_mode != "order":
             _err("menu only valid for order flow_mode")

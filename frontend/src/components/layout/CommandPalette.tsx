@@ -23,9 +23,12 @@ const ADMIN_PAGES = [
 
 const OWNER_PAGES = [
   { to: "/", label: "Home", icon: LayoutDashboard },
+  { to: "/conversations", label: "Inbox", icon: Users },
   { to: "/customers", label: "Customers", icon: Users },
-  { to: "/my-bot", label: "My Bot", icon: Settings },
+  { to: "/my-bot/greeting", label: "My Bot", icon: Settings },
+  { to: "/account", label: "Account", icon: Settings },
   { to: "/billing", label: "Billing", icon: CreditCard },
+  { to: "/team", label: "Team", icon: Users },
 ];
 
 export function CommandPalette({

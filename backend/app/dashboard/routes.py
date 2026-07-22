@@ -251,6 +251,65 @@ async def preview_lead_flow(
     return {"flow": cleaned, "steps": steps}
 
 
+@router.post("/api/dashboard/tenants/{tenant_db_id}/knowledge/preview")
+async def preview_knowledge(
+    tenant_db_id: int,
+    body: dict | None = None,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """
+    Test a customer question against the knowledge base (draft or published).
+    Optional body.knowledge_base overrides stored config (unsaved editor state).
+    """
+    _require_db()
+    await dash_auth.assert_tenant_access(user, tenant_db_id)
+    from app.db.repo import get_tenant_row
+    from app.knowledge import (
+        check_preview_rate_limit,
+        migrate_faq_into_knowledge,
+        preview_knowledge_answer,
+        validate_knowledge_base,
+    )
+
+    question = str((body or {}).get("question") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question is required")
+    if len(question) > 500:
+        raise HTTPException(status_code=400, detail="question too long")
+    if not check_preview_rate_limit(tenant_db_id):
+        raise HTTPException(status_code=429, detail="Too many preview requests — try again shortly")
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tenant_db_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    cfg = migrate_faq_into_knowledge(dict(row.config or {}))
+    kb_raw = (body or {}).get("knowledge_base")
+    if kb_raw is None:
+        kb_raw = cfg.get("knowledge_base")
+    try:
+        validate_knowledge_base(kb_raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Import AI client from main (same provider as WhatsApp path)
+    from app.main import ANTHROPIC_MODEL, anthropic_client
+
+    lang = str((body or {}).get("lang") or "en")
+    try:
+        result = await preview_knowledge_answer(
+            question,
+            kb_raw,
+            client=anthropic_client,
+            model=ANTHROPIC_MODEL,
+            lang_hint=lang,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Preview failed: {exc}") from exc
+    return result
+
+
 @router.post("/api/dashboard/tenants/{tenant_db_id}/menu/test-send")
 async def test_send_menu(
     tenant_db_id: int,
@@ -624,6 +683,16 @@ async def apply_starter_template(
             new_cfg["flow"] = patch["flow"]
         if "faq" in cleaned:
             new_cfg["faq"] = cleaned["faq"]
+            from app.knowledge import empty_knowledge_base, migrate_faq_into_knowledge
+
+            new_cfg = migrate_faq_into_knowledge(new_cfg)
+            kb = dict(new_cfg.get("knowledge_base") or empty_knowledge_base())
+            kb["faq"] = list(cleaned["faq"])
+            # Template FAQ goes live as published knowledge so bot answers work immediately
+            if go_live:
+                kb["status"] = "published"
+                kb["enabled"] = True
+            new_cfg["knowledge_base"] = kb
 
         if tmpl_flow in ("lead", "order") and row.flow_mode != tmpl_flow:
             row.flow_mode = tmpl_flow
@@ -641,6 +710,9 @@ async def apply_starter_template(
         out = tenant_config_response(row) if row else None
 
     invalidate_tenant(phone)
+    from app.knowledge import invalidate_knowledge_cache
+
+    invalidate_knowledge_cache(phone)
     return {
         "ok": True,
         "tenant_id": tenant_db_id,
@@ -648,7 +720,7 @@ async def apply_starter_template(
         "flow_mode": out["flow_mode"] if out else tmpl_flow,
         "go_live": go_live,
         "message": (
-            "Template applied and live — edit greeting, questions, and FAQ anytime"
+            "Template applied and live — edit greeting, questions, and knowledge base anytime"
             if go_live
             else "Draft updated — publish from Settings to go live"
         ),

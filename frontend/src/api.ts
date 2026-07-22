@@ -136,6 +136,15 @@ export type TenantConfig = {
   facts_pricing_note: string;
   facts_claims_note: string;
   faq: { question: string; answer: string }[];
+  knowledge_base?: {
+    enabled?: boolean;
+    status?: "draft" | "published";
+    updated_at?: string | null;
+    sections?: Record<string, string>;
+    complete_knowledge?: string;
+    faq?: { question: string; answer: string }[];
+  };
+  knowledge_char_count?: number;
   menu?: {
     shop_name: string;
     delivery_fee?: number | null;

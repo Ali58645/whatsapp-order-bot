@@ -114,7 +114,7 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-md space-y-4">
+      <div className="mx-auto w-full max-w-3xl space-y-4">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-48 w-full rounded-2xl" />
       </div>
@@ -122,7 +122,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
+    <div className="w-full max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Account</h1>
         <p className="mt-1 text-sm text-muted-foreground">

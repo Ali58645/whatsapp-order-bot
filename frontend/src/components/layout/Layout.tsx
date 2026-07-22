@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Bot,
   Building2,
+  ChevronDown,
   CreditCard,
   Home,
   LogOut,
@@ -55,26 +56,70 @@ type NavItem = {
     | "accessLog"
     | "channels"
     | "conversations"
+    | "inbox"
     | "account"
     | "broadcast"
-    | "settings";
+    | "settings"
+    | "botGreeting"
+    | "botQuestions"
+    | "botFaq"
+    | "botMore"
+    | "channelWhatsapp"
+    | "channelInstagram"
+    | "channelFacebook";
   icon: typeof Home;
   end?: boolean;
   orderOnly?: boolean;
   leadOnly?: boolean;
+  children?: { to: string; labelKey: NavItem["labelKey"]; leadOnly?: boolean; end?: boolean }[];
 };
+
+const CHANNEL_CHILDREN: NavItem["children"] = [
+  { to: "/channels/whatsapp", labelKey: "channelWhatsapp" },
+  { to: "/channels/instagram", labelKey: "channelInstagram" },
+  { to: "/channels/facebook", labelKey: "channelFacebook" },
+];
 
 const OWNER_NAV: NavItem[] = [
   { to: "/", labelKey: "home", icon: Home, end: true },
-  { to: "/conversations", labelKey: "conversations", icon: MessageCircle },
-  { to: "/customers", labelKey: "customers", icon: Users },
-  { to: "/my-bot", labelKey: "myBot", icon: Bot },
-  { to: "/channels", labelKey: "channels", icon: Radio },
+  {
+    to: "/conversations",
+    labelKey: "conversations",
+    icon: MessageCircle,
+    children: [
+      { to: "/conversations", labelKey: "inbox", end: true },
+      { to: "/customers", labelKey: "customers", end: true },
+    ],
+  },
+  {
+    to: "/my-bot",
+    labelKey: "myBot",
+    icon: Bot,
+    children: [
+      { to: "/my-bot/greeting", labelKey: "botGreeting" },
+      { to: "/my-bot/questions", labelKey: "botQuestions", leadOnly: true },
+      { to: "/my-bot/faq", labelKey: "botFaq" },
+      { to: "/my-bot/more", labelKey: "botMore" },
+    ],
+  },
+  {
+    to: "/channels",
+    labelKey: "channels",
+    icon: Radio,
+    children: CHANNEL_CHILDREN,
+  },
   { to: "/menu", labelKey: "menu", icon: Package, orderOnly: true },
   { to: "/broadcast", labelKey: "broadcast", icon: MessageCircle },
-  { to: "/team", labelKey: "team", icon: Users },
-  { to: "/account", labelKey: "account", icon: Settings },
-  { to: "/billing", labelKey: "billing", icon: CreditCard },
+  {
+    to: "/account",
+    labelKey: "settings",
+    icon: Settings,
+    children: [
+      { to: "/account", labelKey: "account", end: true },
+      { to: "/billing", labelKey: "billing", end: true },
+      { to: "/team", labelKey: "team", end: true },
+    ],
+  },
 ];
 
 /** Platform console — no tenant inbox in primary nav. */
@@ -82,10 +127,20 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/", labelKey: "businesses", icon: Building2, end: true },
   { to: "/team", labelKey: "team", icon: Users },
   { to: "/access-log", labelKey: "accessLog", icon: ScrollText },
-  { to: "/channels", labelKey: "channels", icon: Radio },
+  {
+    to: "/channels",
+    labelKey: "channels",
+    icon: Radio,
+    children: CHANNEL_CHILDREN,
+  },
   { to: "/billing", labelKey: "billing", icon: CreditCard },
   { to: "/settings", labelKey: "settings", icon: Settings },
 ];
+
+function pathActive(pathname: string, to: string, end?: boolean) {
+  if (end || to === "/") return pathname === to;
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
 
 export default function Layout() {
   const { collapsed, toggle } = useSidebarCollapsed();
@@ -98,6 +153,8 @@ export default function Layout() {
   const [flowMode, setFlowMode] = useState<string>("lead");
   const [cmdOpen, setCmdOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  /** Accordion drawer: which parent section is expanded (null = none). */
+  const [openDrawer, setOpenDrawer] = useState<string | null>(null);
   const supportMode = isSupportSession();
   const ownerShell = isOwner() || supportMode;
   const isAdmin = getRole() === "admin" && !supportMode;
@@ -112,6 +169,17 @@ export default function Layout() {
       return true;
     });
   }, [ownerShell, flowMode]);
+
+  // Keep the drawer that owns the current route open
+  useEffect(() => {
+    for (const item of nav) {
+      const kids = (item.children || []).filter((c) => !(c.leadOnly && flowMode === "order"));
+      if (kids.some((c) => pathActive(location.pathname, c.to, c.end))) {
+        setOpenDrawer(item.to);
+        return;
+      }
+    }
+  }, [location.pathname, nav, flowMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,11 +237,42 @@ export default function Layout() {
     }
   }
 
-  const crumb = t(
-    (nav.find((n) =>
-      n.end ? location.pathname === n.to : location.pathname.startsWith(n.to) && n.to !== "/"
-    )?.labelKey as Parameters<typeof t>[0]) || (ownerShell ? "home" : "businesses")
-  );
+  const crumbKey = (() => {
+    if (location.pathname.startsWith("/my-bot/")) {
+      const section = location.pathname.split("/")[2];
+      const map: Record<string, Parameters<typeof t>[0]> = {
+        greeting: "botGreeting",
+        questions: "botQuestions",
+        faq: "botFaq",
+        more: "botMore",
+      };
+      if (section && map[section]) return map[section];
+      return "myBot";
+    }
+    if (location.pathname.startsWith("/channels/")) {
+      const section = location.pathname.split("/")[2];
+      const map: Record<string, Parameters<typeof t>[0]> = {
+        whatsapp: "channelWhatsapp",
+        instagram: "channelInstagram",
+        facebook: "channelFacebook",
+      };
+      if (section && map[section]) return map[section];
+      return "channels";
+    }
+    for (const item of nav) {
+      for (const child of item.children || []) {
+        if (pathActive(location.pathname, child.to, child.end)) {
+          return child.labelKey as Parameters<typeof t>[0];
+        }
+      }
+    }
+    return (
+      (nav.find((n) => pathActive(location.pathname, n.to, n.end))?.labelKey as Parameters<
+        typeof t
+      >[0]) || (ownerShell ? "home" : "businesses")
+    );
+  })();
+  const crumb = t(crumbKey);
 
   const sidebarInner = (
     <>
@@ -204,27 +303,116 @@ export default function Layout() {
         </div>
       )}
 
-      <nav className="flex-1 space-y-0.5 px-2.5">
-        {nav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            title={t(item.labelKey)}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-[13px] font-medium transition-all duration-150",
-                collapsed && "justify-center px-0",
-                isActive
-                  ? "nav-item-active"
-                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-              )
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5">
+        {nav.map((item) => {
+          const childLinks = (item.children || []).filter((c) => {
+            if (c.leadOnly && flowMode === "order") return false;
+            return true;
+          });
+          const isDrawer = childLinks.length > 0;
+          const groupActive = childLinks.some((c) =>
+            pathActive(location.pathname, c.to, c.end)
+          );
+          const expanded = isDrawer && !collapsed && openDrawer === item.to;
+          const leafActive =
+            !isDrawer && pathActive(location.pathname, item.to, item.end);
+
+          function openAndGo() {
+            const first = childLinks[0]?.to || item.to;
+            setOpenDrawer(item.to);
+            if (!groupActive) navigate(first);
+            setMobileOpen(false);
+          }
+
+          function toggleDrawer() {
+            if (collapsed) {
+              openAndGo();
+              return;
             }
-          >
-            <item.icon className="h-4 w-4 shrink-0 opacity-90" />
-            {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
-          </NavLink>
-        ))}
+            if (expanded) {
+              setOpenDrawer(null);
+              return;
+            }
+            openAndGo();
+          }
+
+          return (
+            <div key={item.labelKey + item.to} className="space-y-0.5">
+              {isDrawer ? (
+                <button
+                  type="button"
+                  title={t(item.labelKey)}
+                  onClick={toggleDrawer}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-[13px] font-medium transition-all duration-150",
+                    collapsed && "justify-center px-0",
+                    groupActive
+                      ? "nav-item-active"
+                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0 opacity-90" />
+                  {!collapsed && (
+                    <>
+                      <span className="min-w-0 flex-1 truncate text-left">{t(item.labelKey)}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0 opacity-70 transition-transform duration-200",
+                          expanded && "rotate-180"
+                        )}
+                      />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  title={t(item.labelKey)}
+                  onClick={() => {
+                    setOpenDrawer(null);
+                    setMobileOpen(false);
+                  }}
+                  className={() =>
+                    cn(
+                      "flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-[13px] font-medium transition-all duration-150",
+                      collapsed && "justify-center px-0",
+                      leafActive
+                        ? "nav-item-active"
+                        : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                    )
+                  }
+                >
+                  <item.icon className="h-4 w-4 shrink-0 opacity-90" />
+                  {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
+                </NavLink>
+              )}
+
+              {expanded && (
+                <div className="ml-4 space-y-0.5 overflow-hidden border-l border-sidebar-border/80 pl-2">
+                  {childLinks.map((child) => (
+                    <NavLink
+                      key={child.to}
+                      to={child.to}
+                      end={child.end}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        cn(
+                          "block rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition",
+                          isActive
+                            ? "bg-primary/15 text-primary"
+                            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                        )
+                      }
+                    >
+                      {t(child.labelKey)}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       <div className={cn("space-y-0.5 border-t border-sidebar-border/80 p-2.5", collapsed && "px-1")}>
@@ -293,14 +481,14 @@ export default function Layout() {
               onClick={() => setMobileOpen(false)}
             />
             <motion.aside
-              className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-sidebar-border bg-sidebar"
-              initial={{ x: -280 }}
+              className="absolute inset-y-0 left-0 flex w-[min(100%,18rem)] flex-col border-r border-sidebar-border bg-sidebar"
+              initial={{ x: -24 }}
               animate={{ x: 0 }}
-              exit={{ x: -280 }}
+              exit={{ x: -24 }}
             >
               <div className="flex justify-end p-2">
                 <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)}>
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
               {sidebarInner}
@@ -309,29 +497,20 @@ export default function Layout() {
         )}
       </AnimatePresence>
 
-      <div
-        className={cn(
-          "flex min-h-screen flex-1 flex-col transition-[padding] duration-200",
-          collapsed ? "md:pl-16" : "md:pl-60"
-        )}
-      >
-        {supportMode && (
-          <div className="flex items-center justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
-            <span>
-              Viewing as{" "}
-              <span className="font-semibold text-amber-50">
-                {viewAsName || activeTenant?.name || "tenant"}
-              </span>{" "}
-              — support mode
-              {impersonator ? ` · ${impersonator}` : ""}
-            </span>
+      <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "md:pl-16" : "md:pl-60")}>
+        {(supportMode || impersonator) && (
+          <div className="flex items-center justify-between gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm md:px-8">
+            <p>
+              Viewing as <strong>{viewAsName || "owner"}</strong>
+              {impersonator ? ` (signed in as ${impersonator})` : ""}
+            </p>
             <Button size="sm" variant="outline" onClick={onExitViewAs}>
               {t("exitViewAs")}
             </Button>
           </div>
         )}
 
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border/80 bg-background/80 px-4 backdrop-blur-xl md:px-8">
           <Button
             variant="ghost"
             size="icon"
@@ -341,48 +520,24 @@ export default function Layout() {
           >
             <Menu className="h-5 w-5" />
           </Button>
-
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-medium tracking-wide text-muted-foreground">
-              BahiDesk
-              <span className="mx-1.5 text-border">/</span>
-              <span className="text-foreground">{crumb}</span>
-            </p>
+            <p className="truncate text-sm font-semibold tracking-tight">{crumb}</p>
           </div>
-
-          <button
-            onClick={() => setCmdOpen(true)}
-            className="hidden items-center gap-2 rounded-xl border border-border/70 bg-card/50 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-primary/30 hover:bg-card hover:text-foreground sm:flex focus-ring"
-          >
-            <Search className="h-3.5 w-3.5" />
-            Search…
-            <kbd className="rounded-md border border-border/80 bg-background/80 px-1.5 py-0.5 text-[10px]">
-              ⌘K
-            </kbd>
-          </button>
-
           <Button
             variant="ghost"
             size="icon"
-            className="sm:hidden"
             onClick={() => setCmdOpen(true)}
             aria-label="Search"
           >
             <Search className="h-4 w-4" />
           </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-          >
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </header>
 
         <main className="flex-1 px-4 py-7 pb-24 md:px-8 md:pb-10">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto w-full max-w-[1600px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
@@ -398,22 +553,33 @@ export default function Layout() {
         </main>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/90 backdrop-blur-xl md:hidden">
-          {nav.slice(0, 5).map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium",
-                  isActive ? "text-primary" : "text-muted-foreground"
-                )
-              }
-            >
-              <item.icon className="h-5 w-5" />
-              {t(item.labelKey).split(" ")[0]}
-            </NavLink>
-          ))}
+          {nav.slice(0, 5).map((item) => {
+            const childLinks = (item.children || []).filter((c) => {
+              if (c.leadOnly && flowMode === "order") return false;
+              return true;
+            });
+            const to = childLinks[0]?.to || item.to;
+            const active =
+              childLinks.length > 0
+                ? childLinks.some((c) => pathActive(location.pathname, c.to, c.end))
+                : pathActive(location.pathname, item.to, item.end);
+            return (
+              <NavLink
+                key={item.labelKey + item.to}
+                to={to}
+                end={item.end}
+                className={() =>
+                  cn(
+                    "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium",
+                    active ? "text-primary" : "text-muted-foreground"
+                  )
+                }
+              >
+                <item.icon className="h-5 w-5" />
+                {t(item.labelKey).split(" ")[0]}
+              </NavLink>
+            );
+          })}
         </nav>
       </div>
 
