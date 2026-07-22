@@ -393,6 +393,25 @@ export function setChildTrigger(
   return tree;
 }
 
+/** Pull a nested question back out to the main list. */
+export function unnestToRoot(
+  roots: TreeQuestionNode[],
+  childStepId: string
+): TreeQuestionNode[] {
+  const { tree, removed } = extractQuestion(roots, childStepId);
+  if (!removed) return roots;
+  return [...tree, removed];
+}
+
+/** Which follow-up (if any) is opened by this parent button. */
+export function childForOption(
+  parent: TreeQuestionNode,
+  optionId: string
+): TreeQuestionNode | null {
+  const hit = parent.children.find((c) => c.triggerOptionId === optionId);
+  return hit?.question ?? null;
+}
+
 function collectQuestionsInOrder(roots: TreeQuestionNode[]): TreeQuestionNode[] {
   const out: TreeQuestionNode[] = [];
   function walk(node: TreeQuestionNode) {

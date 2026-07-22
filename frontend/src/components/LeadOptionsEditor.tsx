@@ -24,6 +24,7 @@ import { Button } from "./ui/button";
 import {
   type InteractiveOpts,
   type TreeQuestionNode,
+  childForOption,
   childTriggerId,
   flattenTree,
   flowToTree,
@@ -33,6 +34,7 @@ import {
   reorderRoots,
   setChildTrigger,
   treeToFlow,
+  unnestToRoot,
   normKey,
   isTextLike,
 } from "./flowTree";
@@ -532,6 +534,163 @@ export function LeadOptionsEditor({
     setOpenIds((prev) => ({ ...prev, [`q:${step.id}`]: true }));
   }
 
+  /** Create a new follow-up question and attach it to one answer button. */
+  function addBranchForOption(
+    parent: TreeQuestionNode,
+    optionId: string,
+    kind: "text" | "buttons"
+  ) {
+    if (!onFlowChange || readonly) return;
+    const current = ensureLeadFlow(flow);
+    if (current.length >= FLOW_MAX) {
+      toast.error(`Max ${FLOW_MAX} steps in the conversation`);
+      return;
+    }
+    const field = nextCustomField(current);
+    if (!field) {
+      toast.error("You can add up to 5 extra questions");
+      return;
+    }
+    const btn = parent.options.find((o) => o.id === optionId);
+    const n = current.filter(isExtraStep).length + 1;
+    const options: FlowStepOption[] =
+      kind === "buttons"
+        ? [
+            { id: nid("opt"), title: "Option 1", value: "Option 1" },
+            { id: nid("opt"), title: "Option 2", value: "Option 2" },
+          ]
+        : [];
+    const step: FlowStep = {
+      id: nid("step"),
+      key: `EXTRA_${n}_${Date.now().toString(36).toUpperCase()}`.slice(0, 32),
+      type: kind === "buttons" ? "list_options" : "free_text_capture",
+      label: btn?.title ? `${btn.title.slice(0, 28)} path` : kind === "buttons" ? "Branch buttons" : "Branch question",
+      question_text:
+        kind === "buttons"
+          ? "Neeche se muntakhib karein."
+          : "Aapka sawaal yahan likhein…",
+      options,
+      capture_field: field,
+      required: true,
+      skip_if_declined: false,
+      reserved: false,
+      system: false,
+    };
+    // Existing child for this button → unnest first so we replace the path
+    const existing = childForOption(parent, optionId);
+    let nextFlow = insertBeforeScheduling(current, step);
+    let nextTree = flowToTree(nextFlow, interactive);
+    if (existing) {
+      nextTree = unnestToRoot(nextTree, existing.step.id);
+    }
+    nextTree = nestQuestionUnder(nextTree, step.id, parent.step.id, optionId);
+    applyTree(nextTree);
+    setOpenIds((prev) => ({
+      ...prev,
+      [`q:${parent.step.id}`]: true,
+      [`q:${step.id}`]: true,
+    }));
+    toast.success(
+      `Follow-up added for “${btn?.title || "this button"}” — edit the sub item below`
+    );
+  }
+
+  function setBranchForOption(
+    parent: TreeQuestionNode,
+    optionId: string,
+    followUpStepId: string
+  ) {
+    if (!canEditFlow) return;
+    const existing = childForOption(parent, optionId);
+    let next = tree;
+    if (existing && existing.step.id !== followUpStepId) {
+      next = unnestToRoot(next, existing.step.id);
+    }
+    if (!followUpStepId) {
+      if (existing) next = unnestToRoot(next, existing.step.id);
+      applyTree(next);
+      return;
+    }
+    next = nestQuestionUnder(next, followUpStepId, parent.step.id, optionId);
+    applyTree(next);
+    setOpenIds((prev) => ({ ...prev, [`q:${followUpStepId}`]: true }));
+  }
+
+  function renderBranchPanel(parent: TreeQuestionNode) {
+    if (!canEditFlow || parent.options.length === 0) return null;
+    const attachable = rows
+      .map((r) => r.node)
+      .filter((n) => n.step.id !== parent.step.id);
+
+    return (
+      <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/5 p-3">
+        <div>
+          <p className="text-xs font-semibold text-foreground">Different path per button</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Example: “Build New Automation” asks one set of questions; “Technical Support” asks
+            another. Each button can open its own follow-up.
+          </p>
+        </div>
+        <div className="space-y-2">
+          {parent.options.map((opt) => {
+            const linked = childForOption(parent, opt.id);
+            return (
+              <div
+                key={opt.id}
+                className="space-y-2 rounded-lg border border-border bg-card/80 p-2.5 sm:space-y-0 sm:flex sm:flex-wrap sm:items-end sm:gap-2"
+              >
+                <div className="min-w-[8rem] flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    If they choose
+                  </p>
+                  <p className="truncate text-sm font-medium">{opt.title || "Button"}</p>
+                </div>
+                <div className="min-w-[12rem] flex-[2]">
+                  <Label className="text-[11px]">Then ask</Label>
+                  <select
+                    className="mt-1 flex h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                    value={linked?.step.id || ""}
+                    disabled={readonly}
+                    onChange={(e) => setBranchForOption(parent, opt.id, e.target.value)}
+                  >
+                    <option value="">Next main question (no branch)</option>
+                    {attachable.map((n) => (
+                      <option key={n.step.id} value={n.step.id}>
+                        {questionTitle(n.step)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={readonly}
+                    onClick={() => addBranchForOption(parent, opt.id, "text")}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    New text path
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={readonly}
+                    onClick={() => addBranchForOption(parent, opt.id, "buttons")}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    New buttons path
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function onDragOver(event: DragOverEvent) {
     const overId = event.over?.id ? String(event.over.id) : null;
     if (overId?.startsWith("q:")) {
@@ -699,9 +858,7 @@ export function LeadOptionsEditor({
                 });
               }}
             />
-            <p className="text-[11px] text-muted-foreground">
-              Drag another question under this one to add a follow-up, then set “When they choose”.
-            </p>
+            {renderBranchPanel(node)}
             {allowRemove && canEditFlow && (
               <RemoveBuiltinBtn onClick={() => removeStep("BUSINESS_TYPE")} />
             )}
@@ -743,6 +900,7 @@ export function LeadOptionsEditor({
                 });
               }}
             />
+            {renderBranchPanel(node)}
             {allowRemove && canEditFlow && (
               <RemoveBuiltinBtn onClick={() => removeStep("LOCATIONS")} />
             )}
@@ -784,6 +942,7 @@ export function LeadOptionsEditor({
                 });
               }}
             />
+            {renderBranchPanel(node)}
             {allowRemove && canEditFlow && (
               <RemoveBuiltinBtn onClick={() => removeStep("CURRENT_SYSTEM")} />
             )}
@@ -868,6 +1027,7 @@ export function LeadOptionsEditor({
                 }}
               />
             )}
+            {isButtons && renderBranchPanel(node)}
             {isTextLike(step) && (
               <p className="text-[11px] text-muted-foreground">
                 Drag another question under this one to ask it next.
@@ -942,8 +1102,9 @@ export function LeadOptionsEditor({
       <div>
         <p className="mb-2 text-sm font-semibold text-foreground">Menu structure</p>
         <p className="mb-3 text-xs text-muted-foreground">
-          Main rows are questions. Expand to build the button list inside. Nest other questions
-          under a main question as sub items, then set which button opens them.
+          Expand a question → add answer buttons → use{" "}
+          <span className="font-medium text-foreground">Different path per button</span> so each
+          choice (e.g. Build New Automation vs Technical Support) opens its own follow-up questions.
         </p>
 
         <DndContext
