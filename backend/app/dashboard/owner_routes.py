@@ -360,3 +360,259 @@ async def _scoped_phone(user: dash_auth.AuthUser) -> str:
     from app.dashboard.routes import _scoped_tenant_phone
 
     return await _scoped_tenant_phone(user, "all")
+
+
+# ── Owner first-run business setup ──────────────────────────────────────────
+
+
+class OwnerSetupBody(BaseModel):
+    business_name: str = Field(..., min_length=1, max_length=256)
+    flow_mode: str = Field(..., pattern="^(lead|order)$")
+    template_id: str = Field(..., min_length=1, max_length=64)
+    vertical: Optional[str] = Field(None, max_length=64)
+    greeting_language: str = Field("roman_urdu", max_length=32)
+    greeting_text: str = Field("", max_length=900)
+    business_hours: Optional[dict] = None
+    overview: str = Field("", max_length=4000)
+    offer: str = Field("", max_length=4000)
+    location: str = Field("", max_length=2000)
+    contact: str = Field("", max_length=2000)
+    extra: str = Field("", max_length=4000)
+    message_overrides: Optional[dict] = None
+
+
+class RetargetLanguageBody(BaseModel):
+    greeting_language: str = Field(..., pattern="^(roman_urdu|en|english)$")
+    persist: bool = True
+
+
+@router.post("/api/dashboard/owner/retarget-language")
+async def owner_retarget_language(
+    body: RetargetLanguageBody,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """
+    Rewrite greeting + Questions + more replies into the selected language.
+    Persists by default so My Bot Questions update immediately.
+    """
+    _require_db()
+    dash_auth.assert_writable(user)
+    tid = _owner_tenant_id(user)
+
+    from app.dashboard.config_api import tenant_config_response
+    from app.db.repo import get_tenant_row, save_tenant_config
+    from app.owner_setup import retarget_config_language
+    from app.tenant_resolver import invalidate_tenant
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tid)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        new_cfg = retarget_config_language(
+            dict(row.config or {}),
+            business_name=row.name or "Business",
+            flow_mode=row.flow_mode or "lead",
+            greeting_language=body.greeting_language,
+        )
+        phone = row.phone_number_id
+        if body.persist:
+            await save_tenant_config(
+                db,
+                tid,
+                name=None,
+                config=new_cfg,
+                changed_by=user.username,
+            )
+            row = await get_tenant_row(db, tid)
+            out = tenant_config_response(row) if row else None
+        else:
+            meta = {
+                "id": row.id,
+                "phone_number_id": row.phone_number_id,
+                "name": row.name,
+                "flow_mode": row.flow_mode,
+                "status": getattr(row, "status", None) or "live",
+                "updated_at": row.updated_at,
+            }
+            await db.rollback()
+
+            class _Row:
+                pass
+
+            fake = _Row()
+            for k, v in meta.items():
+                setattr(fake, k, v)
+            fake.config = new_cfg
+            out = tenant_config_response(fake)
+            phone = None
+
+    if phone:
+        invalidate_tenant(phone)
+        from app.knowledge import invalidate_knowledge_cache
+
+        invalidate_knowledge_cache(phone)
+
+    await dash_auth.audit_support_action(
+        user,
+        "owner_retarget_language",
+        tenant_id=tid,
+        detail={"greeting_language": body.greeting_language, "persist": body.persist},
+    )
+    return {
+        "ok": True,
+        "greeting_language": new_cfg.get("greeting_language"),
+        "message": (
+            "Language updated — greeting, questions, and replies rewritten."
+            if body.persist
+            else "Texts rewritten — click Save to apply."
+        ),
+        "config": out,
+    }
+
+
+@router.get("/api/dashboard/owner/setup")
+async def owner_setup_status(
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """Whether the first-run wizard should show, plus category/template catalog."""
+    _require_db()
+    tid = _owner_tenant_id(user)
+    from app.db.repo import get_tenant_row
+    from app.owner_setup import owner_setup_needed
+    from app.templates import list_templates
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tid)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        needed = owner_setup_needed(row)
+        ob = (row.config or {}).get("onboarding") or {}
+
+    return {
+        "needed": needed,
+        "tenant_id": tid,
+        "tenant_name": row.name,
+        "flow_mode": row.flow_mode,
+        "template_id": ob.get("template_id") or "",
+        "owner_setup_complete": bool(ob.get("owner_setup_complete")),
+        "content_set": bool(ob.get("content_set")),
+        "templates": {
+            "lead": list_templates(flow_mode="lead"),
+            "order": list_templates(flow_mode="order"),
+        },
+    }
+
+
+@router.get("/api/dashboard/owner/setup/preview")
+async def owner_setup_preview(
+    template_id: str,
+    business_name: str = "Business",
+    greeting_language: str = "roman_urdu",
+    flow_mode: Optional[str] = None,
+    overview: str = "",
+    offer: str = "",
+    location: str = "",
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """Greeting + Questions + more-replies preview for the chosen template."""
+    _require_db()
+    _owner_tenant_id(user)
+    from app.owner_setup import setup_preview
+
+    try:
+        return setup_preview(
+            template_id=template_id,
+            business_name=business_name,
+            greeting_language=greeting_language,
+            flow_mode=flow_mode,
+            overview=overview,
+            offer=offer,
+            location=location,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/api/dashboard/owner/setup")
+async def owner_setup_apply(
+    body: OwnerSetupBody,
+    user: dash_auth.AuthUser = Depends(dash_auth.require_auth),
+):
+    """
+    Apply owner business setup: template (greeting/Questions/more replies) +
+    knowledge base + business hours, published and live.
+    """
+    _require_db()
+    dash_auth.assert_writable(user)
+    tid = _owner_tenant_id(user)
+
+    from app.dashboard.config_api import tenant_config_response
+    from app.db.repo import get_tenant_row, save_tenant_config
+    from app.owner_setup import apply_owner_setup_to_config, resolve_setup_template
+    from app.tenant_resolver import invalidate_tenant
+
+    resolved = resolve_setup_template(
+        template_id=body.template_id,
+        vertical=body.vertical,
+        flow_mode=body.flow_mode,
+    )
+
+    async with _get_db() as db:
+        row = await get_tenant_row(db, tid)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        try:
+            new_cfg, tid_resolved = apply_owner_setup_to_config(
+                row,
+                business_name=body.business_name,
+                flow_mode=body.flow_mode,
+                template_id=resolved,
+                greeting_language=body.greeting_language,
+                greeting_text=body.greeting_text,
+                business_hours=body.business_hours,
+                overview=body.overview,
+                offer=body.offer,
+                location=body.location,
+                contact=body.contact,
+                extra=body.extra,
+                message_overrides=body.message_overrides,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        if row.flow_mode != body.flow_mode:
+            row.flow_mode = body.flow_mode
+
+        await save_tenant_config(
+            db,
+            tid,
+            name=body.business_name.strip()[:256],
+            config=new_cfg,
+            changed_by=user.username,
+        )
+        phone = row.phone_number_id
+        row = await get_tenant_row(db, tid)
+        out = tenant_config_response(row) if row else None
+
+    invalidate_tenant(phone)
+    from app.knowledge import invalidate_knowledge_cache
+
+    invalidate_knowledge_cache(phone)
+    await dash_auth.audit_support_action(
+        user,
+        "owner_setup",
+        tenant_id=tid,
+        detail={
+            "template_id": tid_resolved,
+            "flow_mode": body.flow_mode,
+            "business_name": body.business_name.strip()[:64],
+        },
+    )
+    return {
+        "ok": True,
+        "tenant_id": tid,
+        "template_id": tid_resolved,
+        "flow_mode": body.flow_mode,
+        "message": "Business setup complete — your bot is live. Tweak Questions anytime in My Bot.",
+        "config": out,
+    }

@@ -1054,6 +1054,8 @@ async def get_me(user: dash_auth.AuthUser = Depends(dash_auth.require_auth)):
             row = await get_tenant_row(db, user.tenant_id)
             if row is not None:
                 cfg = row.config or {}
+                from app.owner_setup import owner_setup_needed
+
                 tenant = {
                     "id": row.id,
                     "name": row.name,
@@ -1063,6 +1065,7 @@ async def get_me(user: dash_auth.AuthUser = Depends(dash_auth.require_auth)):
                     "logo_url": (cfg.get("logo_url") or "").strip(),
                     "waba_id": (cfg.get("onboarding") or {}).get("waba_id") or "",
                     "checklist": build_checklist(row),
+                    "setup_needed": owner_setup_needed(row),
                 }
     return {
         "username": user.username,

@@ -84,10 +84,15 @@ export default function OwnerHome() {
         </Button>
       </div>
 
-      {(nudge.greeting || nudge.menu) && (
+      {(nudge.greeting || nudge.menu || me?.tenant?.setup_needed) && (
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
           <AlertTriangle className="h-4 w-4 text-amber-400" />
           <span className="font-medium">{t("completeBot")}</span>
+          {me?.tenant?.setup_needed && (
+            <Link to="/setup" className="text-primary underline-offset-2 hover:underline">
+              Finish business setup →
+            </Link>
+          )}
           {nudge.greeting && (
             <Link to="/my-bot" className="text-primary underline-offset-2 hover:underline">
               Open My Bot → Greeting

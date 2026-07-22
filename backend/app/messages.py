@@ -99,39 +99,37 @@ class MessagesError(ValueError):
 def _defaults_ur() -> dict:
     return {
         "lead": {
-            "greeting_line": "Assalam o Alaikum 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
+            "greeting_line": "Assalam o Alaikum 🙏 Aap ki dilchaspi ka shukriya.",
             "value_line": (
-                "Bahi POS aap ke business ki sales, stock, khata aur invoicing "
-                "ko ek jagah manage karta hai."
+                "Hum aap ki madad ke liye yahan hain — thori si info dein taake "
+                "hum aap ko sahi guide kar saken."
             ),
-            "q_business_name": "Barah-e-karam apne business ya shop ka naam farmaayein.",
-            "q_business_type": "Aap ka business kaunsi category mein aata hai? Neeche se muntakhib karein.",
-            "q_locations": "Aap ki kitni branches ya locations hain?",
-            "q_current_system": "Abhi aap billing ya hisaab kaise karte hain?",
+            "q_business_name": "Barah-e-karam apna naam ya company ka naam farmaayein.",
+            "q_business_type": "Aap ko kaunsi service / option chahiye? Neeche se muntakhib karein.",
+            "q_locations": "Aap kahan based hain ya kis area mein service chahiye?",
+            "q_current_system": "Abhi aap ka process / system kaisa hai?",
             "q_scheduling": (
-                "Hamari team aap ko Bahi POS ka mukammal demo dikhana chahti hai, "
-                "jis mein FBR invoicing support bhi shamil hai.\n"
-                "Demo ke liye kaunsa waqt aap ke liye munasib rahega?"
+                "Hamari team aap ko mukammal walkthrough dikhana chahti hai.\n"
+                "Demo / call ke liye kaunsa waqt aap ke liye munasib rahega?"
             ),
             "q_custom_slot": "Barah-e-karam apni pasandida tarikh aur waqt likh kar bataayein.",
             "confirm_slot": (
-                "Shukriya. Aap ka demo {{slot}} ke liye booked ho gaya hai. "
+                "Shukriya. Aap ka slot {{slot}} ke liye booked ho gaya hai. "
                 "Hamari team aap se is number par rabta karegi."
             ),
             "pricing_text": (
-                "Pricing aap ke business ki zarooriyaat aur size ke mutabiq mukhtasir hoti hai. "
-                "Hamari team demo ke dauran aap ko aap ke liye mukhtasar quote faraham karegi. "
-                "Barah-e-karam ek demo book karein taake hum aap ko sahi rahnumai de sakein."
+                "Pricing aap ki zarooriyaat ke mutabiq hoti hai. "
+                "Hamari team call / demo ke dauran aap ko mukhtasar quote degi. "
+                "Barah-e-karam ek time book karein."
             ),
             "info_text": (
-                "Bahi POS ek mukamal point-of-sale aur business management software hai "
-                "jo Pakistani businesses ke liye khaas taur par taiyar kiya gaya hai. "
-                "Yeh sales, inventory, customer accounts, aur invoicing ko ek platform par "
-                "manage karne ki sahulat deta hai."
+                "Hum businesses ko WhatsApp aur automation ke zariye customers se "
+                "better connect karne mein madad karte hain. "
+                "Neeche jawab dein — team aap ki guide karegi."
             ),
             "price_deflect_mid": (
-                "Pricing aap ke business ki zarooriyaat ke mutabiq tay hoti hai — "
-                "sahi quote demo mein milti hai. {{current_question}}"
+                "Pricing aap ki zarooriyaat ke mutabiq tay hoti hai — "
+                "sahi quote call / demo mein milti hai. {{current_question}}"
             ),
             "media_redirect_suffix": "Barah-e-karam apna jawab text mein likhein.",
             "handoff": "Hamari team jald aap se rabta karegi. Shukriya apna waqt dene ka.",
@@ -141,9 +139,9 @@ def _defaults_ur() -> dict:
                 "Thodi der baad dobara koshish farmaayein."
             ),
             "unsupported_media": "Barah-e-karam apna jawab text mein likhein.",
-            "entry_demo_suffix": "Hamari team aap ko demo ka slot choose karne mein madad karegi:",
-            "ack_business_name": "Shukriya. Aap ke business ka naam record ho gaya.",
-            "owner_card_title": "🔔 *NEW LEAD — Bahi POS*",
+            "entry_demo_suffix": "Hamari team aap ko time choose karne mein madad karegi:",
+            "ack_business_name": "Shukriya. Aap ki info record ho gayi.",
+            "owner_card_title": "🔔 *NEW LEAD*",
             "owner_card_body": (
                 "Business: {{business_name}} ({{business_type}})\n"
                 "Locations: {{locations}}\n"
@@ -196,13 +194,11 @@ def _defaults_ur() -> dict:
             "select_button_label": "Muntakhib karein",
             "slot_other_label": "Koi aur time",
             "business_types": [
-                {"id": "grocery", "title": "Grocery / Kiryana", "description": "Kiryana / superstore", "value": "Grocery / Kiryana"},
-                {"id": "restaurant", "title": "Restaurant", "description": "Food & beverage", "value": "Restaurant"},
-                {"id": "pharmacy", "title": "Pharmacy", "description": "Medical store", "value": "Pharmacy"},
-                {"id": "garments", "title": "Garments", "description": "Clothing / fabric", "value": "Garments"},
-                {"id": "electronics", "title": "Mobile / Electronics", "description": "Mobile / gadgets / appliances", "value": "Mobile / Electronics"},
-                {"id": "general_store", "title": "General Store", "description": "General merchandise", "value": "General Store"},
-                {"id": "other", "title": "Other", "description": "Doosra business type", "value": "Other"},
+                {"id": "svc_1", "title": "Consultation", "description": "Advice / quote", "value": "Consultation"},
+                {"id": "svc_2", "title": "Demo / Call", "description": "Live walkthrough", "value": "Demo / Call"},
+                {"id": "svc_3", "title": "Pricing", "description": "Packages", "value": "Pricing"},
+                {"id": "svc_4", "title": "Support", "description": "Help", "value": "Support"},
+                {"id": "other", "title": "Other", "description": "Kuch aur", "value": "Other"},
             ],
             "locations": [
                 {"id": "loc_1", "title": "1", "value": "1"},
@@ -210,8 +206,8 @@ def _defaults_ur() -> dict:
                 {"id": "loc_5plus", "title": "5+", "value": "5+"},
             ],
             "current_system": [
-                {"id": "sys_manual", "title": "Manual register", "sheet_value": "Manual Register"},
-                {"id": "sys_pos", "title": "POS software", "sheet_value": "Existing POS"},
+                {"id": "sys_manual", "title": "Manual", "sheet_value": "Manual"},
+                {"id": "sys_software", "title": "Software / tools", "sheet_value": "Software"},
                 {"id": "sys_none", "title": "Kuch nahi", "sheet_value": "No System"},
             ],
         },
@@ -221,67 +217,118 @@ def _defaults_ur() -> dict:
 def _defaults_en() -> dict:
     d = _defaults_ur()
     d["lead"].update({
-        "greeting_line": "Welcome 🙏 Thank you for your interest in Bahi POS.",
+        "greeting_line": "Welcome 🙏 Thank you for your interest.",
         "value_line": (
-            "Bahi POS is a complete point-of-sale and business management "
-            "solution designed for Pakistani businesses."
+            "We're here to help — share a few details so we can guide you properly."
         ),
-        "q_business_name": "Kindly share the name of your business or shop.",
-        "q_business_type": "Please select the category that best describes your business.",
-        "q_locations": "How many branches or locations does your business have?",
-        "q_current_system": "How do you currently manage billing or accounts?",
+        "q_business_name": "Kindly share your name or company name.",
+        "q_business_type": "Which service or option do you need? Please select below.",
+        "q_locations": "Where are you based, or which area do you need service in?",
+        "q_current_system": "How do you currently handle this process?",
         "q_scheduling": (
-            "Our team would be glad to walk you through a complete demo of Bahi POS, "
-            "including its invoicing features.\n"
-            "Which time slot would be convenient for you?"
+            "Our team would love to walk you through everything.\n"
+            "Which time works best for a demo or call?"
         ),
         "q_custom_slot": "Kindly specify your preferred date and time.",
         "confirm_slot": (
-            "Thank you. Your demo has been scheduled for {{slot}}. "
+            "Thank you. Your slot has been booked for {{slot}}. "
             "Our team will contact you on this number."
         ),
         "pricing_text": (
-            "Pricing is tailored to the size and requirements of each business. "
-            "Our team will share a personalised quote during the demo session. "
-            "We invite you to book a demo so we can guide you accordingly."
+            "Pricing depends on your requirements. "
+            "Our team will share a quote during the call or demo. "
+            "Please book a time so we can guide you."
         ),
         "info_text": (
-            "Bahi POS is a comprehensive point-of-sale and shop management software "
-            "built specifically for Pakistani businesses. "
-            "It consolidates sales, inventory, customer accounts, and invoicing "
-            "into a single, unified platform."
+            "We help businesses connect with customers through WhatsApp and automation. "
+            "Answer below and our team will guide you."
         ),
         "price_deflect_mid": (
-            "Pricing depends on your business requirements and will be shared "
-            "as a personalised quote during the demo. {{current_question}}"
+            "Pricing depends on your requirements and will be shared "
+            "during the call or demo. {{current_question}}"
         ),
         "media_redirect_suffix": "Kindly respond in text so we may assist you properly.",
         "handoff": "Our team will be in touch with you shortly. Thank you for your time.",
         "reprompt": "We apologise — that response was not recognised. {{current_question}}",
         "error_fallback": "We apologise for the inconvenience. Please try again in a moment.",
         "unsupported_media": "Kindly respond in text so we may assist you.",
-        "entry_demo_suffix": "Our team will help you select a demo slot:",
-        "ack_business_name": "Thank you. Your business name has been noted.",
+        "entry_demo_suffix": "Our team will help you select a time:",
+        "ack_business_name": "Thank you. Your details have been noted.",
+        "owner_card_title": "🔔 *NEW LEAD*",
     })
     d["interactive"]["select_button_label"] = "Select"
     d["interactive"]["slot_other_label"] = "Another time"
-    d["order"]["greeting"] = "Welcome! Tap below to browse the menu."
-    d["order"]["menu_button_label"] = "View menu"
-    d["order"]["category_choose"] = "Please choose a category:"
-    d["order"]["item_choose"] = "{{category}} — please choose an item:"
-    d["order"]["item_choose_flat"] = "Please choose an item:"
-    d["order"]["more_items_ask"] = "Add anything else?"
-    d["order"]["btn_more_yes"] = "Yes"
-    d["order"]["btn_more_no"] = "No, that's all"
-    d["order"]["confirm_note"] = "Confirm order?"
-    d["order"]["cart_header"] = "Your order:"
-    d["order"]["order_received"] = "Thank you! Your order is confirmed."
-    d["order"]["nudge_menu"] = "Please choose from the menu, or type 'menu'."
-    d["order"]["more_row_title"] = "See more →"
-    # Seed default value (= title) for business_types if missing
     for row in d["interactive"]["business_types"]:
         row.setdefault("value", row["title"])
+        if str(row.get("description") or "").lower() in ("kuch aur",):
+            row["description"] = "Something else"
+    for row in d["interactive"]["current_system"]:
+        if str(row.get("title") or "").lower() in ("kuch nahi",):
+            row["title"] = "Nothing yet"
+    d["order"].update(
+        {
+            "greeting": "Welcome! Tap below to browse the menu.",
+            "menu_button_label": "View menu",
+            "category_choose": "Please choose a category:",
+            "item_choose": "{{category}} — please choose an item:",
+            "item_choose_flat": "Please choose an item:",
+            "modifier_prompt": "{{item}} — please choose {{modifier}}:",
+            "quantity_ask": "{{item}} — how many? (1-9)",
+            "more_items_ask": "Add anything else?",
+            "btn_more_yes": "Yes",
+            "btn_more_no": "No, that's all",
+            "btn_confirm": "Confirm",
+            "btn_cancel": "Cancel",
+            "confirm_note": "Confirm order?",
+            "cart_header": "Your order:",
+            "delivery_line": "Delivery: {{amount}}",
+            "delivery_free": "Delivery: Free",
+            "total_line": "Total: {{total}}",
+            "order_received": "Thank you! Your order is confirmed.",
+            "order_cancel": "Order cancelled. Type 'menu' to start a new order.",
+            "nudge_menu": "Please choose from the menu, or type 'menu'.",
+            "item_not_found": "Item not found. Please try again.",
+            "cart_empty": "Your cart is empty. Please choose an item from the menu.",
+            "qty_invalid": "Please enter a number from 1 to 9.",
+            "pick_item_first": "Please select an item first.",
+            "more_row_title": "See more →",
+            "owner_slip_title": "🔔 *NEW ORDER*",
+            "owner_fail_customer": (
+                "Your order has been recorded. We'll confirm shortly. Thank you!"
+            ),
+            "reset_done": "Order reset. What would you like to order?",
+            "text_only": "Please send your order as a text message.",
+            "error_fallback": "Sorry, an issue occurred. Please try again.",
+        }
+    )
     return d
+
+
+def localize_demo_slots(slots: list | None, lang: str) -> list[str]:
+    """Translate common Kal/Tomorrow demo slot labels for the selected language."""
+    import re
+
+    lang_key = "en" if lang in ("en", "english") else "roman_urdu"
+    raw = [str(s or "").strip() for s in (slots or [])][:2]
+    if lang_key == "en":
+        mapped = []
+        for t in raw:
+            t = re.sub(r"(?i)\bkal\b", "Tomorrow", t)
+            t = re.sub(r"(?i)\baaj\b", "Today", t)
+            mapped.append(t[:64] if t else "")
+        defaults = ["Tomorrow 11am", "Tomorrow 4pm"]
+    else:
+        mapped = []
+        for t in raw:
+            t = re.sub(r"(?i)\btomorrow\b", "Kal", t)
+            t = re.sub(r"(?i)\btoday\b", "Aaj", t)
+            mapped.append(t[:64] if t else "")
+        defaults = ["Kal 11am", "Kal 4pm"]
+    if not mapped or not any(mapped):
+        mapped = list(defaults)
+    while len(mapped) < 2:
+        mapped.append(defaults[len(mapped)])
+    return mapped[:2]
 
 
 def default_messages(lang: str = "roman_urdu") -> dict:

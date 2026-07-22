@@ -14,6 +14,7 @@ const Team = lazy(() => import("./pages/Team"));
 const AccessLog = lazy(() => import("./pages/AccessLog"));
 const OwnerHome = lazy(() => import("./pages/owner/OwnerHome"));
 const OwnerBot = lazy(() => import("./pages/owner/OwnerBot"));
+const OwnerSetup = lazy(() => import("./pages/owner/OwnerSetup"));
 const Customers = lazy(() => import("./pages/owner/Customers"));
 const OwnerMenu = lazy(() => import("./pages/owner/OwnerMenu"));
 const Billing = lazy(() => import("./pages/owner/Billing"));
@@ -93,6 +94,16 @@ export default function App() {
         />
 
         {/* Owner / support shell */}
+        <Route
+          path="setup"
+          element={
+            <OwnerOnly>
+              <SuspensePage>
+                <OwnerSetup />
+              </SuspensePage>
+            </OwnerOnly>
+          }
+        />
         <Route
           path="customers"
           element={

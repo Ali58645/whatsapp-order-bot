@@ -39,6 +39,9 @@ export type Tenant = {
   stat_today?: number;
   checklist?: OnboardingChecklist;
   template_id?: string | null;
+  /** True when owner should complete first-run business setup wizard. */
+  setup_needed?: boolean;
+  waba_id?: string;
 };
 
 /** Normalize status; missing → live. */

@@ -197,6 +197,19 @@ export default function Layout() {
           setFlowMode(me.tenant.flow_mode || "lead");
           window.dispatchEvent(new Event("tenant-change"));
         }
+        if (
+          me.tenant?.setup_needed &&
+          (me.role === "owner" || me.impersonated_by) &&
+          !location.pathname.startsWith("/setup")
+        ) {
+          let skipped = false;
+          try {
+            skipped = sessionStorage.getItem("bahi_setup_skipped") === "1";
+          } catch {
+            skipped = false;
+          }
+          if (!skipped) navigate("/setup", { replace: true });
+        }
       }
       if (listRes.status === "fulfilled") {
         const list = listRes.value;

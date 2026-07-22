@@ -1,9 +1,9 @@
 {
   "id": "pos_lead",
-  "name": "POS / B2B Software Lead",
+  "name": "Automation / B2B Software Lead",
   "vertical": "pos",
   "flow_mode": "lead",
-  "blurb": "Bahi POS–style lead qualification for any B2B software reseller.",
+  "blurb": "Lead qualification for automation, software, and B2B service providers.",
   "icon": "monitor",
   "languages": [
     "roman_urdu",
@@ -11,81 +11,57 @@
   ],
   "config": {
     "greeting_language": "roman_urdu",
-    "campaign_phrase": "Bahi POS",
-    "greeting_text": "Assalam o Alaikum 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
+    "campaign_phrase": "[Business]",
+    "greeting_text": "Assalam o Alaikum 🙏 [Business] mein aap ki dilchaspi ka shukriya.",
     "demo_slots": [
       "Kal 11am",
       "Kal 4pm"
     ],
-    "facts_features": "Inventory, billing, multi-branch reports, WhatsApp order sync.",
-    "facts_pricing_note": "Packages start from a monthly subscription — quote after demo.",
-    "facts_claims_note": "Used by retailers, pharmacies, and restaurants across Pakistan.",
+    "facts_features": "Automation, integrations, dashboards, and AI agents for your operations.",
+    "facts_pricing_note": "Packages are quoted after a short discovery call or demo.",
+    "facts_claims_note": "Built for teams that want WhatsApp and ops automation.",
     "template_notes": "",
     "i18n": {
       "english": {
-        "greeting_text": "Assalam o Alaikum! Thanks for your interest in our POS software."
+        "greeting_text": "Welcome! Thanks for your interest in [Business]."
       }
     },
     "messages_overlay": {
       "lead": {
-        "greeting_line": "Assalam o Alaikum 🙏 Bahi POS mein aap ki dilchaspi ka shukriya.",
-        "value_line": "Bahi POS aap ke business ki sales, stock, khata aur invoicing ko ek jagah manage karta hai."
+        "greeting_line": "Assalam o Alaikum 🙏 [Business] mein aap ki dilchaspi ka shukriya.",
+        "value_line": "[Business] aap ke workflows aur customer conversations ko automate karne mein madad karta hai."
       },
       "interactive": {
         "business_types": [
           {
-            "id": "grocery",
-            "title": "Grocery / Kiryana",
-            "description": "Kirana store",
-            "value": "Grocery / Kiryana"
+            "id": "svc_auto",
+            "title": "Automation",
+            "description": "Workflows",
+            "value": "Automation"
           },
           {
-            "id": "restaurant",
-            "title": "Restaurant",
-            "description": "Cafe / restaurant",
-            "value": "Restaurant"
+            "id": "svc_wa",
+            "title": "WhatsApp bot",
+            "description": "Messaging",
+            "value": "WhatsApp bot"
           },
           {
-            "id": "pharmacy",
-            "title": "Pharmacy",
-            "description": "Medical store",
-            "value": "Pharmacy"
+            "id": "svc_int",
+            "title": "Integrations",
+            "description": "Systems sync",
+            "value": "Integrations"
           },
           {
-            "id": "garments",
-            "title": "Garments",
-            "description": "Clothing retail",
-            "value": "Garments"
+            "id": "svc_ai",
+            "title": "AI agents",
+            "description": "Smart replies",
+            "value": "AI agents"
           },
           {
-            "id": "electronics",
-            "title": "Mobile / Electronics",
-            "description": "Phones & gadgets",
-            "value": "Mobile / Electronics"
-          },
-          {
-            "id": "general_store",
-            "title": "General Store",
-            "description": "Variety store",
-            "value": "General Store"
-          },
-          {
-            "id": "hardware",
-            "title": "Hardware",
-            "description": "Tools & supplies",
-            "value": "Hardware"
-          },
-          {
-            "id": "bakery",
-            "title": "Bakery",
-            "description": "Cakes & bread",
-            "value": "Bakery"
-          },
-          {
-            "id": "beauty",
-            "title": "Beauty / Salon",
-            "description": "Cosmetics / salon",
-            "value": "Beauty"
+            "id": "svc_dash",
+            "title": "Dashboards",
+            "description": "Reporting",
+            "value": "Dashboards"
           },
           {
             "id": "other",
@@ -97,18 +73,18 @@
         "locations": [
           {
             "id": "loc_1",
-            "title": "1",
-            "value": "1"
+            "title": "Local",
+            "value": "Local"
           },
           {
-            "id": "loc_2_3",
-            "title": "2-3",
-            "value": "2-3"
+            "id": "loc_2",
+            "title": "Remote / online",
+            "value": "Remote / online"
           },
           {
-            "id": "loc_4p",
-            "title": "4+",
-            "value": "4+"
+            "id": "loc_3",
+            "title": "Multi-city",
+            "value": "Multi-city"
           }
         ],
         "current_system": [

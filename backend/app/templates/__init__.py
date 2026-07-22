@@ -187,11 +187,27 @@ def build_draft_patch(
     else:
         lang = "roman_urdu"
 
+    from app.messages import localize_demo_slots
+
+    name = (business_name or "").strip() or "us"
+    greet = str(cfg_in.get("greeting_text") or "").strip()
+    # Strict English: never keep Assalam / Roman Urdu greetings when EN is selected
+    if lang == "en" and re.search(
+        r"(?i)\b(assalam|aap\b|shukriya|dilchaspi|muntakhib|madad|karein|dekhein)\b",
+        greet,
+    ):
+        if flow == "order":
+            greet = f"Welcome to {name}! Tap below to browse the menu."
+        else:
+            greet = f"Welcome! Thanks for your interest in {name}."
+        cfg_in["greeting_text"] = greet
+
+    slots_in = cfg_in.get("demo_slots") or ["Kal 11am", "Kal 4pm"]
     patch: dict[str, Any] = {
         "greeting_language": lang,
         "greeting_text": cfg_in.get("greeting_text") or "",
         "campaign_phrase": cfg_in.get("campaign_phrase") or data.get("name") or "Hello",
-        "demo_slots": cfg_in.get("demo_slots") or ["Kal 11am", "Kal 4pm"],
+        "demo_slots": localize_demo_slots(slots_in if isinstance(slots_in, list) else [], lang),
         "facts_features": cfg_in.get("facts_features") or "",
         "facts_pricing_note": cfg_in.get("facts_pricing_note") or "",
         "facts_claims_note": cfg_in.get("facts_claims_note") or "",
@@ -207,6 +223,30 @@ def build_draft_patch(
     # Messages draft: defaults + overlay (questions, buttons, reply texts)
     base = default_messages(lang)
     overlay = cfg_in.get("messages_overlay") or {}
+    if lang == "en" and isinstance(overlay, dict):
+        # Seed templates author lead/order overlays in Roman Urdu — keep only
+        # interactive button rows (titles are usually English) when EN is selected.
+        inter = overlay.get("interactive")
+        if isinstance(inter, dict):
+            inter = copy.deepcopy(inter)
+            # Localize leftover Roman Urdu labels in seeded option rows
+            for set_key in ("business_types", "locations", "current_system"):
+                rows = inter.get(set_key)
+                if not isinstance(rows, list):
+                    continue
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    for field in ("title", "description", "value", "sheet_value"):
+                        val = str(row.get(field) or "")
+                        low = val.strip().lower()
+                        if low in ("kuch nahi", "kuch aur"):
+                            row[field] = (
+                                "Nothing yet" if "nahi" in low else "Something else"
+                            )
+            overlay = {"interactive": inter}
+        else:
+            overlay = {}
     msgs = _deep_merge(base, overlay) if overlay else base
     if flow == "lead" and patch["greeting_text"]:
         msgs = {

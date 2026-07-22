@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Building2, KeyRound, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Building2, KeyRound, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -199,6 +200,22 @@ export default function AccountPage() {
           Save profile
         </Button>
       </form>
+
+      {(isOwner() || getRole() === "owner") && (
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className="h-4 w-4" />
+            Business setup
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Re-run the guided setup to refresh your knowledge base, greeting, questions, and
+            replies from a category template.
+          </p>
+          <Button type="button" variant="outline" asChild>
+            <Link to="/setup?rerun=1">Re-run setup wizard</Link>
+          </Button>
+        </div>
+      )}
 
       <form
         onSubmit={(e) => void onPassword(e)}

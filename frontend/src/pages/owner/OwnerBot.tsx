@@ -454,6 +454,51 @@ export default function OwnerBot() {
               disabled={readonly}
             />
           </div>
+          <div>
+            <Label>Language</Label>
+            <select
+              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              value={
+                cfg.config.greeting_language === "en" ||
+                cfg.config.greeting_language === "english"
+                  ? "en"
+                  : "roman_urdu"
+              }
+              onChange={(e) => {
+                const next = e.target.value;
+                void (async () => {
+                  try {
+                    const res = await api<{
+                      config: TenantConfigResponse;
+                      message: string;
+                    }>("/api/dashboard/owner/retarget-language", {
+                      method: "POST",
+                      tenant: false,
+                      body: JSON.stringify({ greeting_language: next, persist: true }),
+                    });
+                    setCfg(res.config);
+                    setFlow((res.config.config.flow as FlowStep[] | undefined) || []);
+                    toast.success(
+                      next === "en"
+                        ? "English applied to greeting, questions & replies"
+                        : "Roman Urdu applied to greeting, questions & replies"
+                    );
+                  } catch (err: unknown) {
+                    toast.error(
+                      err instanceof Error ? err.message : "Language switch failed"
+                    );
+                  }
+                })();
+              }}
+              disabled={readonly}
+            >
+              <option value="roman_urdu">Roman Urdu</option>
+              <option value="en">English</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Rewrites greeting, Questions (including list labels & slots), and more replies.
+            </p>
+          </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -563,7 +608,10 @@ export default function OwnerBot() {
                 rows={2}
                 value={
                   leadMsgs.q_business_name ||
-                  "Barah-e-karam apne business ya shop ka naam farmaayein."
+                  (cfg.config.greeting_language === "en" ||
+                  cfg.config.greeting_language === "english"
+                    ? "Kindly share your name or company name."
+                    : "Barah-e-karam apna naam ya company ka naam farmaayein.")
                 }
                 onChange={(e) =>
                   patchMessagesDraft({
@@ -577,23 +625,6 @@ export default function OwnerBot() {
               </p>
             </div>
           )}
-          <div>
-            <Label>Language</Label>
-            <select
-              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-              value={cfg.config.greeting_language}
-              onChange={(e) =>
-                setCfg({
-                  ...cfg,
-                  config: { ...cfg.config, greeting_language: e.target.value },
-                })
-              }
-              disabled={readonly}
-            >
-              <option value="roman_urdu">Roman Urdu</option>
-              <option value="en">English</option>
-            </select>
-          </div>
           {isLead && (
             <div>
               <Label>Your alert WhatsApp (demos / handoffs)</Label>
