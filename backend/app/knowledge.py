@@ -333,6 +333,7 @@ async def answer_from_knowledge(
     lang_hint: str = "ur",
     conversation_snippet: str = "",
     miss_policy: str = "none",
+    error_out: list | None = None,
 ) -> Optional[str]:
     """
     Grounded answer from published knowledge using the configured Anthropic model.
@@ -341,6 +342,7 @@ async def answer_from_knowledge(
     miss_policy:
       - "none": on miss return None (preserve flow)
       - "unavailable": on miss return the polite human-handoff message
+    If error_out is a list, AI/config failures append a short message there.
     """
     corpus, enabled = _cached_corpus(tenant)
     if not enabled or not corpus.strip():
@@ -379,6 +381,8 @@ async def answer_from_knowledge(
 
     if client is None:
         log.warning("knowledge answer skipped: no AI client configured")
+        if error_out is not None:
+            error_out.append("AI is not configured (missing ANTHROPIC_API_KEY).")
         return _UNAVAILABLE if miss_policy == "unavailable" else None
 
     try:
@@ -394,9 +398,19 @@ async def answer_from_knowledge(
         raw = (response.content[0].text or "").strip()
     except asyncio.TimeoutError:
         log.warning("knowledge answer timeout tenant=%s", getattr(tenant, "phone_number_id", ""))
+        if error_out is not None:
+            error_out.append("AI timed out — try again in a moment.")
         return _UNAVAILABLE if miss_policy == "unavailable" else None
     except Exception as e:
         log.warning("knowledge answer error: %s", e)
+        msg = str(e)
+        if error_out is not None:
+            if "401" in msg or "authentication" in msg.lower() or "invalid" in msg.lower():
+                error_out.append(
+                    "AI authentication failed — check ANTHROPIC_API_KEY on the server."
+                )
+            else:
+                error_out.append(f"AI call failed: {msg[:180]}")
         return _UNAVAILABLE if miss_policy == "unavailable" else None
 
     answer = sanitize_text(raw, max_len=900)
@@ -481,6 +495,7 @@ async def preview_knowledge_answer(
         _raw_config = {"knowledge_base": {**kb, "status": "published"}, "faq": kb.get("faq") or []}
 
     invalidate_knowledge_cache("preview")
+    errors: list[str] = []
     answer = await answer_from_knowledge(
         question,
         _T(),
@@ -489,18 +504,28 @@ async def preview_knowledge_answer(
         lang_hint=lang_hint,
         conversation_snippet="",
         miss_policy="unavailable",
+        error_out=errors,
     )
     invalidate_knowledge_cache("preview")
     text = answer or _UNAVAILABLE
     matched = text.strip() != _UNAVAILABLE
+    detail = None
+    if errors:
+        detail = errors[0]
+        matched = False
+        text = (
+            "Knowledge preview could not reach the AI. "
+            + detail
+            + " Fix the API key on the server, then try again."
+        )
+    elif not matched:
+        detail = "AI ran but found no grounded answer in your knowledge for this question."
     return {
         "answer": text,
         "matched": matched,
-        "used_ai": True,
+        "used_ai": not bool(errors),
         "model": model,
         "char_count": knowledge_char_count(kb),
         "excerpts_preview": grounding_excerpts(corpus, question)[:1500],
-        "detail": None
-        if matched
-        else "AI ran but found no grounded answer in your knowledge for this question.",
+        "detail": detail,
     }

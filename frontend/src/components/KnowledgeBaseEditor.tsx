@@ -208,6 +208,8 @@ export function KnowledgeBaseEditor({
       if (res.detail) setPreviewDetail(res.detail);
       if (res.matched) {
         toast.success(res.used_ai ? "Answered from your knowledge (AI)" : "Answer ready");
+      } else if (res.detail && /api key|authentication|AI call failed|could not reach/i.test(res.detail)) {
+        toast.error(res.detail);
       } else {
         toast.message(res.detail || "No confirmed match — bot would offer human support");
       }
