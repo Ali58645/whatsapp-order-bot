@@ -116,7 +116,6 @@ from app.lead import (                                      # noqa: E402
     forward_lead_card, get_phase_interactive,
     apply_interactive_answer,
     classify_entry_intent, build_entry_response,
-    INTENT_DEMO_FIRST,
 )
 from app.interactive import parse_interactive_reply         # noqa: E402
 from app.sheet import upsert_lead, parse_slot_datetime      # noqa: E402
@@ -138,6 +137,11 @@ def _make_graph_url(phone_number_id: str) -> str:
 
 
 def _is_own_number(phone: str, tenant: Tenant) -> bool:
+    """True if *phone* is the tenant owner or business WA id (INBOUND only).
+
+    Used to skip sheet rows for messages FROM owner/business.
+    Must never gate OUTBOUND sends (lead cards / order slips to owner).
+    """
     from app.sheet import _normalize_phone
     normalized = _normalize_phone(phone)
     own = {_normalize_phone(n) for n in (tenant.owner_whatsapp, tenant.business_wa_id) if n}
@@ -239,6 +243,117 @@ async def _db_append_event(
     except Exception as exc:
         log.error(f"db: append event ({event_type}) failed — {exc}")
 
+
+async def _finalize_lead_confirmed(
+    sender: str,
+    meta: dict,
+    tenant: Tenant,
+    *,
+    customer_text: str | None = None,
+) -> None:
+    """
+    Customer confirm (optional) + owner New Lead card + sheet/DB close.
+    Always call this when phase becomes CONFIRMED so the owner alert is never skipped.
+
+    Outbound to owner is independent of inbound mute / owner-self exclusion
+    (_is_own_number only skips sheet rows for INBOUND from owner/business).
+    """
+    tid = tenant.phone_number_id
+    lang = meta.get("lang", "ur")
+    from app.lead import lead_text
+
+    log.info(
+        "lead card: CONFIRMED finalize for %s tenant=%s owner_whatsapp=%r",
+        sender,
+        tid,
+        tenant.owner_whatsapp,
+    )
+
+    if customer_text is None:
+        customer_text = lead_text(
+            "confirm_slot", lang, tenant, slot=meta.get("demo_slot", "") or "—"
+        )
+    if customer_text:
+        await send_whatsapp_message(sender, customer_text, tenant=tenant)
+
+    owner = (tenant.owner_whatsapp or "").strip()
+    if not owner:
+        log.error(
+            "lead card: skipped because owner_whatsapp empty "
+            "(set My Bot → alert WhatsApp) tenant=%s customer=%s",
+            tid,
+            sender,
+        )
+        asyncio.create_task(
+            _db_append_event(
+                tenant,
+                "owner_notify_skipped",
+                {"reason": "owner_whatsapp_empty", "phase": "CONFIRMED"},
+                wa_id=sender,
+            )
+        )
+    else:
+        await forward_lead_card(
+            sender,
+            meta,
+            owner,
+            lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+            tenant=tenant,
+        )
+
+    demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
+    _sheet_upsert(
+        sender,
+        {
+            "status": STATUS_DEMO_BOOKED,
+            "notes": f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
+            "next_followup": demo_date or "",
+            "demo_date": demo_date or "",
+            "demo_time": demo_time or "",
+            "business_name": meta.get("business_name", ""),
+            "business_type": meta.get("business_type", ""),
+            "current_system": meta.get("current_system", ""),
+        },
+        tenant,
+    )
+    asyncio.create_task(_db_close_lead(sender, meta, tenant, "confirmed"))
+    clear_session(sender, tenant_id=tid)
+    clear_lead_meta(sender, tenant_id=tid)
+
+
+async def _finalize_lead_stalled(sender: str, meta: dict, tenant: Tenant) -> None:
+    """Handoff to customer + owner card (if we have a name) + cleanup."""
+    tid = tenant.phone_number_id
+    lang = meta.get("lang", "ur")
+    from app.lead import build_handoff
+
+    await send_whatsapp_message(sender, build_handoff(lang, tenant), tenant=tenant)
+    if meta.get("business_name") or meta.get("demo_slot"):
+        owner = (tenant.owner_whatsapp or "").strip()
+        if owner:
+            await forward_lead_card(
+                sender,
+                meta,
+                owner,
+                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                tenant=tenant,
+            )
+    tomorrow = (_karachi_now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+    _sheet_upsert(
+        sender,
+        {
+            "status": STATUS_NOT_RESPONDING,
+            "notes": f"Bot: stalled at {meta.get('phase', '?')}",
+            "next_followup": tomorrow,
+            "business_name": meta.get("business_name", ""),
+            "business_type": meta.get("business_type", ""),
+            "current_system": meta.get("current_system", ""),
+        },
+        tenant,
+    )
+    asyncio.create_task(_db_close_lead(sender, meta, tenant, "stalled"))
+    clear_session(sender, tenant_id=tid)
+    clear_lead_meta(sender, tenant_id=tid)
 
 async def _db_save_order_state(sender: str, tenant: Tenant) -> None:
     """Persist order-flow session history. Errors logged only."""
@@ -585,25 +700,7 @@ async def _handle_lead_flow(entry: dict, tenant: Tenant) -> dict:
             meta["demo_slot"] = user_text.strip()
             meta.pop("awaiting_custom_slot")
             meta["phase"] = "CONFIRMED"
-            lang = meta.get("lang", "ur")
-            from app.lead import lead_text
-            confirm_msg = lead_text(
-                "confirm_slot", lang, tenant, slot=meta["demo_slot"]
-            )
-            await send_whatsapp_message(sender, confirm_msg, tenant=tenant)
-            await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
-                                    tenant=tenant)
-            demo_date, demo_time = parse_slot_datetime(meta["demo_slot"])
-            _sheet_upsert(sender, {"status": STATUS_DEMO_BOOKED,
-                "notes": f"Demo confirmed via bot: {meta['demo_slot']}",
-                "next_followup": demo_date or "", "demo_date": demo_date or "",
-                "demo_time": demo_time or "", "business_name": meta.get("business_name", ""),
-                "business_type": meta.get("business_type", ""),
-                "current_system": meta.get("current_system", "")}, tenant)
-            asyncio.create_task(_db_close_lead(sender, meta, tenant, "confirmed"))
-            clear_session(sender, tenant_id=tid)
-            clear_lead_meta(sender, tenant_id=tid)
+            await _finalize_lead_confirmed(sender, meta, tenant)
             return {"status": "ok"}
 
         # Entry intent
@@ -718,40 +815,21 @@ async def _handle_interactive_reply(sender: str, meta: dict, entry: dict, tenant
         marker, clean_reply = extract_lead_marker(reply)
         if marker == "CONFIRMED":
             meta["phase"] = "CONFIRMED"
-            await send_whatsapp_message(sender, clean_reply, tenant=tenant)
-            await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
-                                    tenant=tenant)
-            clear_session(sender, tenant_id=tid)
-            clear_lead_meta(sender, tenant_id=tid)
+            await _finalize_lead_confirmed(sender, meta, tenant, customer_text=clean_reply)
         else:
             await send_whatsapp_message(sender, clean_reply, tenant=tenant)
             await _maybe_send_interactive(sender, meta, tenant)
         return {"status": "ok"}
 
-    if follow_up:
+    # Slot / option follow-up (e.g. custom time question) — still finalize if already confirmed
+    if follow_up and meta.get("phase") != "CONFIRMED":
         await send_whatsapp_message(sender, follow_up, tenant=tenant)
         return {"status": "ok"}
 
     if meta.get("phase") == "CONFIRMED":
-        lang = meta.get("lang", "ur")
-        from app.lead import lead_text
-        confirm_msg = lead_text(
-            "confirm_slot", lang, tenant, slot=meta.get("demo_slot", "")
+        await _finalize_lead_confirmed(
+            sender, meta, tenant, customer_text=follow_up or None
         )
-        await send_whatsapp_message(sender, confirm_msg, tenant=tenant)
-        await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
-                                tenant=tenant)
-        demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
-        _sheet_upsert(sender, {"status": STATUS_DEMO_BOOKED,
-            "notes": f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
-            "next_followup": demo_date or "", "demo_date": demo_date or "",
-            "demo_time": demo_time or "", "business_name": meta.get("business_name", ""),
-            "business_type": meta.get("business_type", ""),
-            "current_system": meta.get("current_system", "")}, tenant)
-        clear_session(sender, tenant_id=tid)
-        clear_lead_meta(sender, tenant_id=tid)
         return {"status": "ok"}
 
     await _maybe_send_interactive(sender, meta, tenant)
@@ -832,7 +910,6 @@ async def _handle_text_at_flow_step(
     """Free-text answer while on a button/list step — match option or re-prompt."""
     from app.flow import match_step_option, match_text_to_step_option, next_phase_key, step_question_text
     from app.lead import (
-        build_handoff,
         increment_reprompt,
         reset_reprompts,
         MAX_REPROMPTS,
@@ -841,7 +918,6 @@ async def _handle_text_at_flow_step(
         build_reprompt,
     )
 
-    tid = tenant.phone_number_id
     phase = step.get("key") or meta.get("phase", "")
     field = step.get("capture_field") or ""
 
@@ -880,6 +956,9 @@ async def _handle_text_at_flow_step(
         )
         reset_reprompts(meta)
         _sheet_field_update(sender, meta, tenant)
+        if meta.get("phase") == "CONFIRMED":
+            await _finalize_lead_confirmed(sender, meta, tenant)
+            return {"status": "ok"}
         await _maybe_send_interactive(sender, meta, tenant, phase=meta["phase"])
         return {"status": "ok"}
 
@@ -894,14 +973,7 @@ async def _handle_text_at_flow_step(
     count = increment_reprompt(meta)
     if count > MAX_REPROMPTS:
         meta["phase"] = "STALLED"
-        await send_whatsapp_message(sender, build_handoff(lang, tenant), tenant=tenant)
-        await forward_lead_card(
-            sender, meta, tenant.owner_whatsapp,
-            lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
-            tenant=tenant,
-        )
-        clear_session(sender, tenant_id=tid)
-        clear_lead_meta(sender, tenant_id=tid)
+        await _finalize_lead_stalled(sender, meta, tenant)
     else:
         await send_whatsapp_message(
             sender, build_reprompt(phase, lang, tenant), tenant=tenant
@@ -927,6 +999,9 @@ async def _handle_free_text_capture_step(
     meta["phase"] = next_phase_key(tenant, step.get("key", ""))
     reset_reprompts(meta)
     _sheet_field_update(sender, meta, tenant)
+    if meta.get("phase") == "CONFIRMED":
+        await _finalize_lead_confirmed(sender, meta, tenant)
+        return {"status": "ok"}
     await _maybe_send_interactive(sender, meta, tenant, phase=meta["phase"])
     return {"status": "ok"}
 
@@ -977,17 +1052,19 @@ async def _handle_text_at_interactive_phase(
     match_fn, advance_to: str, field_key: str, tenant: Tenant,
 ) -> dict:
     from app.lead import (
-        build_reprompt, build_handoff,
+        build_reprompt,
         increment_reprompt, reset_reprompts, MAX_REPROMPTS,
         extract_detour_done, _is_detour_question, lead_text,
     )
-    tid = tenant.phone_number_id
     display_val, sheet_val = match_fn(user_text)
     if display_val is not None:
         meta[field_key] = sheet_val
         meta["phase"] = advance_to
         reset_reprompts(meta)
         _sheet_field_update(sender, meta, tenant)
+        if advance_to == "CONFIRMED":
+            await _finalize_lead_confirmed(sender, meta, tenant)
+            return {"status": "ok"}
         await _maybe_send_interactive(sender, meta, tenant, phase=advance_to)
         return {"status": "ok"}
 
@@ -1008,12 +1085,7 @@ async def _handle_text_at_interactive_phase(
     count = increment_reprompt(meta)
     if count > MAX_REPROMPTS:
         meta["phase"] = "STALLED"
-        await send_whatsapp_message(sender, build_handoff(lang, tenant), tenant=tenant)
-        await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
-                                tenant=tenant)
-        clear_session(sender, tenant_id=tid)
-        clear_lead_meta(sender, tenant_id=tid)
+        await _finalize_lead_stalled(sender, meta, tenant)
     else:
         await send_whatsapp_message(
             sender, build_reprompt(meta.get("phase", ""), lang, tenant), tenant=tenant
@@ -1038,27 +1110,23 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
 
     if marker == "CONFIRMED":
         meta["phase"] = "CONFIRMED"
-        await send_whatsapp_message(sender, clean_reply, tenant=tenant)
-        await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
-                                tenant=tenant)
-        demo_date, demo_time = parse_slot_datetime(meta.get("demo_slot", ""))
-        _sheet_upsert(sender, {"status": STATUS_DEMO_BOOKED,
-            "notes": f"Demo confirmed via bot: {meta.get('demo_slot', '?')}",
-            "next_followup": demo_date or "", "demo_date": demo_date or "",
-            "demo_time": demo_time or "", "business_name": meta.get("business_name", ""),
-            "business_type": meta.get("business_type", ""),
-            "current_system": meta.get("current_system", "")}, tenant)
-        clear_session(sender, tenant_id=tid)
-        clear_lead_meta(sender, tenant_id=tid)
+        await _finalize_lead_confirmed(sender, meta, tenant, customer_text=clean_reply)
         return {"status": "ok"}
 
     if marker == "STALLED":
         meta["phase"] = "STALLED"
-        if meta.get("business_name"):
-            await forward_lead_card(sender, meta, tenant.owner_whatsapp,
-                                    lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
-                                    tenant=tenant)
+        if clean_reply:
+            await send_whatsapp_message(sender, clean_reply, tenant=tenant)
+        # Still notify owner when we have useful lead data
+        owner = (tenant.owner_whatsapp or "").strip()
+        if owner and (meta.get("business_name") or meta.get("demo_slot")):
+            await forward_lead_card(
+                sender,
+                meta,
+                owner,
+                lambda to, txt: send_whatsapp_message(to, txt, tenant=tenant),
+                tenant=tenant,
+            )
         tomorrow = (_karachi_now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
         _sheet_upsert(sender, {"status": STATUS_NOT_RESPONDING,
             "notes": f"Bot: stalled at {meta.get('phase', '?')}",
@@ -1067,6 +1135,7 @@ async def _handle_llm_turn(sender: str, meta: dict, user_text: str, lang: str, t
             "current_system": meta.get("current_system", "")}, tenant)
         clear_session(sender, tenant_id=tid)
         clear_lead_meta(sender, tenant_id=tid)
+        asyncio.create_task(_db_close_lead(sender, meta, tenant, "stalled"))
         return {"status": "ok"}
 
     _sheet_field_update(sender, meta, tenant)
@@ -1230,6 +1299,32 @@ async def _generate_order_reply(sender: str, user_text: str, tenant: Tenant) -> 
 # Outgoing messages via Meta Graph API
 # ---------------------------------------------------------------------------
 
+def _whatsapp_send_creds(tenant: Tenant | None) -> tuple[str, str, str]:
+    """
+    Resolve Graph send credentials at call time (not import time).
+
+    Returns (phone_number_id, access_token, graph_url).
+    Prefer tenant DB channel token → raw config token → env WHATSAPP_ACCESS_TOKEN.
+    Prefer tenant.phone_number_id → env WHATSAPP_PHONE_NUMBER_ID.
+    """
+    env_token = os.environ.get("WHATSAPP_ACCESS_TOKEN") or ""
+    env_pid = os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or ""
+    if tenant is None:
+        return env_pid, env_token, f"https://graph.facebook.com/v21.0/{env_pid}/messages"
+
+    pid = tenant.phone_number_id or env_pid
+    ch = tenant.channel_config("whatsapp") or {}
+    token = (ch.get("access_token") or "").strip()
+    if not token:
+        raw = getattr(tenant, "_raw_config", None) or {}
+        token = str(
+            raw.get("whatsapp_access_token") or raw.get("access_token") or ""
+        ).strip()
+    if not token:
+        token = env_token
+    return pid, token, f"https://graph.facebook.com/v21.0/{pid}/messages"
+
+
 async def send_whatsapp_message(
     to: str,
     text: str = "",
@@ -1238,7 +1333,22 @@ async def send_whatsapp_message(
     *,
     image_link: str = "",
 ) -> bool:
-    """Send a WhatsApp message through the tenant's phone number."""
+    """
+    Send a WhatsApp message through the tenant's phone number.
+
+    Uses the CURRENT tenant phone_number_id + access token from DB/channel
+    config (env fallback). Never applies inbound mute / owner-self exclusion
+    to outbound sends — those guards only apply to webhook inbound handling
+    and sheet writes for messages FROM the owner/business.
+    """
+    from app.lead import normalize_wa_recipient
+
+    normalized_to = normalize_wa_recipient(to)
+    if not normalized_to:
+        log.error("Send failed: empty recipient after normalize (raw=%r)", to)
+        return False
+    to = normalized_to
+
     if interactive_payload is not None:
         payload = interactive_payload
         # Ensure the 'to' field in the payload uses the recipient, not a stale value
@@ -1257,23 +1367,40 @@ async def send_whatsapp_message(
         payload = {"messaging_product": "whatsapp", "to": to,
                    "type": "text", "text": {"body": text}}
 
-    # Use tenant's phone_number_id for the Graph URL if available
-    if tenant is not None:
-        graph_url = tenant.graph_url
-    else:
-        phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
-        graph_url = f"https://graph.facebook.com/v21.0/{phone_number_id}/messages"
+    phone_number_id, access_token, graph_url = _whatsapp_send_creds(tenant)
+    if not access_token:
+        log.error(
+            "Send failed: no access token (tenant=%s phone_number_id=%s)",
+            getattr(tenant, "phone_number_id", None),
+            phone_number_id,
+        )
+        return False
+    if not phone_number_id:
+        log.error("Send failed: no phone_number_id for Graph URL")
+        return False
 
-    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(graph_url, headers=headers, json=payload)
             if r.status_code >= 400:
-                log.error(f"Send failed {r.status_code}: {r.text}")
+                log.error(
+                    "Send failed %s to=%s via=%s body=%s",
+                    r.status_code,
+                    to,
+                    phone_number_id,
+                    r.text,
+                )
                 return False
         if tenant is not None and tenant.flow_mode == "lead":
-            owner = (tenant.owner_whatsapp or "").strip()
-            if to != owner:
+            from app.lead import normalize_wa_recipient as _norm
+
+            owner_n = _norm(tenant.owner_whatsapp or "")
+            # Skip transcript for owner-alert copies only — never skip the Graph send
+            if to != owner_n:
                 from app.transcript import record_bot
 
                 record_bot(
@@ -1284,7 +1411,12 @@ async def send_whatsapp_message(
                 )
         return True
     except Exception as exc:
-        log.error(f"Send failed (network): {exc}")
+        log.error(
+            "Send failed (network) to=%s via=%s: %s",
+            to,
+            phone_number_id,
+            exc,
+        )
         return False
 
 

@@ -645,7 +645,9 @@ export default function OwnerBot() {
                 disabled={readonly}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Number that receives demo confirmations (with country code).
+                Number that receives “New Lead” alerts (country code, no +). That
+                number must message your business WhatsApp at least once so Meta
+                allows the alert (24-hour window).
               </p>
             </div>
           )}

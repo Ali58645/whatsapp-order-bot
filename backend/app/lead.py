@@ -30,6 +30,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from typing import Optional
 
 log = logging.getLogger("orderbot.lead")
@@ -472,6 +473,19 @@ def extract_lead_marker(reply: str):
 
 # ── Lead card forwarding ──────────────────────────────────────────────────────
 
+def normalize_wa_recipient(raw: str | None) -> str:
+    """
+    Normalize a WhatsApp recipient for the Graph API.
+    Strips +, spaces, dashes, and other non-digits, then leading zeros.
+    Returns digits only (E.164 without '+'), or '' if unusable.
+    """
+    if not raw:
+        return ""
+    digits = re.sub(r"[^\d]", "", str(raw))
+    digits = digits.lstrip("0")
+    return digits
+
+
 async def forward_lead_card(
     sender: str,
     meta: dict,
@@ -483,10 +497,35 @@ async def forward_lead_card(
     Send a lead card to the owner. Retries 3× with exponential backoff.
     On total failure logs CRITICAL with full meta payload.
     Reuses the same retry pattern as orders.forward_order_to_owner.
+
+    Guards (early return — never blocks on mute / owner-self inbound rules):
+      - empty owner_number
+      - owner_number normalizes to < 10 digits
     """
-    if not owner_number:
-        log.warning("OWNER_WHATSAPP not set — lead card not forwarded")
+    log.info("lead card: firing for %s", sender)
+
+    if not (owner_number or "").strip():
+        log.warning("lead card: skipped because owner_whatsapp empty")
         return
+
+    normalized = normalize_wa_recipient(owner_number)
+    if len(normalized) < 10:
+        log.error(
+            "lead card: skipped because owner_whatsapp invalid after normalize "
+            "(raw=%r normalized=%r)",
+            owner_number,
+            normalized,
+        )
+        return
+
+    owner_number = normalized
+    pid = getattr(tenant, "phone_number_id", None) or "?"
+    log.info(
+        "lead card: sending to %s via %s (customer=%s)",
+        owner_number,
+        pid,
+        sender,
+    )
 
     phase = meta.get("phase", "?")
     slot = meta.get("demo_slot") or f"not booked — stalled at {phase}"
@@ -517,15 +556,31 @@ async def forward_lead_card(
     for attempt, delay in enumerate(_RETRY_DELAYS, start=1):
         sent = await send_fn(owner_number, card)
         if sent:
-            log.info(f"Lead card sent to owner (attempt {attempt}) for {sender}")
+            log.info(
+                "lead card: delivered to %s (attempt %s) for %s",
+                owner_number,
+                attempt,
+                sender,
+            )
             return
         if attempt < len(_RETRY_DELAYS):
-            log.warning(f"Lead card send attempt {attempt} failed — retrying in {delay}s")
+            log.warning(
+                "lead card: send attempt %s failed to %s — retrying in %ss",
+                attempt,
+                owner_number,
+                delay,
+            )
             await asyncio.sleep(delay)
 
     log.critical(
-        f"UNDELIVERED LEAD CARD — all 3 attempts failed. "
-        f"Sender: {sender}. Meta: {json.dumps(meta)}"
+        "lead card: UNDELIVERED after 3 attempts. "
+        "Owner=%s Sender=%s phone_number_id=%s. "
+        "Often means the owner number has not messaged this WhatsApp Business "
+        "line in the last 24h (Meta session window). Meta: %s",
+        owner_number,
+        sender,
+        pid,
+        json.dumps(meta),
     )
 
 
