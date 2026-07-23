@@ -13,7 +13,8 @@ import {
 } from "../../api";
 import {
   BusinessHoursEditor,
-  DEFAULT_BUSINESS_HOURS,
+  defaultAwayMessage,
+  defaultBusinessHoursForLang,
   type BusinessHoursConfig,
 } from "../../components/BusinessHoursEditor";
 import { TemplatePicker } from "../../components/TemplatePicker";
@@ -82,7 +83,7 @@ export default function OwnerSetup() {
   const [lang, setLang] = useState<"roman_urdu" | "en">("roman_urdu");
   const [templateId, setTemplateId] = useState("");
   const [hours, setHours] = useState<BusinessHoursConfig>({
-    ...DEFAULT_BUSINESS_HOURS,
+    ...defaultBusinessHoursForLang("roman_urdu"),
     enabled: true,
   });
   const [overview, setOverview] = useState("");
@@ -99,6 +100,14 @@ export default function OwnerSetup() {
   function changeBotLang(next: "roman_urdu" | "en") {
     setLang(next);
     setUiLang(botLangToUi(next));
+    setHours((prev) => {
+      const urDefault = defaultAwayMessage("roman_urdu");
+      const enDefault = defaultAwayMessage("en");
+      const current = (prev.away_message || "").trim();
+      const stillDefault = !current || current === urDefault || current === enDefault;
+      if (!stillDefault) return prev;
+      return { ...prev, away_message: defaultAwayMessage(next) };
+    });
   }
 
   const canAccess = isOwner() || isSupportSession();

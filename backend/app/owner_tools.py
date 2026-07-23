@@ -130,6 +130,12 @@ def away_message(tenant) -> str:
     msg = str(bh.get("away_message") or "").strip()
     if msg:
         return msg[:1024]
+    lang = getattr(tenant, "greeting_language", None) or "roman_urdu"
+    if lang in ("en", "english"):
+        return (
+            "Thanks for messaging — our team is currently unavailable. "
+            "Please reach out during business hours."
+        )
     return (
         "Shukriya message karne ka. Abhi hamari team available nahi — "
         "business hours mein dobara rabta karein."

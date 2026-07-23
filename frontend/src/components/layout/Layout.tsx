@@ -155,11 +155,21 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   /** Accordion drawer: which parent section is expanded (null = none). */
   const [openDrawer, setOpenDrawer] = useState<string | null>(null);
+  const [setupNeeded, setSetupNeeded] = useState(false);
   const supportMode = isSupportSession();
   const ownerShell = isOwner() || supportMode;
   const isAdmin = getRole() === "admin" && !supportMode;
   const impersonator = getImpersonatedBy();
   const viewAsName = getViewAsTenantName();
+
+  const setupSkipped = (() => {
+    try {
+      return sessionStorage.getItem("bahi_setup_skipped") === "1";
+    } catch {
+      return false;
+    }
+  })();
+  const lockNavForSetup = ownerShell && setupNeeded && !setupSkipped;
 
   const nav = useMemo(() => {
     const base = ownerShell ? OWNER_NAV : ADMIN_NAV;
@@ -197,19 +207,10 @@ export default function Layout() {
           setFlowMode(me.tenant.flow_mode || "lead");
           window.dispatchEvent(new Event("tenant-change"));
         }
-        if (
-          me.tenant?.setup_needed &&
-          (me.role === "owner" || me.impersonated_by) &&
-          !location.pathname.startsWith("/setup")
-        ) {
-          let skipped = false;
-          try {
-            skipped = sessionStorage.getItem("bahi_setup_skipped") === "1";
-          } catch {
-            skipped = false;
-          }
-          if (!skipped) navigate("/setup", { replace: true });
-        }
+        const needed = Boolean(
+          me.tenant?.setup_needed && (me.role === "owner" || me.impersonated_by)
+        );
+        setSetupNeeded(needed);
       }
       if (listRes.status === "fulfilled") {
         const list = listRes.value;
@@ -220,6 +221,30 @@ export default function Layout() {
       cancelled = true;
     };
   }, []);
+
+  // After setup finishes (or Skip), refresh setup_needed so nav unlocks
+  useEffect(() => {
+    function onTenantChange() {
+      void fetchMe({ force: true })
+        .then((me) => {
+          const needed = Boolean(
+            me.tenant?.setup_needed && (me.role === "owner" || me.impersonated_by)
+          );
+          setSetupNeeded(needed);
+        })
+        .catch(() => undefined);
+    }
+    window.addEventListener("tenant-change", onTenantChange);
+    return () => window.removeEventListener("tenant-change", onTenantChange);
+  }, []);
+
+  // Re-check on every route change so owners cannot leave /setup via the sidebar
+  useEffect(() => {
+    if (!lockNavForSetup) return;
+    if (!location.pathname.startsWith("/setup")) {
+      navigate("/setup", { replace: true });
+    }
+  }, [location.pathname, lockNavForSetup, navigate]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -316,7 +341,18 @@ export default function Layout() {
         </div>
       )}
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5">
+      <nav
+        className={cn(
+          "flex-1 space-y-0.5 overflow-y-auto px-2.5",
+          lockNavForSetup && "pointer-events-none opacity-40"
+        )}
+        aria-disabled={lockNavForSetup || undefined}
+      >
+        {lockNavForSetup && !collapsed && (
+          <p className="mb-2 rounded-lg border border-border bg-muted/30 px-2.5 py-2 text-[11px] text-muted-foreground">
+            Finish or skip business setup to unlock the rest of the dashboard.
+          </p>
+        )}
         {nav.map((item) => {
           const childLinks = (item.children || []).filter((c) => {
             if (c.leadOnly && flowMode === "order") return false;
@@ -331,6 +367,7 @@ export default function Layout() {
             !isDrawer && pathActive(location.pathname, item.to, item.end);
 
           function openAndGo() {
+            if (lockNavForSetup) return;
             const first = childLinks[0]?.to || item.to;
             setOpenDrawer(item.to);
             if (!groupActive) navigate(first);
@@ -338,6 +375,7 @@ export default function Layout() {
           }
 
           function toggleDrawer() {
+            if (lockNavForSetup) return;
             if (collapsed) {
               openAndGo();
               return;
@@ -356,6 +394,7 @@ export default function Layout() {
                   type="button"
                   title={t(item.labelKey)}
                   onClick={toggleDrawer}
+                  disabled={lockNavForSetup}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-[13px] font-medium transition-all duration-150",
                     collapsed && "justify-center px-0",
@@ -379,10 +418,14 @@ export default function Layout() {
                 </button>
               ) : (
                 <NavLink
-                  to={item.to}
+                  to={lockNavForSetup ? "/setup" : item.to}
                   end={item.end}
                   title={t(item.labelKey)}
-                  onClick={() => {
+                  onClick={(e) => {
+                    if (lockNavForSetup) {
+                      e.preventDefault();
+                      return;
+                    }
                     setOpenDrawer(null);
                     setMobileOpen(false);
                   }}
@@ -406,9 +449,15 @@ export default function Layout() {
                   {childLinks.map((child) => (
                     <NavLink
                       key={child.to}
-                      to={child.to}
+                      to={lockNavForSetup ? "/setup" : child.to}
                       end={child.end}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={(e) => {
+                        if (lockNavForSetup) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setMobileOpen(false);
+                      }}
                       className={({ isActive }) =>
                         cn(
                           "block rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition",

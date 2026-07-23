@@ -91,6 +91,7 @@ export default function OwnerBot() {
   const [flow, setFlow] = useState<FlowStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [langBusy, setLangBusy] = useState(false);
   const [error, setError] = useState("");
   const [templateOpen, setTemplateOpen] = useState(false);
   const [pickTemplateId, setPickTemplateId] = useState("pos_lead");
@@ -186,7 +187,7 @@ export default function OwnerBot() {
 
   async function saveAndGoLive(e?: FormEvent) {
     e?.preventDefault();
-    if (!cfg || tenantId == null) return;
+    if (!cfg || tenantId == null || langBusy) return;
 
     const kbPayload = kbWithFaqRows(knowledge, faqRows);
     const labels = kbPayload.faq.map((f) => f.question.toLowerCase());
@@ -467,6 +468,7 @@ export default function OwnerBot() {
               onChange={(e) => {
                 const next = e.target.value;
                 void (async () => {
+                  setLangBusy(true);
                   try {
                     const res = await api<{
                       config: TenantConfigResponse;
@@ -487,10 +489,12 @@ export default function OwnerBot() {
                     toast.error(
                       err instanceof Error ? err.message : "Language switch failed"
                     );
+                  } finally {
+                    setLangBusy(false);
                   }
                 })();
               }}
-              disabled={readonly}
+              disabled={readonly || busy || langBusy}
             >
               <option value="roman_urdu">Roman Urdu</option>
               <option value="en">English</option>
@@ -815,17 +819,17 @@ export default function OwnerBot() {
           <Button
             type="button"
             size="lg"
-            disabled={busy || readonly}
+            disabled={busy || langBusy || readonly}
             onClick={() => void saveAndGoLive()}
             className="w-full sm:w-auto"
           >
-            {busy ? (
+            {busy || langBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Save className="h-4 w-4" />
             )}
             Save & go live
-            {!busy && <Check className="h-4 w-4 opacity-70" />}
+            {!busy && !langBusy && <Check className="h-4 w-4 opacity-70" />}
           </Button>
         </div>
       </div>

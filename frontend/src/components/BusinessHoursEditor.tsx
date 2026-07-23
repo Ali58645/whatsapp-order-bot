@@ -32,10 +32,19 @@ const TIMEZONES = [
 
 const DEFAULT_SLOT: [string, string] = ["09:00", "18:00"];
 
+export const AWAY_MESSAGE_UR =
+  "Shukriya — abhi team available nahi. Business hours mein rabta karein.";
+export const AWAY_MESSAGE_EN =
+  "Thanks for messaging — our team is currently unavailable. Please reach out during business hours.";
+
+export function defaultAwayMessage(lang: "en" | "roman_urdu" | string = "roman_urdu"): string {
+  return lang === "en" || lang === "english" ? AWAY_MESSAGE_EN : AWAY_MESSAGE_UR;
+}
+
 export const DEFAULT_BUSINESS_HOURS: BusinessHoursConfig = {
   enabled: false,
   timezone: "Asia/Karachi",
-  away_message: "Shukriya — abhi team available nahi. Business hours mein rabta karein.",
+  away_message: AWAY_MESSAGE_UR,
   days: {
     mon: [DEFAULT_SLOT],
     tue: [DEFAULT_SLOT],
@@ -46,6 +55,25 @@ export const DEFAULT_BUSINESS_HOURS: BusinessHoursConfig = {
     sun: [],
   },
 };
+
+/** Build default hours seeded for the selected bot language. */
+export function defaultBusinessHoursForLang(
+  lang: "en" | "roman_urdu" | string = "roman_urdu"
+): BusinessHoursConfig {
+  return {
+    ...DEFAULT_BUSINESS_HOURS,
+    away_message: defaultAwayMessage(lang),
+    days: {
+      mon: [DEFAULT_SLOT],
+      tue: [DEFAULT_SLOT],
+      wed: [DEFAULT_SLOT],
+      thu: [DEFAULT_SLOT],
+      fri: [DEFAULT_SLOT],
+      sat: [["10:00", "14:00"]],
+      sun: [],
+    },
+  };
+}
 
 function normalizeDays(days?: Record<string, string[][]>): Record<DayKey, string[][]> {
   const out = {} as Record<DayKey, string[][]>;

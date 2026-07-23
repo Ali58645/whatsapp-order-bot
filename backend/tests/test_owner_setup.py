@@ -454,3 +454,55 @@ def test_english_selection_has_no_roman_urdu_copy():
     assert_clean(en_cfg.get("messages_draft"), "retarget.draft")
     assert "Welcome" in en_cfg["greeting_text"] or "Thanks" in en_cfg["greeting_text"]
     assert en_cfg["messages_draft"]["interactive"]["select_button_label"] == "Select"
+
+
+@pytest.mark.asyncio
+async def test_retarget_language_http_persists_published_english(client, setup_db):
+    """POST /retarget-language must rewrite and publish messages (draft == live)."""
+    data = await _login(client, "setupowner", "ownerpass1")
+    headers = {"Authorization": f"Bearer {data['access_token']}"}
+
+    # Seed with Roman Urdu setup first
+    r = await client.post(
+        "/api/dashboard/owner/setup",
+        headers=headers,
+        json={
+            "business_name": "AccellionX",
+            "flow_mode": "lead",
+            "template_id": "pos_lead",
+            "greeting_language": "roman_urdu",
+            "greeting_text": "Assalam o Alaikum AccellionX mein aap ki dilchaspi ka shukriya.",
+            "business_hours": {
+                "enabled": True,
+                "timezone": "Asia/Karachi",
+                "away_message": "Shukriya — abhi team available nahi. Business hours mein rabta karein.",
+                "days": {"mon": [["09:00", "18:00"]], "tue": [], "wed": [], "thu": [], "fri": [], "sat": [], "sun": []},
+            },
+            "overview": "We automate ops",
+            "offer": "Automation",
+            "location": "Lahore",
+            "contact": "03001234567",
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    rt = await client.post(
+        "/api/dashboard/owner/retarget-language",
+        headers=headers,
+        json={"greeting_language": "en", "persist": True},
+    )
+    assert rt.status_code == 200, rt.text
+    body = rt.json()
+    assert body.get("ok") is True
+    assert body.get("greeting_language") == "en"
+    cfg = body["config"]["config"]
+    lead = (cfg.get("messages") or {}).get("lead") or {}
+    draft = (cfg.get("messages_draft") or {}).get("lead") or {}
+    assert lead.get("confirm_slot") == draft.get("confirm_slot")
+    assert "Thank you" in (lead.get("confirm_slot") or "")
+    assert "Shukriya" not in (lead.get("confirm_slot") or "")
+    assert (cfg.get("messages") or {}).get("interactive", {}).get("select_button_label") == "Select"
+    away = ((cfg.get("business_hours") or {}).get("away_message") or "")
+    assert "unavailable" in away.lower() or "business hours" in away.lower()
+    assert "Shukriya" not in away
+    assert str((cfg.get("demo_slots") or [""])[0]).startswith("Tomorrow")

@@ -821,6 +821,37 @@ def retarget_config_language(
     if mode == "lead":
         out["demo_slots"] = localize_demo_slots(out.get("demo_slots") or [], lang_key)
 
+    # Away message — keep custom copy, but swap defaults when language changes
+    bh = out.get("business_hours")
+    if isinstance(bh, dict):
+        bh = dict(bh)
+        away = str(bh.get("away_message") or "").strip()
+        ur_default = (
+            "Shukriya — abhi team available nahi. Business hours mein rabta karein."
+        )
+        ur_fallback = (
+            "Shukriya message karne ka. Abhi hamari team available nahi — "
+            "business hours mein dobara rabta karein."
+        )
+        en_default = (
+            "Thanks for messaging — our team is currently unavailable. "
+            "Please reach out during business hours."
+        )
+        looks_ur = bool(
+            re.search(
+                r"(?i)\b(shukriya|abhi|rabta|nahi|mein|karein|hamari)\b",
+                away,
+            )
+        )
+        looks_en = bool(
+            re.search(r"(?i)\b(thanks|unavailable|business hours|reach out)\b", away)
+        )
+        if lang_key == "en" and (not away or looks_ur or away in (ur_default, ur_fallback)):
+            bh["away_message"] = en_default
+        elif lang_key != "en" and (not away or looks_en or away == en_default):
+            bh["away_message"] = ur_default
+        out["business_hours"] = bh
+
     # Clear baked-in flow question_text so Questions UI + WhatsApp use messages catalog
     flow = out.get("flow")
     if isinstance(flow, list):
